@@ -1,0 +1,24 @@
+First draft of README file
+==========================
+
+==================
+To compile library
+==================
+On Linux and MacOS X platform :
+$cd Build
+$./bootstrap
+$./configure --prefix=<path to install> --with-libARSalInstallDir=<path of libSAL install> --with-libARNetworkInstallDir=<path of libARNetwork install>
+$make
+$make install (if you want to install library)
+
+On NDK Android platform :
+$cd Build
+$./bootstrap
+$./configure --prefix=<path to install> --with-libARSalInstallDir=<path of libSAL install> --with-libARNetworkInstallDir=<path of libARNetwork install> --host=arm-linux-androideabi
+$make
+$make install (if you want to install library)
+
+=================================
+To generate doxygen documentation
+=================================
+$make doxygen-doc
