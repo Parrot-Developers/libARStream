@@ -41,7 +41,7 @@ typedef struct {
     uint16_t frameNumber; /**< Current frame number */
     uint8_t fragmentNumber; /**< Index of the current fragment in current frame */
     uint8_t fragmentsPerFrame; /**< Number of fragments un current frame */
-} ARVIDEO_NetworkHeaders_DataHeader_t;
+} __attribute__ ((packed)) ARVIDEO_NetworkHeaders_DataHeader_t;
 
 /**
  * @brief Content of video ack frames
@@ -57,7 +57,7 @@ typedef struct {
     uint32_t numFrame; /**< Frame number on which the ack packet refers */
     uint64_t highPacketsAck; /**< Upper 64 packets bitfield */
     uint64_t lowPacketsAck; /**< Lower 64 packets bitfield */
-} ARVIDEO_NetworkHeaders_AckPacket_t;
+} __attribute__ ((packed)) ARVIDEO_NetworkHeaders_AckPacket_t;
 
 /*
  * Functions declarations
