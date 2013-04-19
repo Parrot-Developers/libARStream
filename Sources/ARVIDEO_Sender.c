@@ -532,7 +532,6 @@ void* ARVIDEO_Sender_RunDataThread (void *ARVIDEO_Sender_t_Param)
                 sender->callback (ARVIDEO_SENDER_STATUS_FRAME_CANCEL, sender->currentFrameBuffer, sender->currentFrameSize);
             }
             sender->currentFrameCbWasCalled = 0; // New frame
-            ARSAL_Mutex_Unlock (&(sender->callbackMutex));
 
             /* Save next frame data into current frame data */
             ARSAL_Mutex_Lock (&(sender->nextFrameMutex));
@@ -541,6 +540,8 @@ void* ARVIDEO_Sender_RunDataThread (void *ARVIDEO_Sender_t_Param)
             sender->currentFrameNumber = sender->nextFrameNumber;
             ARSAL_Mutex_Unlock (&(sender->nextFrameMutex));
             sendSize = sender->currentFrameSize;
+
+            ARSAL_Mutex_Unlock (&(sender->callbackMutex));
 
             /* Reset ack packet - No packets are ack on the new frame */
             ARSAL_Mutex_Lock (&(sender->ackMutex));

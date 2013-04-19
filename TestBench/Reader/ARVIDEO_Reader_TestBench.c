@@ -11,6 +11,7 @@
 
 #include <stdlib.h>
 #include <pthread.h>
+#include <stdio.h>
 
 /*
  * ARSDK Headers
@@ -33,7 +34,7 @@
 #define NET_BUFFER_SIZE (1500)
 
 #define FRAME_MIN_SIZE (2000)
-#define FRAME_MAX_SIZE (50000)
+#define FRAME_MAX_SIZE (20000)
 
 #define NB_BUFFERS (3)
 
@@ -60,6 +61,8 @@ static int multiBufferIsFree[NB_BUFFERS];
 
 static char *appName;
 
+static FILE *outFile;
+
 /*
  * Internal functions declarations
  */
@@ -71,8 +74,16 @@ void printUsage ();
 
 /**
  * @brief Initializes the multi buffers of the testbench
+ * @param initialSize Initial size of the buffers
  */
-void initMultiBuffers ();
+void initMultiBuffers (int initialSize);
+
+/**
+ * @brief Realloc a buffer to a new size
+ * @param id The index of the buffer to reallocate
+ * @param newSize The new size of the buffer
+ */
+void reallocBuffer (int id, int newSize);
 
 /**
  * @see ARVIDEO_Reader.h
@@ -88,16 +99,17 @@ void ARVIDEO_ReaderTb_SetBufferFree (uint8_t *buffer);
 /**
  * @brief Gets a free buffer pointer
  * @param[out] retSize Pointer where to store the size of the next free buffer (or 0 if there is no free buffer)
+ * @param[in] reallocToDouble Set to non-zero to realloc the buffer to the double of its previous size
  * @return Pointer to the next free buffer, or NULL if there is no free buffer
  */
-uint8_t* ARVIDEO_ReaderTb_GetNextFreeBuffer (uint32_t *retSize);
+uint8_t* ARVIDEO_ReaderTb_GetNextFreeBuffer (uint32_t *retSize, int reallocToDouble);
 
 /**
  * @brief Video entry point
  * @param manager An initialized network manager
  * @return "Main" return value
  */
-int ARVIDEO_ReaderTb_StartVideoTest (ARNETWORK_Manager_t *manager);
+int ARVIDEO_ReaderTb_StartVideoTest (ARNETWORK_Manager_t *manager, const char *outPath);
 
 /*
  * Internal functions implementation
@@ -105,19 +117,25 @@ int ARVIDEO_ReaderTb_StartVideoTest (ARNETWORK_Manager_t *manager);
 
 void printUsage ()
 {
-    ARSAL_PRINT (ARSAL_PRINT_ERROR, __TAG__, "Usage : %s [ip]\n", appName);
-    ARSAL_PRINT (ARSAL_PRINT_ERROR, __TAG__, "        ip -> optionnal, ip of the video reader\n");
+    ARSAL_PRINT (ARSAL_PRINT_ERROR, __TAG__, "Usage : %s [ip] [outFile]", appName);
+    ARSAL_PRINT (ARSAL_PRINT_ERROR, __TAG__, "        ip -> optionnal, ip of the video reader");
+    ARSAL_PRINT (ARSAL_PRINT_ERROR, __TAG__, "        outFile -> optionnal (ip must be provided), output file for received video stream");
 }
 
-void initMultiBuffers ()
+void initMultiBuffers (int initialSize)
 {
     int buffIndex;
     for (buffIndex = 0; buffIndex < NB_BUFFERS; buffIndex++)
     {
-        multiBuffer[buffIndex] = malloc (FRAME_MAX_SIZE);
-        multiBufferSize[buffIndex] = FRAME_MAX_SIZE;
+        reallocBuffer (buffIndex, initialSize);
         multiBufferIsFree[buffIndex] = 1;
     }
+}
+
+void reallocBuffer (int id, int newSize)
+{
+    multiBuffer [id] = realloc (multiBuffer [id], newSize);
+    multiBufferSize [id] = newSize;
 }
 
 uint8_t* ARVIDEO_ReaderTb_FrameCompleteCallback (eARVIDEO_READER_CAUSE cause, uint8_t *framePointer, uint32_t frameSize, int numberOfSkippedFrames, uint32_t *newBufferCapacity)
@@ -131,13 +149,17 @@ uint8_t* ARVIDEO_ReaderTb_FrameCompleteCallback (eARVIDEO_READER_CAUSE cause, ui
         {
             ARSAL_PRINT (ARSAL_PRINT_WARNING, __TAG__, "Skipped %d frames", numberOfSkippedFrames);
         }
+        if (outFile != NULL)
+        {
+            fwrite (framePointer, 1, frameSize, outFile);
+        }
         ARVIDEO_ReaderTb_SetBufferFree (framePointer);
-        retVal = ARVIDEO_ReaderTb_GetNextFreeBuffer (newBufferCapacity);
+        retVal = ARVIDEO_ReaderTb_GetNextFreeBuffer (newBufferCapacity, 0);
         break;
 
     case ARVIDEO_READER_CAUSE_FRAME_TOO_SMALL:
         ARSAL_PRINT (ARSAL_PRINT_WARNING, __TAG__, "Current buffer is to small for frame !");
-        retVal = ARVIDEO_ReaderTb_GetNextFreeBuffer (newBufferCapacity);
+        retVal = ARVIDEO_ReaderTb_GetNextFreeBuffer (newBufferCapacity, 1);
         break;
 
     case ARVIDEO_READER_CAUSE_COPY_COMPLETE:
@@ -170,7 +192,7 @@ void ARVIDEO_ReaderTb_SetBufferFree (uint8_t *buffer)
     }
 }
 
-uint8_t* ARVIDEO_ReaderTb_GetNextFreeBuffer (uint32_t *retSize)
+uint8_t* ARVIDEO_ReaderTb_GetNextFreeBuffer (uint32_t *retSize, int reallocToDouble)
 {
     uint8_t *retBuffer = NULL;
     int nbtest = 0;
@@ -182,6 +204,10 @@ uint8_t* ARVIDEO_ReaderTb_GetNextFreeBuffer (uint32_t *retSize)
     {
         if (multiBufferIsFree[currentBufferIndex] == 1)
         {
+            if (reallocToDouble != 0)
+            {
+                reallocBuffer (currentBufferIndex, 2* multiBufferSize [currentBufferIndex]);
+            }
             retBuffer = multiBuffer[currentBufferIndex];
             *retSize = multiBufferSize[currentBufferIndex];
         }
@@ -191,19 +217,27 @@ uint8_t* ARVIDEO_ReaderTb_GetNextFreeBuffer (uint32_t *retSize)
     return retBuffer;
 }
 
-int ARVIDEO_ReaderTb_StartVideoTest (ARNETWORK_Manager_t *manager)
+int ARVIDEO_ReaderTb_StartVideoTest (ARNETWORK_Manager_t *manager, const char *outPath)
 {
     int retVal;
     ARVIDEO_Reader_t *reader;
     uint8_t *firstFrame;
     uint32_t firstFrameSize;
-    initMultiBuffers ();
+    if (NULL != outPath)
+    {
+        outFile = fopen (outPath, "wb");
+    }
+    else
+    {
+        outFile = NULL;
+    }
+    initMultiBuffers (FRAME_MAX_SIZE);
     ARSAL_Sem_Init (&closeSem, 0, 0);
-    firstFrame = ARVIDEO_ReaderTb_GetNextFreeBuffer (&firstFrameSize);
+    firstFrame = ARVIDEO_ReaderTb_GetNextFreeBuffer (&firstFrameSize, 0);
     reader = ARVIDEO_Reader_New (manager, DATA_BUFFER_ID, ACK_BUFFER_ID, ARVIDEO_ReaderTb_FrameCompleteCallback, firstFrame, firstFrameSize);
     if (reader == NULL)
     {
-        ARSAL_PRINT (ARSAL_PRINT_ERROR, __TAG__, "Error during ARVIDEO_Reader_New call\n");
+        ARSAL_PRINT (ARSAL_PRINT_ERROR, __TAG__, "Error during ARVIDEO_Reader_New call");
         return 1;
     }
 
@@ -237,17 +271,22 @@ int main (int argc, char *argv[])
 {
     int retVal = 0;
     appName = argv[0];
-    if (3 <=  argc)
+    if (argc > 3)
     {
         printUsage ();
         return 1;
     }
 
     char *ip = __IP;
+    char *outPath = NULL;
 
-    if (2 == argc)
+    if (argc >= 2)
     {
         ip = argv[1];
+    }
+    if (argc >= 3)
+    {
+        outPath = argv[2];
     }
 
     int nbInBuff = 1;
@@ -262,14 +301,14 @@ int main (int argc, char *argv[])
     if ((manager == NULL) ||
         (error != ARNETWORK_OK))
     {
-        ARSAL_PRINT (ARSAL_PRINT_ERROR, __TAG__, "Error during ARNETWORK_Manager_New call : %d\n", error);
+        ARSAL_PRINT (ARSAL_PRINT_ERROR, __TAG__, "Error during ARNETWORK_Manager_New call : %d", error);
         return 1;
     }
 
     error = ARNETWORK_Manager_SocketsInit (manager, ip, SENDING_PORT, READING_PORT, 1000);
     if (error != ARNETWORK_OK)
     {
-        ARSAL_PRINT (ARSAL_PRINT_ERROR, __TAG__, "Error during ARNETWORK_Manager_SocketsInit call : %d\n", error);
+        ARSAL_PRINT (ARSAL_PRINT_ERROR, __TAG__, "Error during ARNETWORK_Manager_SocketsInit call : %d", error);
         return 1;
     }
 
@@ -277,7 +316,7 @@ int main (int argc, char *argv[])
     pthread_create (&netsend, NULL, ARNETWORK_Manager_SendingThreadRun, manager);
     pthread_create (&netread, NULL, ARNETWORK_Manager_ReceivingThreadRun, manager);
 
-    retVal = ARVIDEO_ReaderTb_StartVideoTest (manager);
+    retVal = ARVIDEO_ReaderTb_StartVideoTest (manager, outPath);
 
     ARNETWORK_Manager_Stop (manager);
 

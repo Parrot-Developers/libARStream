@@ -379,7 +379,7 @@ int ARVIDEO_MP4SenderTb_OpenVideoFile (const char *path)
     }
     if (res != -1)
     {
-        res = ARVIDEO_MP4SenderTb_JumpToAtom ("stsz");
+        res = ARVIDEO_MP4SenderTb_JumpToAtom ("stco");
     }
 
     /* Read nbFrames + all frames sizes */
