@@ -189,7 +189,7 @@ uint8_t* ARVIDEO_SenderTb_GetNextFreeBuffer (uint32_t *retSize)
 void* fakeEncoderThread (void *ARVIDEO_Sender_t_Param)
 {
 
-    uint8_t cnt = 0;
+    uint32_t cnt = 0;
     uint32_t frameSize = 0;
     uint32_t frameCapacity = 0;
     uint8_t *nextFrameAddr;
