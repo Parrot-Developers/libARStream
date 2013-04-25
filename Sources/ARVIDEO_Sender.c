@@ -361,7 +361,6 @@ ARVIDEO_Sender_t* ARVIDEO_Sender_New (ARNETWORK_Manager_t *manager, int dataBuff
         retSender->nextFrameBuffer = NULL;
         retSender->nextFrameSize = 0;
         retSender->hasNextFrame = 0;
-        retSender->allSent = 0;
         retSender->threadsShouldStop = 0;
         retSender->dataThreadStarted = 0;
         retSender->ackThreadStarted = 0;
