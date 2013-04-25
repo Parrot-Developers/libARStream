@@ -146,7 +146,7 @@ static void ARVIDEO_Sender_SignalNewFrameAvailable (ARVIDEO_Sender_t *sender)
     ARSAL_Cond_Signal (&(sender->hasNextCond));
 }
 
-static int ARVIDEO_Sender_WaitForNewFrameOrSend (ARVIDEO_Sender_t *sender)
+static int ARVIDEO_Sender_WaitForNewFrameOrRetry (ARVIDEO_Sender_t *sender)
 {
     int needToWait;
     int retVal;
@@ -496,7 +496,7 @@ void* ARVIDEO_Sender_RunDataThread (void *ARVIDEO_Sender_t_Param)
 
     while (sender->threadsShouldStop == 0)
     {
-        int waitRes = ARVIDEO_Sender_WaitForNewFrameOrSend (sender);
+        int waitRes = ARVIDEO_Sender_WaitForNewFrameOrRetry (sender);
         if (waitRes == 1)
         {
             ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARVIDEO_SENDER_TAG, "Previous frame was sent in %d packets. Frame size was %d packets", numbersOfFragmentsSentForCurrentFrame, nbPackets);
