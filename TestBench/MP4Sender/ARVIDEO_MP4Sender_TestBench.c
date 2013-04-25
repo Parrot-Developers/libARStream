@@ -38,7 +38,7 @@
 
 #define NB_BUFFERS (3)
 
-#define TEST_MODE (0)
+#define TEST_MODE (1)
 
 #if TEST_MODE
 # define TIME_BETWEEN_FRAMES_MS (1000)

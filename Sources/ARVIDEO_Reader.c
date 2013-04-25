@@ -56,6 +56,8 @@ struct ARVIDEO_Reader_t {
     /* Acknowledge storage */
     ARSAL_Mutex_t ackMutex;
     ARVIDEO_NetworkHeaders_AckPacket_t ackPacket;
+    ARSAL_Mutex_t ackSendMutex;
+    ARSAL_Cond_t ackSendCond;
 
     /* Thread status */
     ARSAL_Mutex_t threadsStatusMutex;
@@ -114,6 +116,8 @@ ARVIDEO_Reader_t* ARVIDEO_Reader_New (ARNETWORK_Manager_t *manager, int dataBuff
     int stillValid = 1;
     int ackMutexWasInit = 0;
     int threadsStatusMutexWasInit = 0;
+    int ackSendMutexWasInit = 0;
+    int ackSendCondWasInit = 0;
     /* ARGS Check */
     if ((manager == NULL) ||
         (callback == NULL) ||
@@ -141,7 +145,7 @@ ARVIDEO_Reader_t* ARVIDEO_Reader_New (ARNETWORK_Manager_t *manager, int dataBuff
         retReader->currentFrameBuffer = frameBuffer;
     }
 
-    /* Setup internal mutexes/sems */
+    /* Setup internal mutexes/conditions */
     if (stillValid == 1)
     {
         int mutexInitRet = ARSAL_Mutex_Init (&(retReader->ackMutex));
@@ -152,6 +156,30 @@ ARVIDEO_Reader_t* ARVIDEO_Reader_New (ARNETWORK_Manager_t *manager, int dataBuff
         else
         {
             ackMutexWasInit = 1;
+        }
+    }
+    if (stillValid == 1)
+    {
+        int mutexInitRet = ARSAL_Mutex_Init (&(retReader->ackSendMutex));
+        if (mutexInitRet != 0)
+        {
+            stillValid = 0;
+        }
+        else
+        {
+            ackSendMutexWasInit = 1;
+        }
+    }
+    if (stillValid == 1)
+    {
+        int condInitRet = ARSAL_Cond_Init (&(retReader->ackSendCond));
+        if (condInitRet != 0)
+        {
+            stillValid = 0;
+        }
+        else
+        {
+            ackSendCondWasInit = 1;
         }
     }
     if (stillValid == 1)
@@ -182,6 +210,14 @@ ARVIDEO_Reader_t* ARVIDEO_Reader_New (ARNETWORK_Manager_t *manager, int dataBuff
         if (ackMutexWasInit == 1)
         {
             ARSAL_Mutex_Destroy (&(retReader->ackMutex));
+        }
+        if (ackSendMutexWasInit == 1)
+        {
+            ARSAL_Mutex_Destroy (&(retReader->ackSendMutex));
+        }
+        if (ackSendCondWasInit == 1)
+        {
+            ARSAL_Cond_Destroy (&(retReader->ackSendCond));
         }
         if (threadsStatusMutexWasInit == 1)
         {
@@ -223,6 +259,8 @@ int ARVIDEO_Reader_Delete (ARVIDEO_Reader_t **reader)
         {
             ARSAL_Mutex_Destroy (&((*reader)->threadsStatusMutex));
             ARSAL_Mutex_Destroy (&((*reader)->ackMutex));
+            ARSAL_Mutex_Destroy (&((*reader)->ackSendMutex));
+            ARSAL_Cond_Destroy (&((*reader)->ackSendCond));
             free (*reader);
             *reader = NULL;
         }
@@ -280,6 +318,8 @@ void* ARVIDEO_Reader_RunDataThread (void *ARVIDEO_Reader_t_Param)
             }
             ARVIDEO_NetworkHeaders_AckPacketSetFlag (&(reader->ackPacket), header->fragmentNumber);
             ARSAL_Mutex_Unlock (&(reader->ackMutex));
+
+            ARSAL_Cond_Signal (&(reader->ackSendCond));
 
             cpIndex = ARVIDEO_NETWORK_HEADERS_FRAGMENT_SIZE*header->fragmentNumber;
             cpSize = recvSize - sizeof (ARVIDEO_NetworkHeaders_DataHeader_t);
@@ -350,7 +390,9 @@ void* ARVIDEO_Reader_RunAckThread (void *ARVIDEO_Reader_t_Param)
 
     while (reader->threadsShouldStop == 0)
     {
-        usleep (1000);
+        ARSAL_Mutex_Lock (&(reader->ackSendMutex));
+        ARSAL_Cond_Timedwait (&(reader->ackSendCond), &(reader->ackSendMutex), 1);
+        ARSAL_Mutex_Unlock (&(reader->ackSendMutex));
         ARSAL_Mutex_Lock (&(reader->ackMutex));
         sendPacket.numFrame       = htodl  (reader->ackPacket.numFrame);
         sendPacket.highPacketsAck = htodll (reader->ackPacket.highPacketsAck);

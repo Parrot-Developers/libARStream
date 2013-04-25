@@ -73,7 +73,6 @@ struct ARVIDEO_Sender_t {
     ARSAL_Mutex_t hasNextMutex;
     ARSAL_Cond_t hasNextCond;
     int hasNextFrame;
-    int allSent;
 
     /* Thread status */
     int threadsShouldStop;
@@ -107,16 +106,11 @@ static int ARVIDEO_Sender_CheckForNewFrame (ARVIDEO_Sender_t *sender);
 static void ARVIDEO_Sender_SignalNewFrameAvailable (ARVIDEO_Sender_t *sender);
 
 /**
- * @brief Waits for either new frame or frame sending complete
+ * @brief Waits for either new frame or a timeout to retry sending the current frame
  * @return 0 if we don't have a new frame
  * @return 1 if we have a new frame
  */
-static int ARVIDEO_Sender_WaitForNewFrameOrSend (ARVIDEO_Sender_t *sender);
-
-/**
- * @brief Signals that the current sends are complete
- */
-static void ARVIDEO_Sender_SignalSendsComplete (ARVIDEO_Sender_t *sender);
+static int ARVIDEO_Sender_WaitForNewFrameOrRetry (ARVIDEO_Sender_t *sender);
 
 /**
  * @brief ARNETWORK_Manager_Callback_t for ARNETWORK_... calls
@@ -158,14 +152,12 @@ static int ARVIDEO_Sender_WaitForNewFrameOrSend (ARVIDEO_Sender_t *sender)
     int retVal;
     // Compute "needToWait" + get first retVal value
     ARSAL_Mutex_Lock (&(sender->hasNextMutex));
-    if (sender->hasNextFrame == 1 ||
-        sender->allSent == 1)
+    if (sender->hasNextFrame == 1)
     {
         // We have a signal pending, dont wait
         needToWait = 0;
         retVal = sender->hasNextFrame;
         sender->hasNextFrame = 0;
-        sender->allSent = 0;
     }
     else
     {
@@ -176,22 +168,13 @@ static int ARVIDEO_Sender_WaitForNewFrameOrSend (ARVIDEO_Sender_t *sender)
     if (needToWait == 1)
     {
         // Wait then copy/reset flags
-        ARSAL_Cond_Wait (&(sender->hasNextCond), &(sender->hasNextMutex));
+        //TODO: replace constant with a call to "ARNETWORK_Manager_GetLatency()" when available
+        ARSAL_Cond_Timedwait (&(sender->hasNextCond), &(sender->hasNextMutex), /*TODO*/10/*TODO*/);
         retVal = sender->hasNextFrame;
         sender->hasNextFrame = 0;
-        sender->allSent = 0;
     }
     ARSAL_Mutex_Unlock (&(sender->hasNextMutex));
     return retVal;
-}
-
-static void ARVIDEO_Sender_SignalSendsComplete (ARVIDEO_Sender_t *sender)
-{
-    /* No arg check becase this function is always called by arg-checked functions */
-    ARSAL_Mutex_Lock (&(sender->hasNextMutex));
-    sender->allSent = 1;
-    ARSAL_Mutex_Unlock (&(sender->hasNextMutex));
-    ARSAL_Cond_Signal (&(sender->hasNextCond));
 }
 
 eARNETWORK_MANAGER_CALLBACK_RETURN ARVIDEO_Sender_NetworkCallback (int IoBufferId, uint8_t *dataPtr, void *customData, eARNETWORK_MANAGER_CALLBACK_STATUS status)
@@ -221,16 +204,15 @@ eARNETWORK_MANAGER_CALLBACK_RETURN ARVIDEO_Sender_NetworkCallback (int IoBufferI
         // Modify packetsToSend only if it refers to the frame we're sending
         if (frameNumber == sender->packetsToSend.numFrame)
         {
-            //ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARVIDEO_SENDER_TAG, "Sent/free packet %d", packetIndex);
+            ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARVIDEO_SENDER_TAG, "Sent packet %d", packetIndex);
             if (1 == ARVIDEO_NetworkHeaders_AckPacketUnsetFlag (&(sender->packetsToSend), packetIndex))
             {
-                //ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARVIDEO_SENDER_TAG, "All packets were sent");
-                ARVIDEO_Sender_SignalSendsComplete (sender);
+                ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARVIDEO_SENDER_TAG, "All packets were sent");
             }
         }
         else
         {
-            //ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARVIDEO_SENDER_TAG, "Sent a packet for an old frame");
+            ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARVIDEO_SENDER_TAG, "Sent a packet for an old frame [packet %d, current frame %d]", frameNumber,sender->packetsToSend.numFrame);
         }
         ARSAL_Mutex_Unlock (&(sender->packetsToSendMutex));
         /* Free cbParams */
@@ -490,6 +472,7 @@ void* ARVIDEO_Sender_RunDataThread (void *ARVIDEO_Sender_t_Param)
     uint32_t sendSize = 0;
     uint16_t nbPackets = 0;
     int cnt;
+    int numbersOfFragmentsSentForCurrentFrame = 0;
     int lastFragmentSize = 0;
     ARVIDEO_NetworkHeaders_DataHeader_t *header = NULL;
 
@@ -517,6 +500,8 @@ void* ARVIDEO_Sender_RunDataThread (void *ARVIDEO_Sender_t_Param)
         int waitRes = ARVIDEO_Sender_WaitForNewFrameOrSend (sender);
         if (waitRes == 1)
         {
+            ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARVIDEO_SENDER_TAG, "Previous frame was sent in %d packets. Frame size was %d packets", numbersOfFragmentsSentForCurrentFrame, nbPackets);
+            numbersOfFragmentsSentForCurrentFrame = 0;
             /* We have a new frame to send */
             ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARVIDEO_SENDER_TAG, "New frame needs to be sent");
 
@@ -528,6 +513,8 @@ void* ARVIDEO_Sender_RunDataThread (void *ARVIDEO_Sender_t_Param)
                 ARSAL_Mutex_Lock (&(sender->ackMutex));
                 ARVIDEO_NetworkHeaders_AckPacketDump ("Cancel frame:", &(sender->ackPacket));
                 ARSAL_Mutex_Unlock (&(sender->ackMutex));
+
+                ARNETWORK_Manager_FlushInputBuffer (sender->manager, sender->dataBufferID);
 
                 sender->callback (ARVIDEO_SENDER_STATUS_FRAME_CANCEL, sender->currentFrameBuffer, sender->currentFrameSize);
             }
@@ -570,7 +557,7 @@ void* ARVIDEO_Sender_RunDataThread (void *ARVIDEO_Sender_t_Param)
                 }
             }
 
-            ARSAL_PRINT (ARSAL_PRINT_WARNING, ARVIDEO_SENDER_TAG, "New frame has size %d (=%d packets)", sendSize, nbPackets);
+            ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARVIDEO_SENDER_TAG, "New frame has size %d (=%d packets)", sendSize, nbPackets);
         }
         /* END OF NEW FRAME BLOCK */
 
@@ -591,14 +578,15 @@ void* ARVIDEO_Sender_RunDataThread (void *ARVIDEO_Sender_t_Param)
         {
             if (ARVIDEO_NetworkHeaders_AckPacketFlagIsSet (&(sender->packetsToSend), cnt))
             {
+                numbersOfFragmentsSentForCurrentFrame ++;
                 int currFragmentSize = (cnt == nbPackets-1) ? lastFragmentSize : ARVIDEO_NETWORK_HEADERS_FRAGMENT_SIZE;
-                //ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARVIDEO_SENDER_TAG, "Will send subpacket %d with size %d", cnt, currFragmentSize);
                 header->fragmentNumber = cnt;
                 header->fragmentsPerFrame = nbPackets;
                 memcpy (&sendFragment[sizeof (ARVIDEO_NetworkHeaders_DataHeader_t)], &(sender->currentFrameBuffer)[ARVIDEO_NETWORK_HEADERS_FRAGMENT_SIZE*cnt], currFragmentSize);
                 ARVIDEO_Sender_NetworkCallbackParam_t *cbParams = malloc (sizeof (ARVIDEO_Sender_NetworkCallbackParam_t));
                 cbParams->sender = sender;
                 cbParams->fragmentIndex = cnt;
+                cbParams->frameNumber = sender->packetsToSend.numFrame;
                 ARNETWORK_Manager_SendData (sender->manager, sender->dataBufferID, sendFragment, currFragmentSize + sizeof (ARVIDEO_NetworkHeaders_DataHeader_t), (void *)cbParams, ARVIDEO_Sender_NetworkCallback, 1);
             }
         }

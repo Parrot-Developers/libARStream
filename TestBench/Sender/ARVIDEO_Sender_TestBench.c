@@ -33,8 +33,8 @@
 
 #define NET_BUFFER_SIZE (1500)
 
-#define FRAME_MIN_SIZE (2000)
-#define FRAME_MAX_SIZE (20000)
+#define FRAME_MIN_SIZE (5000)
+#define FRAME_MAX_SIZE (5000)
 
 #define NB_BUFFERS (3)
 
