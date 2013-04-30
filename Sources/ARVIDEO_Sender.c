@@ -37,6 +37,10 @@
  */
 
 #define ARVIDEO_SENDER_TAG "ARVIDEO_Sender"
+/**
+ * Latency used when the network can't give us a valid value
+ */
+#define ARVIDEO_SENDER_DEFAULT_ESTIMATED_LATENCY_MS (100)
 
 /*
  * Types
@@ -168,8 +172,15 @@ static int ARVIDEO_Sender_WaitForNewFrameOrRetry (ARVIDEO_Sender_t *sender)
     if (needToWait == 1)
     {
         // Wait then copy/reset flags
-        //TODO: replace constant with a call to "ARNETWORK_Manager_GetLatency()" when available
-        ARSAL_Cond_Timedwait (&(sender->hasNextCond), &(sender->hasNextMutex), /*TODO*/10/*TODO*/);
+        int latency = ARNETWORK_Manager_GetEstimatedLatency (sender->manager);
+        if (latency < 0)
+        {
+            latency = ARVIDEO_SENDER_DEFAULT_ESTIMATED_LATENCY_MS;
+        }
+
+        latency++; // Add 1ms to avoid optimistic latency estimations and "zero" latency
+
+        ARSAL_Cond_Timedwait (&(sender->hasNextCond), &(sender->hasNextMutex), latency);
         retVal = sender->hasNextFrame;
         sender->hasNextFrame = 0;
     }
@@ -512,10 +523,11 @@ void* ARVIDEO_Sender_RunDataThread (void *ARVIDEO_Sender_t_Param)
             ARSAL_Mutex_Lock (&(sender->callbackMutex));
             if (sender->currentFrameCbWasCalled == 0)
             {
-
+#ifdef DEBUG
                 ARSAL_Mutex_Lock (&(sender->ackMutex));
                 ARVIDEO_NetworkHeaders_AckPacketDump ("Cancel frame:", &(sender->ackPacket));
                 ARSAL_Mutex_Unlock (&(sender->ackMutex));
+#endif
 
                 ARNETWORK_Manager_FlushInputBuffer (sender->manager, sender->dataBufferID);
 
