@@ -48,6 +48,7 @@ struct ARVIDEO_Sender_t {
     int dataBufferID;
     int ackBufferID;
     ARVIDEO_Sender_FrameUpdateCallback_t callback;
+    ARSAL_Mutex_t callbackMutex;
 
     /* Current frame storage */
     uint32_t currentFrameNumber;
@@ -55,7 +56,6 @@ struct ARVIDEO_Sender_t {
     uint32_t currentFrameSize;
     int currentFrameNbFragments;
     int currentFrameCbWasCalled;
-    ARSAL_Mutex_t callbackMutex;
     ARSAL_Mutex_t packetsToSendMutex;
     ARVIDEO_NetworkHeaders_AckPacket_t packetsToSend;
 
@@ -142,8 +142,8 @@ static void ARVIDEO_Sender_SignalNewFrameAvailable (ARVIDEO_Sender_t *sender)
     /* No arg check becase this function is always called by arg-checked functions */
     ARSAL_Mutex_Lock (&(sender->hasNextMutex));
     sender->hasNextFrame = 1;
-    ARSAL_Mutex_Unlock (&(sender->hasNextMutex));
     ARSAL_Cond_Signal (&(sender->hasNextCond));
+    ARSAL_Mutex_Unlock (&(sender->hasNextMutex));
 }
 
 static int ARVIDEO_Sender_WaitForNewFrameOrRetry (ARVIDEO_Sender_t *sender)
@@ -432,6 +432,10 @@ int ARVIDEO_Sender_Delete (ARVIDEO_Sender_t **sender)
             free (*sender);
             *sender = NULL;
         }
+        else
+        {
+            ARSAL_PRINT (ARSAL_PRINT_ERROR, ARVIDEO_SENDER_TAG, "Call ARVIDEO_Sender_StopSender before calling this function");
+        }
         retVal = canDelete;
     }
     return retVal;
@@ -633,6 +637,7 @@ void* ARVIDEO_Sender_RunAckThread (void *ARVIDEO_Sender_t_Param)
             ARSAL_Mutex_Lock (&(sender->ackMutex));
             if (sender->ackPacket.numFrame == recvPacket.numFrame)
             {
+                //TODO: ARVIDEO_NetworkHeaders_Func !!!
                 sender->ackPacket.highPacketsAck |= recvPacket.highPacketsAck;
                 sender->ackPacket.lowPacketsAck |= recvPacket.lowPacketsAck;
                 ARSAL_Mutex_Lock (&(sender->callbackMutex));
