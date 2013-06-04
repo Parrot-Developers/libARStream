@@ -46,6 +46,12 @@
  * Types
  */
 
+typedef struct {
+    uint32_t frameNumber;
+    uint32_t frameSize;
+    uint8_t *frameBuffer;
+} ARVIDEO_Sender_Frame_t;
+
 struct ARVIDEO_Sender_t {
     /* Configuration on New */
     ARNETWORK_Manager_t *manager;
@@ -53,11 +59,10 @@ struct ARVIDEO_Sender_t {
     int ackBufferID;
     ARVIDEO_Sender_FrameUpdateCallback_t callback;
     ARSAL_Mutex_t callbackMutex;
+    uint32_t maxNumberOfNextFrames;
 
     /* Current frame storage */
-    uint32_t currentFrameNumber;
-    uint8_t *currentFrameBuffer;
-    uint32_t currentFrameSize;
+    ARVIDEO_Sender_Frame_t currentFrame;
     int currentFrameNbFragments;
     int currentFrameCbWasCalled;
     ARSAL_Mutex_t packetsToSendMutex;
@@ -69,14 +74,12 @@ struct ARVIDEO_Sender_t {
 
     /* Next frame storage */
     ARSAL_Mutex_t nextFrameMutex;
+    ARSAL_Cond_t  nextFrameCond;
     uint32_t nextFrameNumber;
-    uint8_t *nextFrameBuffer;
-    uint32_t nextFrameSize;
-
-    /* All sent / next frame condition + flags */
-    ARSAL_Mutex_t hasNextMutex;
-    ARSAL_Cond_t hasNextCond;
-    int hasNextFrame;
+    uint32_t indexAddNextFrame;
+    uint32_t indexGetNextFrame;
+    uint32_t numberOfWaitingFrames;
+    ARVIDEO_Sender_Frame_t *nextFrames;
 
     /* Thread status */
     int threadsShouldStop;
@@ -95,26 +98,29 @@ typedef struct {
  */
 
 /**
- * @brief Checks if the sender already has a new frame pending
- * @param sender The sender to test
- * @return 0 if no frame is pending
- * @return 1 if a new frame was already pending
- * @return -1 (and errno set) on error
+ * @brief Flush the new frame queue
+ * @param sender The sender to flush
  */
-static int ARVIDEO_Sender_CheckForNewFrame (ARVIDEO_Sender_t *sender);
+static void ARVIDEO_Sender_FlushQueue (ARVIDEO_Sender_t *sender);
 
 /**
- * @brief Signals the sender that a new frame is available
- * @param sender The sender that should send the new frame
+ * @brief Add a frame to the new frame queue
+ * @param sender The sender which should send the frame
+ * @param size The frame size, in bytes
+ * @param buffer Pointer to the buffer which contains the frame
+ * @return the number of frames previously in queue (-1 if queue is full)
  */
-static void ARVIDEO_Sender_SignalNewFrameAvailable (ARVIDEO_Sender_t *sender);
+static int ARVIDEO_Sender_AddToQueue (ARVIDEO_Sender_t *sender, uint32_t size, uint8_t *buffer);
 
 /**
- * @brief Waits for either new frame or a timeout to retry sending the current frame
- * @return 0 if we don't have a new frame
- * @return 1 if we have a new frame
+ * @brief Pop a frame from the new frame queue
+ * @param sender The sender
+ * @param newFrame Pointer in which the function will save the new frame infos
+ * @return 1 if a new frame is available, but should not interrupt current one
+ * @return 2 if the new frame should be sent immediately
+ * @return 0 on timeout (newFrame is not modified)
  */
-static int ARVIDEO_Sender_WaitForNewFrameOrRetry (ARVIDEO_Sender_t *sender);
+static int ARVIDEO_Sender_PopFromQueue (ARVIDEO_Sender_t *sender, ARVIDEO_Sender_Frame_t *newFrame);
 
 /**
  * @brief ARNETWORK_Manager_Callback_t for ARNETWORK_... calls
@@ -132,59 +138,92 @@ eARNETWORK_MANAGER_CALLBACK_RETURN ARVIDEO_Sender_NetworkCallback (int IoBufferI
  * Internal functions implementation
  */
 
-static int ARVIDEO_Sender_CheckForNewFrame (ARVIDEO_Sender_t *sender)
+static void ARVIDEO_Sender_FlushQueue (ARVIDEO_Sender_t *sender)
 {
-    int retVal = 0;
-    ARSAL_Mutex_Lock (&(sender->hasNextMutex));
-    retVal = sender->hasNextFrame;
-    ARSAL_Mutex_Unlock (&(sender->hasNextMutex));
-    return retVal;
-}
-
-static void ARVIDEO_Sender_SignalNewFrameAvailable (ARVIDEO_Sender_t *sender)
-{
-    /* No arg check becase this function is always called by arg-checked functions */
-    ARSAL_Mutex_Lock (&(sender->hasNextMutex));
-    sender->hasNextFrame = 1;
-    ARSAL_Cond_Signal (&(sender->hasNextCond));
-    ARSAL_Mutex_Unlock (&(sender->hasNextMutex));
-}
-
-static int ARVIDEO_Sender_WaitForNewFrameOrRetry (ARVIDEO_Sender_t *sender)
-{
-    int needToWait;
-    int retVal;
-    // Compute "needToWait" + get first retVal value
-    ARSAL_Mutex_Lock (&(sender->hasNextMutex));
-    if (sender->hasNextFrame == 1)
+    ARSAL_Mutex_Lock (&(sender->nextFrameMutex));
+    ARSAL_Mutex_Lock (&(sender->callbackMutex));
+    while (sender->numberOfWaitingFrames > 0)
     {
-        // We have a signal pending, dont wait
-        needToWait = 0;
-        retVal = sender->hasNextFrame;
-        sender->hasNextFrame = 0;
+        ARVIDEO_Sender_Frame_t *nextFrame = &(sender->nextFrames [sender->indexGetNextFrame]);
+        sender->callback (ARVIDEO_SENDER_STATUS_FRAME_CANCEL, nextFrame->frameBuffer, nextFrame->frameSize);
+        sender->indexGetNextFrame++;
+        sender->indexGetNextFrame %= sender->maxNumberOfNextFrames;
+        sender->numberOfWaitingFrames--;
+    }
+    ARSAL_Mutex_Unlock (&(sender->callbackMutex));
+    ARSAL_Mutex_Unlock (&(sender->nextFrameMutex));
+}
+
+static int ARVIDEO_Sender_AddToQueue (ARVIDEO_Sender_t *sender, uint32_t size, uint8_t *buffer)
+{
+    int retVal;
+    ARSAL_Mutex_Lock (&(sender->nextFrameMutex));
+    retVal = sender->numberOfWaitingFrames;
+    if (sender->numberOfWaitingFrames < sender->maxNumberOfNextFrames)
+    {
+        ARVIDEO_Sender_Frame_t *nextFrame = &(sender->nextFrames [sender->indexAddNextFrame]);
+        sender->nextFrameNumber++;
+        nextFrame->frameNumber = sender->nextFrameNumber;
+        nextFrame->frameBuffer = buffer;
+        nextFrame->frameSize   = size;
+
+        sender->indexAddNextFrame++;
+        sender->indexAddNextFrame %= sender->maxNumberOfNextFrames;
+
+        sender->numberOfWaitingFrames++;
+        if (sender->numberOfWaitingFrames == 1)
+        {
+            // First frame in the buffer, send signal
+            ARSAL_Cond_Signal (&(sender->nextFrameCond));
+        }
     }
     else
     {
-        // No signal pending, wait on condition
-        needToWait = 1;
+        retVal = -1;
     }
+    ARSAL_Mutex_Unlock (&(sender->nextFrameMutex));
+    return retVal;
+}
 
-    if (needToWait == 1)
+static int ARVIDEO_Sender_PopFromQueue (ARVIDEO_Sender_t *sender, ARVIDEO_Sender_Frame_t *newFrame)
+{
+    int retVal = 0;
+    ARSAL_Mutex_Lock (&(sender->nextFrameMutex));
+    // Check if a frame is ready
+    if (sender->numberOfWaitingFrames > 0)
     {
-        // Wait then copy/reset flags
+        retVal = 1;
+        sender->numberOfWaitingFrames--;
+    }
+    // If not, wait for a frame ready event
+    if (retVal == 0)
+    {
         int latency = ARNETWORK_Manager_GetEstimatedLatency (sender->manager);
-        if (latency < 0)
+        if (latency < 0) // Unable to get latency
         {
             latency = ARVIDEO_SENDER_DEFAULT_ESTIMATED_LATENCY_MS;
         }
+        latency++; // Add 1ms to avoid optimistic latency, and 0ms latency
 
-        latency++; // Add 1ms to avoid optimistic latency estimations and "zero" latency
-
-        ARSAL_Cond_Timedwait (&(sender->hasNextCond), &(sender->hasNextMutex), latency);
-        retVal = sender->hasNextFrame;
-        sender->hasNextFrame = 0;
+        ARSAL_Cond_Timedwait (&(sender->nextFrameCond), &(sender->nextFrameMutex), latency);
+        if (sender->numberOfWaitingFrames > 0)
+        {
+            retVal = 1;
+            sender->numberOfWaitingFrames--;
+        }
     }
-    ARSAL_Mutex_Unlock (&(sender->hasNextMutex));
+    // If we got a new frame, copy it
+    if (retVal == 1)
+    {
+        ARVIDEO_Sender_Frame_t *frame = &(sender->nextFrames [sender->indexGetNextFrame]);
+        sender->indexGetNextFrame++;
+        sender->indexGetNextFrame %= sender->maxNumberOfNextFrames;
+
+        newFrame->frameNumber = frame->frameNumber;
+        newFrame->frameBuffer = frame->frameBuffer;
+        newFrame->frameSize   = frame->frameSize;
+    }
+    ARSAL_Mutex_Unlock (&(sender->nextFrameMutex));
     return retVal;
 }
 
@@ -253,7 +292,7 @@ void ARVIDEO_Sender_InitVideoAckBuffer (ARNETWORK_IOBufferParam_t *bufferParams,
     ARVIDEO_Buffers_InitVideoAckBuffer (bufferParams, bufferID);
 }
 
-ARVIDEO_Sender_t* ARVIDEO_Sender_New (ARNETWORK_Manager_t *manager, int dataBufferID, int ackBufferID, ARVIDEO_Sender_FrameUpdateCallback_t callback)
+ARVIDEO_Sender_t* ARVIDEO_Sender_New (ARNETWORK_Manager_t *manager, int dataBufferID, int ackBufferID, ARVIDEO_Sender_FrameUpdateCallback_t callback, uint32_t framesBufferSize)
 {
     ARVIDEO_Sender_t *retSender = NULL;
     int stillValid = 1;
@@ -261,8 +300,8 @@ ARVIDEO_Sender_t* ARVIDEO_Sender_New (ARNETWORK_Manager_t *manager, int dataBuff
     int packetsToSendMutexWasInit = 0;
     int ackMutexWasInit = 0;
     int nextFrameMutexWasInit = 0;
-    int hasNextMutexWasInit = 0;
-    int hasNextCondWasInit = 0;
+    int nextFrameCondWasInit = 0;
+    int nextFramesArrayWasCreated = 0;
     /* ARGS Check */
     if ((manager == NULL) ||
         (callback == NULL))
@@ -284,6 +323,7 @@ ARVIDEO_Sender_t* ARVIDEO_Sender_New (ARNETWORK_Manager_t *manager, int dataBuff
         retSender->dataBufferID = dataBufferID;
         retSender->ackBufferID = ackBufferID;
         retSender->callback = callback;
+        retSender->maxNumberOfNextFrames = framesBufferSize;
     }
 
     /* Setup internal mutexes/sems */
@@ -337,41 +377,43 @@ ARVIDEO_Sender_t* ARVIDEO_Sender_New (ARNETWORK_Manager_t *manager, int dataBuff
     }
     if (stillValid == 1)
     {
-        int mutexInitRet = ARSAL_Mutex_Init (&(retSender->hasNextMutex));
-        if (mutexInitRet != 0)
-        {
-            stillValid = 0;
-        }
-        else
-        {
-            hasNextMutexWasInit = 1;
-        }
-    }
-    if (stillValid == 1)
-    {
-        int condInitRet = ARSAL_Cond_Init (&(retSender->hasNextCond));
+        int condInitRet = ARSAL_Cond_Init (&(retSender->nextFrameCond));
         if (condInitRet != 0)
         {
             stillValid = 0;
         }
         else
         {
-            hasNextCondWasInit = 1;
+            nextFrameCondWasInit = 1;
+        }
+    }
+
+    /* Allocate next frame storage */
+    if (stillValid == 1)
+    {
+        retSender->nextFrames = malloc (framesBufferSize * sizeof (ARVIDEO_Sender_Frame_t));
+        if (retSender->nextFrames == NULL)
+        {
+            stillValid = 0;
+        }
+        else
+        {
+            nextFramesArrayWasCreated = 1;
         }
     }
 
     /* Setup internal variables */
     if (stillValid == 1)
     {
-        retSender->currentFrameNumber = 0;
-        retSender->currentFrameBuffer = NULL;
-        retSender->currentFrameSize = 0;
+        retSender->currentFrame.frameNumber = 0;
+        retSender->currentFrame.frameBuffer = NULL;
+        retSender->currentFrame.frameSize   = 0;
         retSender->currentFrameNbFragments = 0;
         retSender->currentFrameCbWasCalled = 0;
         retSender->nextFrameNumber = 0;
-        retSender->nextFrameBuffer = NULL;
-        retSender->nextFrameSize = 0;
-        retSender->hasNextFrame = 0;
+        retSender->indexAddNextFrame = 0;
+        retSender->indexGetNextFrame = 0;
+        retSender->numberOfWaitingFrames = 0;
         retSender->threadsShouldStop = 0;
         retSender->dataThreadStarted = 0;
         retSender->ackThreadStarted = 0;
@@ -396,13 +438,13 @@ ARVIDEO_Sender_t* ARVIDEO_Sender_New (ARNETWORK_Manager_t *manager, int dataBuff
         {
             ARSAL_Mutex_Destroy (&(retSender->nextFrameMutex));
         }
-        if (hasNextMutexWasInit)
+        if (nextFrameCondWasInit == 1)
         {
-            ARSAL_Mutex_Destroy (&(retSender->hasNextMutex));
+            ARSAL_Cond_Destroy (&(retSender->nextFrameCond));
         }
-        if (hasNextCondWasInit)
+        if (nextFramesArrayWasCreated == 1)
         {
-            ARSAL_Cond_Destroy (&(retSender->hasNextCond));
+            free (retSender->nextFrames);
         }
         free (retSender);
         retSender = NULL;
@@ -438,8 +480,8 @@ int ARVIDEO_Sender_Delete (ARVIDEO_Sender_t **sender)
             ARSAL_Mutex_Destroy (&((*sender)->packetsToSendMutex));
             ARSAL_Mutex_Destroy (&((*sender)->ackMutex));
             ARSAL_Mutex_Destroy (&((*sender)->nextFrameMutex));
-            ARSAL_Mutex_Destroy (&((*sender)->hasNextMutex));
-            ARSAL_Cond_Destroy (&((*sender)->hasNextCond));
+            ARSAL_Cond_Destroy (&((*sender)->nextFrameCond));
+            free ((*sender)->nextFrames);
             free (*sender);
             *sender = NULL;
         }
@@ -452,29 +494,22 @@ int ARVIDEO_Sender_Delete (ARVIDEO_Sender_t **sender)
     return retVal;
 }
 
-int ARVIDEO_Sender_SendNewFrame (ARVIDEO_Sender_t *sender, uint8_t *frameBuffer, uint32_t frameSize)
+int ARVIDEO_Sender_SendNewFrame (ARVIDEO_Sender_t *sender, uint8_t *frameBuffer, uint32_t frameSize, int flushPreviousFrames)
 {
     int res = -1;
-    if (sender != NULL)
+    // Args check
+    if ((sender == NULL) ||
+        (frameBuffer == NULL) ||
+        ((flushPreviousFrames != 0) &&
+         (flushPreviousFrames != 1)))
     {
-        ARSAL_Mutex_Lock (&(sender->nextFrameMutex));
-
-        /* If a new frame was pending, cancel it and replace with current frame */
-        res = ARVIDEO_Sender_CheckForNewFrame (sender);
-        if (res == 1)
-        {
-            sender->callback (ARVIDEO_SENDER_STATUS_FRAME_CANCEL, sender->nextFrameBuffer, sender->nextFrameSize);
-        }
-
-        sender->nextFrameNumber++;
-        sender->nextFrameBuffer = frameBuffer;
-        sender->nextFrameSize = frameSize;
-
-        /* Signal sender thread that a new frame is available */
-        ARVIDEO_Sender_SignalNewFrameAvailable (sender);
-
-        ARSAL_Mutex_Unlock (&(sender->nextFrameMutex));
+        return res;
     }
+    if (flushPreviousFrames == 1)
+    {
+        ARVIDEO_Sender_FlushQueue (sender);
+    }
+    res = ARVIDEO_Sender_AddToQueue (sender, frameSize, frameBuffer);
     return res;
 }
 
@@ -489,6 +524,7 @@ void* ARVIDEO_Sender_RunDataThread (void *ARVIDEO_Sender_t_Param)
     int numbersOfFragmentsSentForCurrentFrame = 0;
     int lastFragmentSize = 0;
     ARVIDEO_NetworkHeaders_DataHeader_t *header = NULL;
+    ARVIDEO_Sender_Frame_t nextFrame = {0};
 
     /* Parameters check */
     if (sender == NULL)
@@ -511,8 +547,24 @@ void* ARVIDEO_Sender_RunDataThread (void *ARVIDEO_Sender_t_Param)
 
     while (sender->threadsShouldStop == 0)
     {
-        int waitRes = ARVIDEO_Sender_WaitForNewFrameOrRetry (sender);
-        if (waitRes == 1)
+        int loadNewFrame = 0;
+        int waitRes = ARVIDEO_Sender_PopFromQueue (sender, &nextFrame);
+        switch (waitRes)
+        {
+        case 1:
+            // New frame, only if the current one was finished
+            loadNewFrame = (sender->currentFrameCbWasCalled == 0) ? 0 : 1;
+            break;
+        case 2:
+            // New frame, always
+            loadNewFrame = 1;
+            break;
+        default:
+            // No new frame, don't load
+            loadNewFrame = 0;
+            break;
+        }
+        if (loadNewFrame == 1)
         {
             ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARVIDEO_SENDER_TAG, "Previous frame was sent in %d packets. Frame size was %d packets", numbersOfFragmentsSentForCurrentFrame, nbPackets);
             numbersOfFragmentsSentForCurrentFrame = 0;
@@ -531,34 +583,31 @@ void* ARVIDEO_Sender_RunDataThread (void *ARVIDEO_Sender_t_Param)
 
                 ARNETWORK_Manager_FlushInputBuffer (sender->manager, sender->dataBufferID);
 
-                sender->callback (ARVIDEO_SENDER_STATUS_FRAME_CANCEL, sender->currentFrameBuffer, sender->currentFrameSize);
+                sender->callback (ARVIDEO_SENDER_STATUS_FRAME_CANCEL, sender->currentFrame.frameBuffer, sender->currentFrame.frameSize);
             }
             sender->currentFrameCbWasCalled = 0; // New frame
+            ARSAL_Mutex_Unlock (&(sender->callbackMutex));
 
             /* Save next frame data into current frame data */
-            ARSAL_Mutex_Lock (&(sender->nextFrameMutex));
-            sender->currentFrameSize = sender->nextFrameSize;
-            sender->currentFrameBuffer = sender->nextFrameBuffer;
-            sender->currentFrameNumber = sender->nextFrameNumber;
-            ARSAL_Mutex_Unlock (&(sender->nextFrameMutex));
-            sendSize = sender->currentFrameSize;
-
-            ARSAL_Mutex_Unlock (&(sender->callbackMutex));
+            sender->currentFrame.frameNumber = nextFrame.frameNumber;
+            sender->currentFrame.frameBuffer = nextFrame.frameBuffer;
+            sender->currentFrame.frameSize   = nextFrame.frameSize;
+            sendSize = nextFrame.frameSize;
 
             /* Reset ack packet - No packets are ack on the new frame */
             ARSAL_Mutex_Lock (&(sender->ackMutex));
-            sender->ackPacket.numFrame = sender->currentFrameNumber;
+            sender->ackPacket.numFrame = sender->currentFrame.frameNumber;
             ARVIDEO_NetworkHeaders_AckPacketReset (&(sender->ackPacket));
             ARSAL_Mutex_Unlock (&(sender->ackMutex));
 
             /* Reset packetsToSend - update frame number */
             ARSAL_Mutex_Lock (&(sender->packetsToSendMutex));
-            sender->packetsToSend.numFrame = sender->currentFrameNumber;
+            sender->packetsToSend.numFrame = sender->currentFrame.frameNumber;
             ARVIDEO_NetworkHeaders_AckPacketReset (&(sender->packetsToSend));
             ARSAL_Mutex_Unlock (&(sender->packetsToSendMutex));
 
             /* Update video data header with the new frame number */
-            header->frameNumber = sender->currentFrameNumber;
+            header->frameNumber = sender->currentFrame.frameNumber;
 
             /* Compute number of fragments / size of the last fragment */
             if (0 < sendSize)
@@ -597,7 +646,7 @@ void* ARVIDEO_Sender_RunDataThread (void *ARVIDEO_Sender_t_Param)
                 int currFragmentSize = (cnt == nbPackets-1) ? lastFragmentSize : ARVIDEO_NETWORK_HEADERS_FRAGMENT_SIZE;
                 header->fragmentNumber = cnt;
                 header->fragmentsPerFrame = nbPackets;
-                memcpy (&sendFragment[sizeof (ARVIDEO_NetworkHeaders_DataHeader_t)], &(sender->currentFrameBuffer)[ARVIDEO_NETWORK_HEADERS_FRAGMENT_SIZE*cnt], currFragmentSize);
+                memcpy (&sendFragment[sizeof (ARVIDEO_NetworkHeaders_DataHeader_t)], &(sender->currentFrame.frameBuffer)[ARVIDEO_NETWORK_HEADERS_FRAGMENT_SIZE*cnt], currFragmentSize);
                 ARVIDEO_Sender_NetworkCallbackParam_t *cbParams = malloc (sizeof (ARVIDEO_Sender_NetworkCallbackParam_t));
                 cbParams->sender = sender;
                 cbParams->fragmentIndex = cnt;
@@ -658,7 +707,7 @@ void* ARVIDEO_Sender_RunAckThread (void *ARVIDEO_Sender_t_Param)
                 if ((sender->currentFrameCbWasCalled == 0) &&
                     (ARVIDEO_NetworkHeaders_AckPacketAllFlagsSet (&(sender->ackPacket), sender->currentFrameNbFragments) == 1))
                 {
-                    sender->callback (ARVIDEO_SENDER_STATUS_FRAME_SENT, sender->currentFrameBuffer, sender->currentFrameSize);
+                    sender->callback (ARVIDEO_SENDER_STATUS_FRAME_SENT, sender->currentFrame.frameBuffer, sender->currentFrame.frameSize);
                     sender->currentFrameCbWasCalled = 1;
                 }
                 ARSAL_Mutex_Unlock (&(sender->callbackMutex));

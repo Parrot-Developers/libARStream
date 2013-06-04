@@ -34,7 +34,8 @@
 #define SENDING_PORT (54321)
 #define READING_PORT (12345)
 
-#define NB_BUFFERS (3)
+#define NB_BUFFERS (15)
+#define I_FRAME_EVERY_N (10)
 
 #define TEST_MODE (1)
 
@@ -237,7 +238,8 @@ void* fileReaderThread (void *ARVIDEO_Sender_t_Param)
 
         if (frameSize != 0)
         {
-            int res = ARVIDEO_Sender_SendNewFrame (sender, nextFrameAddr, frameSize);
+            int flush = ((cnt % I_FRAME_EVERY_N) == 1) ? 1 : 0;
+            int res = ARVIDEO_Sender_SendNewFrame (sender, nextFrameAddr, frameSize, flush);
             switch (res)
             {
             case -1:
@@ -267,7 +269,7 @@ int ARVIDEO_MP4SenderTb_StartVideoTest (const char *fpath, ARNETWORK_Manager_t *
     int retVal;
     ARVIDEO_Sender_t *sender;
     initMultiBuffers (ARVIDEO_MP4SenderTb_OpenVideoFile (fpath));
-    sender = ARVIDEO_Sender_New (manager, DATA_BUFFER_ID, ACK_BUFFER_ID, ARVIDEO_MP4SenderTb_FrameUpdateCallback);
+    sender = ARVIDEO_Sender_New (manager, DATA_BUFFER_ID, ACK_BUFFER_ID, ARVIDEO_MP4SenderTb_FrameUpdateCallback, NB_BUFFERS);
     if (sender == NULL)
     {
         ARSAL_PRINT (ARSAL_PRINT_ERROR, __TAG__, "Error during ARVIDEO_Sender_New call");

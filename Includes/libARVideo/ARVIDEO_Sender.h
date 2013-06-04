@@ -77,13 +77,17 @@ void ARVIDEO_Sender_InitVideoAckBuffer (ARNETWORK_IOBufferParam_t *bufferParams,
  * @param[in] dataBufferID ID of a VideoDataBuffer available within the manager
  * @param[in] ackBufferID ID of a VideoAckBuffer available within the manager
  * @param[in] callback The status update callback which will be called every time the status of a send-frame is updated
+ * @param[in] framesBufferSize Number of frames that the ARVIDEO_Sender_t instance will be able to hold in queue
  * @return A pointer to the new ARVIDEO_Sender_t, or NULL if an error occured
+ *
+ * @note framesBufferSize should be greater than the number of frames between two I-Frames
+ *
  * @see ARVIDEO_Sender_InitVideoDataBuffer()
  * @see ARVIDEO_Sender_InitVideoAckBuffer()
  * @see ARVIDEO_Sender_StopSender()
  * @see ARVIDEO_Sender_Delete()
  */
-ARVIDEO_Sender_t* ARVIDEO_Sender_New (ARNETWORK_Manager_t *manager, int dataBufferID, int ackBufferID, ARVIDEO_Sender_FrameUpdateCallback_t callback);
+ARVIDEO_Sender_t* ARVIDEO_Sender_New (ARNETWORK_Manager_t *manager, int dataBufferID, int ackBufferID, ARVIDEO_Sender_FrameUpdateCallback_t callback, uint32_t framesBufferSize);
 
 /**
  * @brief Stops a running ARVIDEO_Sender_t
@@ -115,11 +119,11 @@ int ARVIDEO_Sender_Delete (ARVIDEO_Sender_t **sender);
  * @param[in] sender The ARVIDEO_Sender_t which will try to send the frame
  * @param[in] frameBuffer pointer to the frame in memory
  * @param[in] frameSize size of the frame in memory
- * @return 0 if the frame was successfully queued
- * @return 1 if another frame was already in queue (Previous frame will be cancelled)
+ * @param[in] flushPreviousFrames Boolean-like flag (0/1). If active, tells the sender to flush the frame queue when adding this frame.
+ * @return The number of frames already waiting in queue (even if flushed)
  * @return -1 on error
  */
-int ARVIDEO_Sender_SendNewFrame (ARVIDEO_Sender_t *sender, uint8_t *frameBuffer, uint32_t frameSize);
+int ARVIDEO_Sender_SendNewFrame (ARVIDEO_Sender_t *sender, uint8_t *frameBuffer, uint32_t frameSize, int flushPreviousFrames);
 
 /**
  * @brief Runs the data loop of the ARVIDEO_Sender_t

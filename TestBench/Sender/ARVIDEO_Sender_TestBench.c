@@ -34,7 +34,8 @@
 #define FRAME_MIN_SIZE (5000)
 #define FRAME_MAX_SIZE (5000)
 
-#define NB_BUFFERS (3)
+#define NB_BUFFERS (15)
+#define I_FRAME_EVERY_N (10)
 
 #define TEST_MODE (0)
 
@@ -210,8 +211,9 @@ void* fakeEncoderThread (void *ARVIDEO_Sender_t_Param)
             if (frameCapacity >= frameSize)
             {
                 int prevRes;
+                int flush = ((cnt % I_FRAME_EVERY_N) == 1) ? 1 : 0;
                 memset (nextFrameAddr, cnt, frameSize);
-                prevRes = ARVIDEO_Sender_SendNewFrame (sender, nextFrameAddr, frameSize);
+                prevRes = ARVIDEO_Sender_SendNewFrame (sender, nextFrameAddr, frameSize, flush);
                 switch (prevRes)
                 {
                 case -1:
@@ -246,7 +248,7 @@ int ARVIDEO_SenderTb_StartVideoTest (ARNETWORK_Manager_t *manager)
     int retVal;
     ARVIDEO_Sender_t *sender;
     initMultiBuffers ();
-    sender = ARVIDEO_Sender_New (manager, DATA_BUFFER_ID, ACK_BUFFER_ID, ARVIDEO_SenderTb_FrameUpdateCallback);
+    sender = ARVIDEO_Sender_New (manager, DATA_BUFFER_ID, ACK_BUFFER_ID, ARVIDEO_SenderTb_FrameUpdateCallback, NB_BUFFERS);
     if (sender == NULL)
     {
         ARSAL_PRINT (ARSAL_PRINT_ERROR, __TAG__, "Error during ARVIDEO_Sender_New call\n");
