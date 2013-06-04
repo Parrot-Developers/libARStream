@@ -36,6 +36,8 @@
  */
 
 #define ARVIDEO_READER_TAG "ARVIDEO_Reader"
+#define ARVIDEO_READER_DATAREAD_TIMEOUT_MS (500)
+#define ARVIDEO_READER_MAX_TIME_BETWEEN_ACK_MS (5)
 
 /*
  * Types
@@ -278,7 +280,7 @@ void* ARVIDEO_Reader_RunDataThread (void *ARVIDEO_Reader_t_Param)
 
     while (reader->threadsShouldStop == 0)
     {
-        eARNETWORK_ERROR err = ARNETWORK_Manager_ReadDataWithTimeout (reader->manager, reader->dataBufferID, recvData, recvDataLen, &recvSize, 1000);//TODO: Timeout #define + reduire
+        eARNETWORK_ERROR err = ARNETWORK_Manager_ReadDataWithTimeout (reader->manager, reader->dataBufferID, recvData, recvDataLen, &recvSize, ARVIDEO_READER_DATAREAD_TIMEOUT_MS);
         if (ARNETWORK_OK != err)
         {
             ARSAL_PRINT (ARSAL_PRINT_ERROR, ARVIDEO_READER_TAG, "Error while reading video data: %s", ARNETWORK_Error_ToString (err));
@@ -376,7 +378,7 @@ void* ARVIDEO_Reader_RunAckThread (void *ARVIDEO_Reader_t_Param)
     while (reader->threadsShouldStop == 0)
     {
         ARSAL_Mutex_Lock (&(reader->ackSendMutex));
-        ARSAL_Cond_Timedwait (&(reader->ackSendCond), &(reader->ackSendMutex), 1);//TODO #define timeout
+        ARSAL_Cond_Timedwait (&(reader->ackSendCond), &(reader->ackSendMutex), ARVIDEO_READER_MAX_TIME_BETWEEN_ACK_MS);
         ARSAL_Mutex_Unlock (&(reader->ackSendMutex));
         ARSAL_Mutex_Lock (&(reader->ackPacketMutex));
         sendPacket.numFrame       = htodl  (reader->ackPacket.numFrame);

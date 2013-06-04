@@ -602,7 +602,9 @@ void* ARVIDEO_Sender_RunDataThread (void *ARVIDEO_Sender_t_Param)
                 cbParams->sender = sender;
                 cbParams->fragmentIndex = cnt;
                 cbParams->frameNumber = sender->packetsToSend.numFrame;
+                ARSAL_Mutex_Unlock (&(sender->packetsToSendMutex));
                 ARNETWORK_Manager_SendData (sender->manager, sender->dataBufferID, sendFragment, currFragmentSize + sizeof (ARVIDEO_NetworkHeaders_DataHeader_t), (void *)cbParams, ARVIDEO_Sender_NetworkCallback, 1);
+                ARSAL_Mutex_Lock (&(sender->packetsToSendMutex));
             }
         }
         ARSAL_Mutex_Unlock (&(sender->packetsToSendMutex));
