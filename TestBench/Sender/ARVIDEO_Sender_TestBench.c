@@ -37,7 +37,7 @@
 #define NB_BUFFERS (15)
 #define I_FRAME_EVERY_N (10)
 
-#define TEST_MODE (0)
+#define TEST_MODE (1)
 
 #if TEST_MODE
 # define TIME_BETWEEN_FRAMES_MS (1000)
@@ -119,8 +119,8 @@ int ARVIDEO_SenderTb_StartVideoTest (ARNETWORK_Manager_t *manager);
 
 void printUsage ()
 {
-    ARSAL_PRINT (ARSAL_PRINT_ERROR, __TAG__, "Usage : %s [ip]\n", appName);
-    ARSAL_PRINT (ARSAL_PRINT_ERROR, __TAG__, "        ip -> optionnal, ip of the video reader\n");
+    ARSAL_PRINT (ARSAL_PRINT_ERROR, __TAG__, "Usage : %s [ip]", appName);
+    ARSAL_PRINT (ARSAL_PRINT_ERROR, __TAG__, "        ip -> optionnal, ip of the video reader");
 }
 
 void initMultiBuffers ()
@@ -140,11 +140,11 @@ void ARVIDEO_SenderTb_FrameUpdateCallback (eARVIDEO_SENDER_STATUS status, uint8_
     {
     case ARVIDEO_SENDER_STATUS_FRAME_SENT:
         ARVIDEO_SenderTb_SetBufferFree (framePointer);
-        ARSAL_PRINT (ARSAL_PRINT_WARNING, __TAG__, "Successfully sent a frame of size %u\n", frameSize);
+        ARSAL_PRINT (ARSAL_PRINT_WARNING, __TAG__, "Successfully sent a frame of size %u", frameSize);
         break;
     case ARVIDEO_SENDER_STATUS_FRAME_CANCEL:
         ARVIDEO_SenderTb_SetBufferFree (framePointer);
-        ARSAL_PRINT (ARSAL_PRINT_WARNING, __TAG__, "Cancelled a frame of size %u\n", frameSize);
+        ARSAL_PRINT (ARSAL_PRINT_WARNING, __TAG__, "Cancelled a frame of size %u", frameSize);
         break;
     default:
         // All cases handled
@@ -194,7 +194,7 @@ void* fakeEncoderThread (void *ARVIDEO_Sender_t_Param)
     uint8_t *nextFrameAddr;
     ARVIDEO_Sender_t *sender = (ARVIDEO_Sender_t *)ARVIDEO_Sender_t_Param;
     srand (time (NULL));
-    ARSAL_PRINT (ARSAL_PRINT_WARNING, __TAG__, "Encoder thread running\n");
+    ARSAL_PRINT (ARSAL_PRINT_WARNING, __TAG__, "Encoder thread running");
     while (1)
     {
         cnt++;
@@ -203,7 +203,7 @@ void* fakeEncoderThread (void *ARVIDEO_Sender_t_Param)
         {
             frameSize = FRAME_MIN_SIZE;
         }
-        ARSAL_PRINT (ARSAL_PRINT_WARNING, __TAG__, "Generating a frame of size %d with number %u\n", frameSize, cnt);
+        ARSAL_PRINT (ARSAL_PRINT_WARNING, __TAG__, "Generating a frame of size %d with number %u", frameSize, cnt);
 
         nextFrameAddr = ARVIDEO_SenderTb_GetNextFreeBuffer (&frameCapacity);
         if (nextFrameAddr != NULL)
@@ -217,29 +217,29 @@ void* fakeEncoderThread (void *ARVIDEO_Sender_t_Param)
                 switch (prevRes)
                 {
                 case -1:
-                    ARSAL_PRINT (ARSAL_PRINT_ERROR, __TAG__, "Unable to send the new frame\n");
+                    ARSAL_PRINT (ARSAL_PRINT_ERROR, __TAG__, "Unable to send the new frame");
                     break;
                 case 0:
-                    ARSAL_PRINT (ARSAL_PRINT_WARNING, __TAG__, "Try to send a frame of size %u\n", frameSize);
+                    ARSAL_PRINT (ARSAL_PRINT_WARNING, __TAG__, "Try to send a frame of size %u", frameSize);
                     break;
-                case 1:
-                    ARSAL_PRINT (ARSAL_PRINT_WARNING, __TAG__, "Try to send a frame of size %u, will cancel previous frame sending\n", frameSize);
+                default:
+                    ARSAL_PRINT (ARSAL_PRINT_WARNING, __TAG__, "Try to send a frame of size %u, already %d in queue", frameSize, prevRes);
                     break;
                 }
             }
             else
             {
-                ARSAL_PRINT (ARSAL_PRINT_ERROR, __TAG__, "Could not encode a new frame : buffer too small !\n");
+                ARSAL_PRINT (ARSAL_PRINT_ERROR, __TAG__, "Could not encode a new frame : buffer too small !");
             }
         }
         else
         {
-            ARSAL_PRINT (ARSAL_PRINT_ERROR, __TAG__, "Could not encode a new frame : no free buffer !\n");
+            ARSAL_PRINT (ARSAL_PRINT_ERROR, __TAG__, "Could not encode a new frame : no free buffer !");
         }
 
         usleep (1000 * TIME_BETWEEN_FRAMES_MS);
     }
-    ARSAL_PRINT (ARSAL_PRINT_WARNING, __TAG__, "Encoder thread ended\n");
+    ARSAL_PRINT (ARSAL_PRINT_WARNING, __TAG__, "Encoder thread ended");
     return (void *)0;
 }
 
@@ -251,7 +251,7 @@ int ARVIDEO_SenderTb_StartVideoTest (ARNETWORK_Manager_t *manager)
     sender = ARVIDEO_Sender_New (manager, DATA_BUFFER_ID, ACK_BUFFER_ID, ARVIDEO_SenderTb_FrameUpdateCallback, NB_BUFFERS);
     if (sender == NULL)
     {
-        ARSAL_PRINT (ARSAL_PRINT_ERROR, __TAG__, "Error during ARVIDEO_Sender_New call\n");
+        ARSAL_PRINT (ARSAL_PRINT_ERROR, __TAG__, "Error during ARVIDEO_Sender_New call");
         return 1;
     }
 
@@ -312,22 +312,22 @@ int main (int argc, char *argv[])
 
     if(specificError == ARNETWORKAL_OK)
     {
-		specificError = ARNETWORKAL_Manager_InitWiFiNetwork(osspecificManagerPtr, ip, SENDING_PORT, READING_PORT, 1000);
-	}
+        specificError = ARNETWORKAL_Manager_InitWiFiNetwork(osspecificManagerPtr, ip, SENDING_PORT, READING_PORT, 1000);
+    }
 
-	if(specificError == ARNETWORKAL_OK)
-	{
-		manager = ARNETWORK_Manager_New(osspecificManagerPtr, nbInBuff, &inParams, nbOutBuff, &outParams, &error);
-	}
-	else
-	{
-		error = ARNETWORK_ERROR;
-	}
+    if(specificError == ARNETWORKAL_OK)
+    {
+        manager = ARNETWORK_Manager_New(osspecificManagerPtr, nbInBuff, &inParams, nbOutBuff, &outParams, &error);
+    }
+    else
+    {
+        error = ARNETWORK_ERROR;
+    }
 
     if ((manager == NULL) ||
         (error != ARNETWORK_OK))
     {
-        ARSAL_PRINT (ARSAL_PRINT_ERROR, __TAG__, "Error during ARNETWORK_Manager_New call : %d\n", error);
+        ARSAL_PRINT (ARSAL_PRINT_ERROR, __TAG__, "Error during ARNETWORK_Manager_New call : %d", error);
         return 1;
     }
 
