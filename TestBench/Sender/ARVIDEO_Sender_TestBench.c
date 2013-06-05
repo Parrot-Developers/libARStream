@@ -31,8 +31,6 @@
 #define SENDING_PORT (54321)
 #define READING_PORT (12345)
 
-#define NET_BUFFER_SIZE (1500)
-
 #define FRAME_MIN_SIZE (5000)
 #define FRAME_MAX_SIZE (5000)
 
@@ -306,18 +304,28 @@ int main (int argc, char *argv[])
     ARVIDEO_Sender_InitVideoAckBuffer (&outParams, ACK_BUFFER_ID);
 
     eARNETWORK_ERROR error;
-    ARNETWORK_Manager_t *manager = ARNETWORK_Manager_New (NET_BUFFER_SIZE, NET_BUFFER_SIZE, nbInBuff, &inParams, nbOutBuff, &outParams, &error);
+    ARNETWORK_Manager_t *manager = NULL;
+    eARNETWORKAL_ERROR specificError = ARNETWORKAL_OK;
+    ARNETWORKAL_Manager_t *osspecificManagerPtr = ARNETWORKAL_Manager_New(&specificError);
+
+    if(specificError == ARNETWORKAL_OK)
+    {
+		specificError = ARNETWORKAL_Manager_InitWiFiNetwork(osspecificManagerPtr, ip, SENDING_PORT, READING_PORT, 1000);
+	}
+
+	if(specificError == ARNETWORKAL_OK)
+	{
+		manager = ARNETWORK_Manager_New(osspecificManagerPtr, nbInBuff, &inParams, nbOutBuff, &outParams, &error);
+	}
+	else
+	{
+		error = ARNETWORK_ERROR;
+	}
+
     if ((manager == NULL) ||
         (error != ARNETWORK_OK))
     {
         ARSAL_PRINT (ARSAL_PRINT_ERROR, __TAG__, "Error during ARNETWORK_Manager_New call : %d\n", error);
-        return 1;
-    }
-
-    error = ARNETWORK_Manager_SocketsInit (manager, ip, SENDING_PORT, READING_PORT, 1000);
-    if (error != ARNETWORK_OK)
-    {
-        ARSAL_PRINT (ARSAL_PRINT_ERROR, __TAG__, "Error during ARNETWORK_Manager_SocketsInit call : %d\n", error);
         return 1;
     }
 
