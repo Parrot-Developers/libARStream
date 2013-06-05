@@ -554,17 +554,17 @@ int main (int argc, char *argv[])
 
     if(specificError == ARNETWORKAL_OK)
     {
-		specificError = ARNETWORKAL_Manager_InitWiFiNetwork(osspecificManagerPtr, ip, SENDING_PORT, READING_PORT, 1000);
-	}
+        specificError = ARNETWORKAL_Manager_InitWiFiNetwork(osspecificManagerPtr, ip, SENDING_PORT, READING_PORT, 1000);
+    }
 
-	if(specificError == ARNETWORKAL_OK)
-	{
-		manager = ARNETWORK_Manager_New(osspecificManagerPtr, nbInBuff, &inParams, nbOutBuff, &outParams, &error);
-	}
-	else
-	{
-		error = ARNETWORK_ERROR;
-	}
+    if(specificError == ARNETWORKAL_OK)
+    {
+        manager = ARNETWORK_Manager_New(osspecificManagerPtr, nbInBuff, &inParams, nbOutBuff, &outParams, &error);
+    }
+    else
+    {
+        error = ARNETWORK_ERROR;
+    }
 
     if ((manager == NULL) ||
         (error != ARNETWORK_OK))
