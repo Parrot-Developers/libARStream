@@ -142,6 +142,54 @@ AC_ARG_WITH([libARNetworkLibDir],
                 libARNetworkLibDir=""
               fi])
 
+# get the directories of libARNetworkAL
+AC_ARG_WITH([libARNetworkALInstallDir],
+            AS_HELP_STRING([--with-libARNetworkALInstallDir=DIR],[directory of the libARNetworkAL installation @<:@default=PREFIX@:>@]),
+            [if test x$withval = xno; then
+              libARNetworkALInstallDir=""
+            else
+              libARNetworkALInstallDir="$withval"
+            fi], 
+            [if test x$prefix = xNONE; then
+              libARNetworkALInstallDir=""
+            else
+              libARNetworkALInstallDir="$prefix"
+            fi])
+
+AC_ARG_WITH([libARNetworkALIncludeDir],
+            AS_HELP_STRING([--with-libARNetworkALIncludeDir=DIR],[directory of the libARNetworkAL headers @<:@default=ARNetworkALInstallDir/include@:>@]),
+            [if test x$withval = xno; then
+              [if test ! -z $libARNetworkALInstallDir; then
+                 libARNetworkALIncludeDir="$libARNetworkALInstallDir/include"
+              else
+                 libARNetworkALIncludeDir=""
+              fi]
+            else
+              libARNetworkALIncludeDir="$withval"
+            fi],
+              [if test ! -z $libARNetworkALInstallDir; then
+                 libARNetworkALIncludeDir="$libARNetworkALInstallDir/include"
+              else
+                 libARNetworkALIncludeDir=""
+              fi])
+
+AC_ARG_WITH([libARNetworkALLibDir],
+            AS_HELP_STRING([--with-libARNetworkALLibDir=DIR],[directory of the libARNetworkAL libraries @<:@default=ARNetworkALInstallDir/lib@:>@]),
+            [if test x$withval = xno; then
+              [if test ! -z $libARNetworkALInstallDir; then
+                libARNetworkALLibDir="$libARNetworkALInstallDir/lib"
+              else
+                libARNetworkALLibDir=""
+              fi]
+            else
+              libARNetworkALLibDir="$withval"
+            fi],
+              [if test ! -z $libARNetworkALInstallDir; then
+                libARNetworkALLibDir="$libARNetworkALInstallDir/lib"
+              else
+                libARNetworkALLibDir=""
+              fi])
+
 ##########################################################################
 # Define includes directories
 ##########################################################################
@@ -156,6 +204,10 @@ fi
 if test ! -z $libARNetworkIncludeDir; then
   CFLAGS+=" -I$libARNetworkIncludeDir"
 fi
+# add the headers directory of libARNetworkAL
+if test ! -z $libARNetworkALIncludeDir; then
+  CFLAGS+=" -I$libARNetworkALIncludeDir"
+fi
 
 CPPFLAGS="$CFLAGS"
 ##########################################################################
@@ -169,6 +221,10 @@ fi
 # add the binaries directory of libARNetwork
 if test ! -z $libARNetworkLibDir; then
   LDFLAGS+=" -L$libARNetworkLibDir"
+fi
+# add the binaries directory of libARNetworkAL
+if test ! -z $libARNetworkALLibDir; then
+  LDFLAGS+=" -L$libARNetworkALLibDir"
 fi
 
 ##########################################################################
