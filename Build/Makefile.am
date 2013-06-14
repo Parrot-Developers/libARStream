@@ -30,39 +30,42 @@ libarvideo_la_HEADERS                                       =   $(HEADER_FILES)
 libarvideo_la_SOURCES                                       =   $(SOURCE_FILES)
 endif
 
-check_PROGRAMS                                              =   ../TestBench/Sender/ARVIDEO_Sender_TestBench    \
-                                                                ../TestBench/Reader/ARVIDEO_Reader_TestBench    \
-                                                                ../TestBench/MP4Sender/ARVIDEO_MP4Sender_TestBench
+check_PROGRAMS                                              =   ../TestBench/Linux/Sender/ARVIDEO_Sender_TestBench                      \
+                                                                ../TestBench/Linux/Reader/ARVIDEO_Reader_TestBench                      \
+                                                                ../TestBench/Linux/MP4Sender/ARVIDEO_MP4Sender_TestBench
 
-___TestBench_Sender_ARVIDEO_Sender_TestBench_SOURCES        =   ../TestBench/Sender/ARVIDEO_Sender_TestBench.c
-___TestBench_Reader_ARVIDEO_Reader_TestBench_SOURCES        =   ../TestBench/Reader/ARVIDEO_Reader_TestBench.c
-___TestBench_MP4Sender_ARVIDEO_MP4Sender_TestBench_SOURCES  =   ../TestBench/MP4Sender/ARVIDEO_MP4Sender_TestBench.c
+___TestBench_Linux_Sender_ARVIDEO_Sender_TestBench_SOURCES          =   ../TestBench/Linux/Sender/ARVIDEO_Sender_LinuxTestBench.c       \
+                                                                        ../TestBench/Common/Sender/ARVIDEO_Sender_TestBench.c
+___TestBench_Linux_Reader_ARVIDEO_Reader_TestBench_SOURCES          =   ../TestBench/Linux/Reader/ARVIDEO_Reader_LinuxTestBench.c       \
+                                                                        ../TestBench/Common/Reader/ARVIDEO_Reader_TestBench.c
+___TestBench_Linux_MP4Sender_ARVIDEO_MP4Sender_TestBench_SOURCES    =   ../TestBench/Linux/MP4Sender/ARVIDEO_MP4Sender_LinuxTestBench.c \
+                                                                        ../TestBench/Common/MP4Sender/ARVIDEO_MP4Sender_TestBench.c
 if DEBUG_MODE
-___TestBench_Sender_ARVIDEO_Sender_TestBench_LDADD          =   -larsal                                 \
-                                                                -larnetworkal                           \
-                                                                -larnetwork                             \
-                                                                libarvideo_dbg.la
-___TestBench_Reader_ARVIDEO_Reader_TestBench_LDADD          =   -larsal                                 \
-                                                                -larnetworkal                           \
-                                                                -larnetwork                             \
-                                                                libarvideo_dbg.la
-___TestBench_MP4Sender_ARVIDEO_MP4Sender_TestBench_LDADD    =   -larsal                                 \
-                                                                -larnetworkal                           \
-                                                                -larnetwork                             \
-                                                                libarvideo_dbg.la
+___TestBench_Linux_Sender_ARVIDEO_Sender_TestBench_LDADD            =   -larsal                         \
+                                                                        -larnetworkal                   \
+                                                                        -larnetwork                     \
+                                                                        libarvideo_dbg.la
+___TestBench_Linux_Reader_ARVIDEO_Reader_TestBench_LDADD            =   -larsal                         \
+                                                                        -larnetworkal                   \
+                                                                        -larnetwork                     \
+                                                                        libarvideo_dbg.la
+___TestBench_Linux_MP4Sender_ARVIDEO_MP4Sender_TestBench_LDADD      =   -larsal                         \
+                                                                        -larnetworkal                   \
+                                                                        -larnetwork                     \
+                                                                        libarvideo_dbg.la
 else
-___TestBench_Sender_ARVIDEO_Sender_TestBench_LDADD          =   -larsal                                 \
-                                                                -larnetworkal                           \
-                                                                -larnetwork                             \
-                                                                libarvideo.la
-___TestBench_Reader_ARVIDEO_Reader_TestBench_LDADD          =   -larsal                                 \
-                                                                -larnetworkal                           \
-                                                                -larnetwork                             \
-                                                                libarvideo.la
-___TestBench_MP4Sender_ARVIDEO_MP4Sender_TestBench_LDADD    =   -larsal                                 \
-                                                                -larnetworkal                           \
-                                                                -larnetwork                             \
-                                                                libarvideo.la
+___TestBench_Linux_Sender_ARVIDEO_Sender_TestBench_LDADD            =   -larsal                         \
+                                                                        -larnetworkal                   \
+                                                                        -larnetwork                     \
+                                                                        libarvideo.la
+___TestBench_Linux_Reader_ARVIDEO_Reader_TestBench_LDADD            =   -larsal                         \
+                                                                        -larnetworkal                   \
+                                                                        -larnetwork                     \
+                                                                        libarvideo.la
+___TestBench_Linux_MP4Sender_ARVIDEO_MP4Sender_TestBench_LDADD      =   -larsal                         \
+                                                                        -larnetworkal                   \
+                                                                        -larnetwork                     \
+                                                                        libarvideo.la
 endif
 
 CLEAN_FILES                                                 =   libarvideo.la                           \

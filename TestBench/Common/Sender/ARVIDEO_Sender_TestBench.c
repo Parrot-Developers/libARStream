@@ -281,7 +281,7 @@ int ARVIDEO_SenderTb_StartVideoTest (ARNETWORK_Manager_t *manager)
  * Implementation
  */
 
-int main (int argc, char *argv[])
+int ARVIDEO_Sender_TestBenchMain (int argc, char *argv[])
 {
     int retVal = 0;
     appName = argv[0];

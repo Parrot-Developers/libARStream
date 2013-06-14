@@ -1,5 +1,5 @@
 /**
- * @file ARVIDEO_Sender_TestBench.c
+ * @file ARVIDEO_MP4Sender_TestBench.c
  * @brief Testbench for the ARVIDEO_Sender submodule
  * This testbench sends video frames from a mp4 file
  * @date 04/18/2013
@@ -521,7 +521,7 @@ int ARVIDEO_MP4SenderTb_JumpToAtom (const char *atomName)
  * Implementation
  */
 
-int main (int argc, char *argv[])
+int ARVIDEO_MP4Sender_TestBenchMain (int argc, char *argv[])
 {
     int retVal = 0;
     appName = argv[0];

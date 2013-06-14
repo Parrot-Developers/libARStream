@@ -265,7 +265,7 @@ int ARVIDEO_ReaderTb_StartVideoTest (ARNETWORK_Manager_t *manager, const char *o
  * Implementation
  */
 
-int main (int argc, char *argv[])
+int ARVIDEO_Reader_TestBenchMain (int argc, char *argv[])
 {
     int retVal = 0;
     appName = argv[0];
