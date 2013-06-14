@@ -542,8 +542,8 @@ void* ARVIDEO_Sender_RunDataThread (void *ARVIDEO_Sender_t_Param)
     while (sender->threadsShouldStop == 0)
     {
         int waitRes;
-        ARSAL_Mutex_Lock (&(sender->ackMutex));
         waitRes = ARVIDEO_Sender_PopFromQueue (sender, &nextFrame, sender->currentFrameCbWasCalled);
+        ARSAL_Mutex_Lock (&(sender->ackMutex));
         if (waitRes == 1)
         {
             ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARVIDEO_SENDER_TAG, "Previous frame was sent in %d packets. Frame size was %d packets", numbersOfFragmentsSentForCurrentFrame, nbPackets);
