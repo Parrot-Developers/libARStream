@@ -28,7 +28,7 @@
 #define ACK_BUFFER_ID (50)
 #define DATA_BUFFER_ID (51)
 
-#define SENDING_PORT (12345)
+#define SENDING_PORT (43210)
 #define READING_PORT (54321)
 
 #define FRAME_MIN_SIZE (2000)

@@ -32,7 +32,7 @@
 #define DATA_BUFFER_ID (51)
 
 #define SENDING_PORT (54321)
-#define READING_PORT (12345)
+#define READING_PORT (43210)
 
 #define NB_BUFFERS (15)
 #define I_FRAME_EVERY_N (10)

@@ -29,7 +29,7 @@
 #define DATA_BUFFER_ID (51)
 
 #define SENDING_PORT (54321)
-#define READING_PORT (12345)
+#define READING_PORT (43210)
 
 #define FRAME_MIN_SIZE (5000)
 #define FRAME_MAX_SIZE (5000)
