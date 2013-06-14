@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="2.0" toolsVersion="3084" systemVersion="11G56" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" initialViewController="2">
+    <dependencies>
+        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="2083"/>
+    </dependencies>
+    <scenes>
+        <!--View Controller-->
+        <scene sceneID="5">
+            <objects>
+                <viewController id="2" customClass="ARVViewController" sceneMemberID="viewController">
+                    <view key="view" contentMode="scaleToFill" id="3">
+                        <rect key="frame" x="0.0" y="20" width="320" height="548"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                        <subviews>
+                            <textField opaque="NO" clipsSubviews="YES" contentMode="scaleToFill" contentHorizontalAlignment="left" contentVerticalAlignment="center" text="172.20.5.12" borderStyle="bezel" textAlignment="center" minimumFontSize="17" translatesAutoresizingMaskIntoConstraints="NO" id="V9c-nY-s7O">
+                                <constraints>
+                                    <constraint firstAttribute="height" constant="30" id="eyn-B2-bzo"/>
+                                </constraints>
+                                <fontDescription key="fontDescription" type="system" pointSize="14"/>
+                                <textInputTraits key="textInputTraits"/>
+                            </textField>
+                            <label opaque="NO" clipsSubviews="YES" userInteractionEnabled="NO" contentMode="left" text="IP" textAlignment="center" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="joH-ER-zl3">
+                                <constraints>
+                                    <constraint firstAttribute="height" constant="21" id="66j-b4-7UO"/>
+                                </constraints>
+                                <fontDescription key="fontDescription" name="HelveticaNeue-CondensedBold" family="Helvetica Neue" pointSize="17"/>
+                                <color key="textColor" cocoaTouchSystemColor="darkTextColor"/>
+                                <nil key="highlightedColor"/>
+                            </label>
+                            <button opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="kHy-mi-mbG">
+                                <color key="backgroundColor" white="0.0" alpha="0.90000000000000002" colorSpace="custom" customColorSpace="calibratedWhite"/>
+                                <constraints>
+                                    <constraint firstAttribute="height" constant="44" id="Y7i-Y7-VO9"/>
+                                </constraints>
+                                <fontDescription key="fontDescription" type="boldSystem" pointSize="15"/>
+                                <state key="normal" title="Reader">
+                                    <color key="titleColor" red="1" green="0.47058823529999999" blue="0.0" alpha="1" colorSpace="calibratedRGB"/>
+                                    <color key="titleShadowColor" white="0.5" alpha="1" colorSpace="calibratedWhite"/>
+                                </state>
+                                <state key="highlighted">
+                                    <color key="titleColor" white="1" alpha="1" colorSpace="calibratedWhite"/>
+                                </state>
+                                <connections>
+                                    <action selector="readerGo:" destination="2" eventType="touchUpInside" id="caH-18-HKd"/>
+                                </connections>
+                            </button>
+                            <button opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="Geo-ER-zvU">
+                                <color key="backgroundColor" white="0.0" alpha="0.90000000000000002" colorSpace="custom" customColorSpace="calibratedWhite"/>
+                                <fontDescription key="fontDescription" type="boldSystem" pointSize="15"/>
+                                <state key="normal" title="Sender">
+                                    <color key="titleColor" red="1" green="0.47058823529999999" blue="0.0" alpha="1" colorSpace="calibratedRGB"/>
+                                    <color key="titleShadowColor" white="0.5" alpha="1" colorSpace="calibratedWhite"/>
+                                </state>
+                                <state key="highlighted">
+                                    <color key="titleColor" white="1" alpha="1" colorSpace="calibratedWhite"/>
+                                </state>
+                                <connections>
+                                    <action selector="senderGo:" destination="2" eventType="touchUpInside" id="LuV-Yu-6JP"/>
+                                </connections>
+                            </button>
+                        </subviews>
+                        <color key="backgroundColor" white="1" alpha="1" colorSpace="custom" customColorSpace="calibratedWhite"/>
+                        <constraints>
+                            <constraint firstItem="joH-ER-zl3" firstAttribute="top" secondItem="3" secondAttribute="top" constant="20" symbolic="YES" type="default" id="0zo-R8-iW0"/>
+                            <constraint firstItem="Geo-ER-zvU" firstAttribute="leading" secondItem="kHy-mi-mbG" secondAttribute="trailing" constant="8" symbolic="YES" type="user" id="1He-eW-4vb"/>
+                            <constraint firstAttribute="bottom" secondItem="Geo-ER-zvU" secondAttribute="bottom" constant="20" symbolic="YES" type="default" id="5ne-fV-Be0"/>
+                            <constraint firstItem="V9c-nY-s7O" firstAttribute="top" secondItem="joH-ER-zl3" secondAttribute="bottom" constant="8" symbolic="YES" type="default" id="7QI-R9-hqT"/>
+                            <constraint firstItem="V9c-nY-s7O" firstAttribute="leading" secondItem="3" secondAttribute="leading" constant="20" symbolic="YES" type="default" id="BTN-Ff-sKv"/>
+                            <constraint firstAttribute="trailing" secondItem="Geo-ER-zvU" secondAttribute="trailing" constant="20" symbolic="YES" type="user" id="akc-RO-csi"/>
+                            <constraint firstItem="joH-ER-zl3" firstAttribute="leading" secondItem="3" secondAttribute="leading" constant="20" symbolic="YES" type="default" id="hx5-Ed-DS3"/>
+                            <constraint firstItem="kHy-mi-mbG" firstAttribute="top" secondItem="Geo-ER-zvU" secondAttribute="top" type="default" id="jXv-XB-PRO"/>
+                            <constraint firstAttribute="trailing" secondItem="V9c-nY-s7O" secondAttribute="trailing" constant="20" symbolic="YES" type="default" id="rEM-cj-k4E"/>
+                            <constraint firstItem="Geo-ER-zvU" firstAttribute="width" secondItem="kHy-mi-mbG" secondAttribute="width" type="user" id="u1Z-ti-JWD"/>
+                            <constraint firstAttribute="bottom" secondItem="kHy-mi-mbG" secondAttribute="bottom" constant="20" symbolic="YES" type="default" id="voi-E6-jMO"/>
+                            <constraint firstItem="kHy-mi-mbG" firstAttribute="leading" secondItem="3" secondAttribute="leading" constant="20" symbolic="YES" type="user" id="wbX-tV-hk4"/>
+                            <constraint firstAttribute="trailing" secondItem="joH-ER-zl3" secondAttribute="trailing" constant="20" symbolic="YES" type="default" id="wfj-JU-end"/>
+                        </constraints>
+                    </view>
+                    <connections>
+                        <outlet property="ipField" destination="V9c-nY-s7O" id="yNz-qp-hyf"/>
+                        <outlet property="readerButton" destination="kHy-mi-mbG" id="Zzm-HE-S7z"/>
+                        <outlet property="senderButton" destination="Geo-ER-zvU" id="J26-Eq-XE5"/>
+                    </connections>
+                </viewController>
+                <placeholder placeholderIdentifier="IBFirstResponder" id="4" sceneMemberID="firstResponder"/>
+            </objects>
+        </scene>
+    </scenes>
+    <classes>
+        <class className="ARVViewController" superclassName="UIViewController">
+            <source key="sourceIdentifier" type="project" relativePath="./Classes/ARVViewController.h"/>
+            <relationships>
+                <relationship kind="action" name="readerGo:"/>
+                <relationship kind="action" name="senderGo:"/>
+                <relationship kind="outlet" name="ipField" candidateClass="UITextField"/>
+                <relationship kind="outlet" name="readerButton" candidateClass="UIButton"/>
+                <relationship kind="outlet" name="senderButton" candidateClass="UIButton"/>
+            </relationships>
+        </class>
+        <class className="NSLayoutConstraint" superclassName="NSObject">
+            <source key="sourceIdentifier" type="project" relativePath="./Classes/NSLayoutConstraint.h"/>
+        </class>
+    </classes>
+    <simulatedMetricsContainer key="defaultSimulatedMetrics">
+        <simulatedStatusBarMetrics key="statusBar"/>
+        <simulatedOrientationMetrics key="orientation"/>
+        <simulatedScreenMetrics key="destination" type="retina4"/>
+    </simulatedMetricsContainer>
+</document>

@@ -73,12 +73,12 @@ static char *appName;
 /**
  * @brief Print the parameters of the application
  */
-void printUsage ();
+void ARVIDEO_SenderTb_printUsage ();
 
 /**
  * @brief Initializes the multi buffers of the testbench
  */
-void initMultiBuffers ();
+void ARVIDEO_SenderTb_initMultiBuffers ();
 
 /**
  * @see ARVIDEO_Sender.h
@@ -117,13 +117,13 @@ int ARVIDEO_SenderTb_StartVideoTest (ARNETWORK_Manager_t *manager);
  * Internal functions implementation
  */
 
-void printUsage ()
+void ARVIDEO_SenderTb_printUsage ()
 {
     ARSAL_PRINT (ARSAL_PRINT_ERROR, __TAG__, "Usage : %s [ip]", appName);
     ARSAL_PRINT (ARSAL_PRINT_ERROR, __TAG__, "        ip -> optionnal, ip of the video reader");
 }
 
-void initMultiBuffers ()
+void ARVIDEO_SenderTb_initMultiBuffers ()
 {
     int buffIndex;
     for (buffIndex = 0; buffIndex < NB_BUFFERS; buffIndex++)
@@ -245,9 +245,9 @@ void* fakeEncoderThread (void *ARVIDEO_Sender_t_Param)
 
 int ARVIDEO_SenderTb_StartVideoTest (ARNETWORK_Manager_t *manager)
 {
-    int retVal;
+    int retVal = 0;
     ARVIDEO_Sender_t *sender;
-    initMultiBuffers ();
+    ARVIDEO_SenderTb_initMultiBuffers ();
     sender = ARVIDEO_Sender_New (manager, DATA_BUFFER_ID, ACK_BUFFER_ID, ARVIDEO_SenderTb_FrameUpdateCallback, NB_BUFFERS);
     if (sender == NULL)
     {
@@ -287,7 +287,7 @@ int ARVIDEO_Sender_TestBenchMain (int argc, char *argv[])
     appName = argv[0];
     if (3 <=  argc)
     {
-        printUsage ();
+        ARVIDEO_SenderTb_printUsage ();
         return 1;
     }
 

@@ -79,13 +79,13 @@ static uint32_t *framesSizeArray;
 /**
  * @brief Print the parameters of the application
  */
-void printUsage ();
+void ARVIDEO_MP4SenderTb_printUsage ();
 
 /**
  * @brief Initializes the multi buffers of the testbench
  * @param maxsize Maximum size of a frame in the current mp4 file
  */
-void initMultiBuffers (int maxsize);
+void ARVIDEO_MP4SenderTb_initMultiBuffers (int maxsize);
 
 /**
  * @see ARVIDEO_Sender.h
@@ -151,14 +151,14 @@ int ARVIDEO_MP4SenderTb_JumpToAtom (const char *atomName);
  * Internal functions implementation
  */
 
-void printUsage ()
+void ARVIDEO_MP4SenderTb_printUsage ()
 {
     ARSAL_PRINT (ARSAL_PRINT_ERROR, __TAG__, "Usage : %s file [ip]", appName);
     ARSAL_PRINT (ARSAL_PRINT_ERROR, __TAG__, "        file -> mp4 file to read from");
     ARSAL_PRINT (ARSAL_PRINT_ERROR, __TAG__, "        ip -> optionnal, ip of the video reader");
 }
 
-void initMultiBuffers (int maxsize)
+void ARVIDEO_MP4SenderTb_initMultiBuffers (int maxsize)
 {
     int buffIndex;
     for (buffIndex = 0; buffIndex < NB_BUFFERS; buffIndex++)
@@ -266,9 +266,9 @@ void* fileReaderThread (void *ARVIDEO_Sender_t_Param)
 
 int ARVIDEO_MP4SenderTb_StartVideoTest (const char *fpath, ARNETWORK_Manager_t *manager)
 {
-    int retVal;
+    int retVal = 0;
     ARVIDEO_Sender_t *sender;
-    initMultiBuffers (ARVIDEO_MP4SenderTb_OpenVideoFile (fpath));
+    ARVIDEO_MP4SenderTb_initMultiBuffers (ARVIDEO_MP4SenderTb_OpenVideoFile (fpath));
     sender = ARVIDEO_Sender_New (manager, DATA_BUFFER_ID, ACK_BUFFER_ID, ARVIDEO_MP4SenderTb_FrameUpdateCallback, NB_BUFFERS);
     if (sender == NULL)
     {
@@ -527,7 +527,7 @@ int ARVIDEO_MP4Sender_TestBenchMain (int argc, char *argv[])
     appName = argv[0];
     if (argc < 2)
     {
-        printUsage ();
+        ARVIDEO_MP4SenderTb_printUsage ();
         return 1;
     }
 

@@ -68,13 +68,13 @@ static FILE *outFile;
 /**
  * @brief Print the parameters of the application
  */
-void printUsage ();
+void ARVIDEO_ReaderTb_printUsage ();
 
 /**
  * @brief Initializes the multi buffers of the testbench
  * @param initialSize Initial size of the buffers
  */
-void initMultiBuffers (int initialSize);
+void ARVIDEO_ReaderTb_initMultiBuffers (int initialSize);
 
 /**
  * @brief Realloc a buffer to a new size
@@ -113,14 +113,14 @@ int ARVIDEO_ReaderTb_StartVideoTest (ARNETWORK_Manager_t *manager, const char *o
  * Internal functions implementation
  */
 
-void printUsage ()
+void ARVIDEO_ReaderTb_printUsage ()
 {
     ARSAL_PRINT (ARSAL_PRINT_ERROR, __TAG__, "Usage : %s [ip] [outFile]", appName);
     ARSAL_PRINT (ARSAL_PRINT_ERROR, __TAG__, "        ip -> optionnal, ip of the video reader");
     ARSAL_PRINT (ARSAL_PRINT_ERROR, __TAG__, "        outFile -> optionnal (ip must be provided), output file for received video stream");
 }
 
-void initMultiBuffers (int initialSize)
+void ARVIDEO_ReaderTb_initMultiBuffers (int initialSize)
 {
     int buffIndex;
     for (buffIndex = 0; buffIndex < NB_BUFFERS; buffIndex++)
@@ -217,7 +217,7 @@ uint8_t* ARVIDEO_ReaderTb_GetNextFreeBuffer (uint32_t *retSize, int reallocToDou
 
 int ARVIDEO_ReaderTb_StartVideoTest (ARNETWORK_Manager_t *manager, const char *outPath)
 {
-    int retVal;
+    int retVal = 0;
     ARVIDEO_Reader_t *reader;
     uint8_t *firstFrame;
     uint32_t firstFrameSize;
@@ -229,7 +229,7 @@ int ARVIDEO_ReaderTb_StartVideoTest (ARNETWORK_Manager_t *manager, const char *o
     {
         outFile = NULL;
     }
-    initMultiBuffers (FRAME_MAX_SIZE);
+    ARVIDEO_ReaderTb_initMultiBuffers (FRAME_MAX_SIZE);
     ARSAL_Sem_Init (&closeSem, 0, 0);
     firstFrame = ARVIDEO_ReaderTb_GetNextFreeBuffer (&firstFrameSize, 0);
     reader = ARVIDEO_Reader_New (manager, DATA_BUFFER_ID, ACK_BUFFER_ID, ARVIDEO_ReaderTb_FrameCompleteCallback, firstFrame, firstFrameSize);
@@ -271,7 +271,7 @@ int ARVIDEO_Reader_TestBenchMain (int argc, char *argv[])
     appName = argv[0];
     if (argc > 3)
     {
-        printUsage ();
+        ARVIDEO_ReaderTb_printUsage ();
         return 1;
     }
 
@@ -286,6 +286,8 @@ int ARVIDEO_Reader_TestBenchMain (int argc, char *argv[])
     {
         outPath = argv[2];
     }
+    
+    printf ("IP = %s", ip);
 
     int nbInBuff = 1;
     ARNETWORK_IOBufferParam_t inParams;
