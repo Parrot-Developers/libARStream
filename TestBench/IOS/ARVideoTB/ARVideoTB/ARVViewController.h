@@ -8,13 +8,19 @@
 
 #import <UIKit/UIKit.h>
 
-@interface ARVViewController : UIViewController {
+@interface ARVViewController : UIViewController <UITextFieldDelegate> {
     IBOutlet UITextField *ipField;
     IBOutlet UIButton *senderButton;
     IBOutlet UIButton *readerButton;
+    IBOutlet UILabel *percentOk;
+    IBOutlet UILabel *latency;
 }
 
 - (IBAction)senderGo:(id)sender;
 - (IBAction)readerGo:(id)sender;
+
+@property (nonatomic) BOOL running;
+@property (nonatomic) BOOL isSender;
+@property (nonatomic, strong) NSTimer *refreshTimer;
 
 @end

@@ -59,6 +59,10 @@
  * Globals
  */
 
+float ARVIDEO_MP4Sender_PercentOk = 0.0;
+static int nbSent = 0;
+static int nbOk = 0;
+
 static int currentBufferIndex = 0;
 static uint8_t *multiBuffer[NB_BUFFERS];
 static uint32_t multiBufferSize[NB_BUFFERS];
@@ -176,10 +180,15 @@ void ARVIDEO_MP4SenderTb_FrameUpdateCallback (eARVIDEO_SENDER_STATUS status, uin
     case ARVIDEO_SENDER_STATUS_FRAME_SENT:
         ARVIDEO_MP4SenderTb_SetBufferFree (framePointer);
         ARSAL_PRINT (ARSAL_PRINT_WARNING, __TAG__, "Successfully sent a frame of size %u", frameSize);
+        nbSent++;
+        nbOk++;
+        ARVIDEO_MP4Sender_PercentOk = (100.f * nbOk) / (1.f * nbSent);
         break;
     case ARVIDEO_SENDER_STATUS_FRAME_CANCEL:
         ARVIDEO_MP4SenderTb_SetBufferFree (framePointer);
         ARSAL_PRINT (ARSAL_PRINT_WARNING, __TAG__, "Cancelled a frame of size %u", frameSize);
+        nbSent++;
+        ARVIDEO_MP4Sender_PercentOk = (100.f * nbOk) / (1.f * nbSent);
         break;
     default:
         // All cases handled

@@ -50,7 +50,12 @@
  * Globals
  */
 
+float ARVIDEO_Reader_PercentOk = 100.f;
+static int nbRead = 0;
+static int nbSkipped = 0;
+
 ARSAL_Sem_t closeSem;
+static ARNETWORK_Manager_t *g_Manager = NULL;
 
 static int currentBufferIndex = 0;
 static uint8_t *multiBuffer[NB_BUFFERS];
@@ -143,10 +148,16 @@ uint8_t* ARVIDEO_ReaderTb_FrameCompleteCallback (eARVIDEO_READER_CAUSE cause, ui
     {
     case ARVIDEO_READER_CAUSE_FRAME_COMPLETE:
         ARSAL_PRINT (ARSAL_PRINT_WARNING, __TAG__, "Got a complete frame of size %d, at address %p", frameSize, framePointer);
+        nbRead++;
         if (numberOfSkippedFrames != 0)
         {
             ARSAL_PRINT (ARSAL_PRINT_WARNING, __TAG__, "Skipped %d frames", numberOfSkippedFrames);
+            if (numberOfSkippedFrames > 0)
+            {
+                nbSkipped += numberOfSkippedFrames;
+            }
         }
+        ARVIDEO_Reader_PercentOk = (100.f * nbRead) / (1.f * (nbRead + nbSkipped));
         if (outFile != NULL)
         {
             fwrite (framePointer, 1, frameSize, outFile);
@@ -297,7 +308,6 @@ int ARVIDEO_Reader_TestBenchMain (int argc, char *argv[])
     ARVIDEO_Reader_InitVideoDataBuffer (&outParams, DATA_BUFFER_ID);
 
     eARNETWORK_ERROR error;
-    ARNETWORK_Manager_t *manager = NULL;
     eARNETWORKAL_ERROR specificError = ARNETWORKAL_OK;
     ARNETWORKAL_Manager_t *osspecificManagerPtr = ARNETWORKAL_Manager_New(&specificError);
 
@@ -308,14 +318,14 @@ int ARVIDEO_Reader_TestBenchMain (int argc, char *argv[])
 
     if(specificError == ARNETWORKAL_OK)
     {
-        manager = ARNETWORK_Manager_New(osspecificManagerPtr, nbInBuff, &inParams, nbOutBuff, &outParams, &error);
+        g_Manager = ARNETWORK_Manager_New(osspecificManagerPtr, nbInBuff, &inParams, nbOutBuff, &outParams, &error);
     }
     else
     {
         error = ARNETWORK_ERROR;
     }
 
-    if ((manager == NULL) ||
+    if ((g_Manager == NULL) ||
         (error != ARNETWORK_OK))
     {
         ARSAL_PRINT (ARSAL_PRINT_ERROR, __TAG__, "Error during ARNETWORK_Manager_New call : %d", error);
@@ -323,17 +333,29 @@ int ARVIDEO_Reader_TestBenchMain (int argc, char *argv[])
     }
 
     pthread_t netsend, netread;
-    pthread_create (&netsend, NULL, ARNETWORK_Manager_SendingThreadRun, manager);
-    pthread_create (&netread, NULL, ARNETWORK_Manager_ReceivingThreadRun, manager);
+    pthread_create (&netsend, NULL, ARNETWORK_Manager_SendingThreadRun, g_Manager);
+    pthread_create (&netread, NULL, ARNETWORK_Manager_ReceivingThreadRun, g_Manager);
 
-    retVal = ARVIDEO_ReaderTb_StartVideoTest (manager, outPath);
+    retVal = ARVIDEO_ReaderTb_StartVideoTest (g_Manager, outPath);
 
-    ARNETWORK_Manager_Stop (manager);
+    ARNETWORK_Manager_Stop (g_Manager);
 
     pthread_join (netread, NULL);
     pthread_join (netsend, NULL);
 
-    ARNETWORK_Manager_Delete (&manager);
+    ARNETWORK_Manager_Delete (&g_Manager);
 
     return retVal;
+}
+
+int ARVIDEO_ReaderTb_GetLatency ()
+{
+    if (g_Manager == NULL)
+    {
+        return -1;
+    }
+    else
+    {
+        return ARNETWORK_Manager_GetEstimatedLatency(g_Manager);
+    }
 }

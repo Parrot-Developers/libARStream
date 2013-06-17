@@ -16,4 +16,15 @@
  */
 int ARVIDEO_Reader_TestBenchMain (int argc, char *argv[]);
 
+/**
+ * Percentage of frames which were correclty received
+ */
+extern float ARVIDEO_Reader_PercentOk;
+
+/**
+ * Gets libARNetwork estimated Latency
+ * @return estimated network latency in ms
+ */
+int ARVIDEO_ReaderTb_GetLatency ();
+
 #endif /* _ARVIDEO_READER_TESTBENCH_H_ */

@@ -16,4 +16,9 @@
  */
 int ARVIDEO_MP4Sender_TestBenchMain (int argc, char *argv[]);
 
+/**
+ * Percentage of frames which were correclty sent
+ */
+extern float ARVIDEO_MP4Sender_PercentOk;
+
 #endif /* _ARVIDEO_MP4SENDER_TESTBENCH_H_ */

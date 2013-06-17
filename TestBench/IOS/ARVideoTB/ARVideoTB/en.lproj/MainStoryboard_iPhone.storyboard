@@ -14,14 +14,17 @@
                         <subviews>
                             <textField opaque="NO" clipsSubviews="YES" contentMode="scaleToFill" contentHorizontalAlignment="left" contentVerticalAlignment="center" text="172.20.5.12" borderStyle="bezel" textAlignment="center" minimumFontSize="17" translatesAutoresizingMaskIntoConstraints="NO" id="V9c-nY-s7O">
                                 <constraints>
-                                    <constraint firstAttribute="height" constant="30" id="eyn-B2-bzo"/>
+                                    <constraint firstAttribute="height" constant="29" type="user" id="If0-b2-hpg"/>
                                 </constraints>
-                                <fontDescription key="fontDescription" type="system" pointSize="14"/>
+                                <fontDescription key="fontDescription" name="HelveticaNeue-CondensedBold" family="Helvetica Neue" pointSize="14"/>
                                 <textInputTraits key="textInputTraits"/>
+                                <connections>
+                                    <outlet property="delegate" destination="2" id="2O7-1v-6PW"/>
+                                </connections>
                             </textField>
                             <label opaque="NO" clipsSubviews="YES" userInteractionEnabled="NO" contentMode="left" text="IP" textAlignment="center" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="joH-ER-zl3">
                                 <constraints>
-                                    <constraint firstAttribute="height" constant="21" id="66j-b4-7UO"/>
+                                    <constraint firstAttribute="height" constant="21" type="user" id="66j-b4-7UO"/>
                                 </constraints>
                                 <fontDescription key="fontDescription" name="HelveticaNeue-CondensedBold" family="Helvetica Neue" pointSize="17"/>
                                 <color key="textColor" cocoaTouchSystemColor="darkTextColor"/>
@@ -30,10 +33,10 @@
                             <button opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="kHy-mi-mbG">
                                 <color key="backgroundColor" white="0.0" alpha="0.90000000000000002" colorSpace="custom" customColorSpace="calibratedWhite"/>
                                 <constraints>
-                                    <constraint firstAttribute="height" constant="44" id="Y7i-Y7-VO9"/>
+                                    <constraint firstAttribute="height" constant="44" type="user" id="Y7i-Y7-VO9"/>
                                 </constraints>
-                                <fontDescription key="fontDescription" type="boldSystem" pointSize="15"/>
-                                <state key="normal" title="Reader">
+                                <fontDescription key="fontDescription" name="HelveticaNeue-CondensedBold" family="Helvetica Neue" pointSize="15"/>
+                                <state key="normal" title="READER">
                                     <color key="titleColor" red="1" green="0.47058823529999999" blue="0.0" alpha="1" colorSpace="calibratedRGB"/>
                                     <color key="titleShadowColor" white="0.5" alpha="1" colorSpace="calibratedWhite"/>
                                 </state>
@@ -46,8 +49,8 @@
                             </button>
                             <button opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="Geo-ER-zvU">
                                 <color key="backgroundColor" white="0.0" alpha="0.90000000000000002" colorSpace="custom" customColorSpace="calibratedWhite"/>
-                                <fontDescription key="fontDescription" type="boldSystem" pointSize="15"/>
-                                <state key="normal" title="Sender">
+                                <fontDescription key="fontDescription" name="HelveticaNeue-CondensedBold" family="Helvetica Neue" pointSize="15"/>
+                                <state key="normal" title="SENDER">
                                     <color key="titleColor" red="1" green="0.47058823529999999" blue="0.0" alpha="1" colorSpace="calibratedRGB"/>
                                     <color key="titleShadowColor" white="0.5" alpha="1" colorSpace="calibratedWhite"/>
                                 </state>
@@ -58,26 +61,44 @@
                                     <action selector="senderGo:" destination="2" eventType="touchUpInside" id="LuV-Yu-6JP"/>
                                 </connections>
                             </button>
+                            <label opaque="NO" clipsSubviews="YES" userInteractionEnabled="NO" contentMode="left" text="PercentOK" textAlignment="center" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="8QE-K1-Wkr">
+                                <fontDescription key="fontDescription" name="HelveticaNeue-CondensedBold" family="Helvetica Neue" pointSize="17"/>
+                                <color key="textColor" cocoaTouchSystemColor="darkTextColor"/>
+                                <nil key="highlightedColor"/>
+                            </label>
+                            <label opaque="NO" clipsSubviews="YES" userInteractionEnabled="NO" contentMode="left" text="Latency" textAlignment="center" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="QbL-WF-sPw">
+                                <fontDescription key="fontDescription" name="HelveticaNeue-CondensedBold" family="Helvetica Neue" pointSize="17"/>
+                                <color key="textColor" cocoaTouchSystemColor="darkTextColor"/>
+                                <nil key="highlightedColor"/>
+                            </label>
                         </subviews>
                         <color key="backgroundColor" white="1" alpha="1" colorSpace="custom" customColorSpace="calibratedWhite"/>
                         <constraints>
-                            <constraint firstItem="joH-ER-zl3" firstAttribute="top" secondItem="3" secondAttribute="top" constant="20" symbolic="YES" type="default" id="0zo-R8-iW0"/>
+                            <constraint firstItem="joH-ER-zl3" firstAttribute="top" secondItem="3" secondAttribute="top" constant="20" symbolic="YES" type="user" id="0zo-R8-iW0"/>
                             <constraint firstItem="Geo-ER-zvU" firstAttribute="leading" secondItem="kHy-mi-mbG" secondAttribute="trailing" constant="8" symbolic="YES" type="user" id="1He-eW-4vb"/>
-                            <constraint firstAttribute="bottom" secondItem="Geo-ER-zvU" secondAttribute="bottom" constant="20" symbolic="YES" type="default" id="5ne-fV-Be0"/>
-                            <constraint firstItem="V9c-nY-s7O" firstAttribute="top" secondItem="joH-ER-zl3" secondAttribute="bottom" constant="8" symbolic="YES" type="default" id="7QI-R9-hqT"/>
-                            <constraint firstItem="V9c-nY-s7O" firstAttribute="leading" secondItem="3" secondAttribute="leading" constant="20" symbolic="YES" type="default" id="BTN-Ff-sKv"/>
-                            <constraint firstAttribute="trailing" secondItem="Geo-ER-zvU" secondAttribute="trailing" constant="20" symbolic="YES" type="user" id="akc-RO-csi"/>
-                            <constraint firstItem="joH-ER-zl3" firstAttribute="leading" secondItem="3" secondAttribute="leading" constant="20" symbolic="YES" type="default" id="hx5-Ed-DS3"/>
-                            <constraint firstItem="kHy-mi-mbG" firstAttribute="top" secondItem="Geo-ER-zvU" secondAttribute="top" type="default" id="jXv-XB-PRO"/>
-                            <constraint firstAttribute="trailing" secondItem="V9c-nY-s7O" secondAttribute="trailing" constant="20" symbolic="YES" type="default" id="rEM-cj-k4E"/>
+                            <constraint firstAttribute="bottom" secondItem="Geo-ER-zvU" secondAttribute="bottom" constant="20" symbolic="YES" type="user" id="5ne-fV-Be0"/>
+                            <constraint firstItem="V9c-nY-s7O" firstAttribute="top" secondItem="joH-ER-zl3" secondAttribute="bottom" constant="8" symbolic="YES" type="user" id="7QI-R9-hqT"/>
+                            <constraint firstAttribute="trailing" secondItem="joH-ER-zl3" secondAttribute="trailing" constant="18" type="user" id="BSG-NL-SGA"/>
+                            <constraint firstItem="V9c-nY-s7O" firstAttribute="leading" secondItem="3" secondAttribute="leading" constant="20" symbolic="YES" type="user" id="BTN-Ff-sKv"/>
+                            <constraint firstItem="8QE-K1-Wkr" firstAttribute="top" secondItem="V9c-nY-s7O" secondAttribute="bottom" constant="8" symbolic="YES" type="user" id="Ge6-HI-gtd"/>
+                            <constraint firstItem="QbL-WF-sPw" firstAttribute="top" secondItem="8QE-K1-Wkr" secondAttribute="bottom" constant="8" symbolic="YES" type="default" id="PpE-ud-tiz"/>
+                            <constraint firstAttribute="trailing" secondItem="QbL-WF-sPw" secondAttribute="trailing" constant="20" symbolic="YES" type="default" id="Ruz-RB-Q3y"/>
+                            <constraint firstAttribute="trailing" secondItem="8QE-K1-Wkr" secondAttribute="trailing" constant="20" symbolic="YES" type="default" id="YKv-3F-uy9"/>
+                            <constraint firstAttribute="trailing" secondItem="Geo-ER-zvU" secondAttribute="trailing" constant="20" symbolic="YES" type="user" id="f1O-QJ-UWG"/>
+                            <constraint firstItem="joH-ER-zl3" firstAttribute="leading" secondItem="3" secondAttribute="leading" constant="20" symbolic="YES" type="user" id="hx5-Ed-DS3"/>
+                            <constraint firstItem="Geo-ER-zvU" firstAttribute="height" secondItem="kHy-mi-mbG" secondAttribute="height" type="user" id="n6y-bQ-uhr"/>
+                            <constraint firstAttribute="trailing" secondItem="V9c-nY-s7O" secondAttribute="trailing" constant="20" symbolic="YES" type="user" id="taQ-J3-j53"/>
                             <constraint firstItem="Geo-ER-zvU" firstAttribute="width" secondItem="kHy-mi-mbG" secondAttribute="width" type="user" id="u1Z-ti-JWD"/>
-                            <constraint firstAttribute="bottom" secondItem="kHy-mi-mbG" secondAttribute="bottom" constant="20" symbolic="YES" type="default" id="voi-E6-jMO"/>
+                            <constraint firstItem="8QE-K1-Wkr" firstAttribute="leading" secondItem="3" secondAttribute="leading" constant="20" symbolic="YES" type="default" id="vUC-oT-Drh"/>
+                            <constraint firstAttribute="bottom" secondItem="kHy-mi-mbG" secondAttribute="bottom" constant="20" symbolic="YES" type="user" id="voi-E6-jMO"/>
                             <constraint firstItem="kHy-mi-mbG" firstAttribute="leading" secondItem="3" secondAttribute="leading" constant="20" symbolic="YES" type="user" id="wbX-tV-hk4"/>
-                            <constraint firstAttribute="trailing" secondItem="joH-ER-zl3" secondAttribute="trailing" constant="20" symbolic="YES" type="default" id="wfj-JU-end"/>
+                            <constraint firstItem="QbL-WF-sPw" firstAttribute="leading" secondItem="3" secondAttribute="leading" constant="20" symbolic="YES" type="default" id="xcS-x9-eXX"/>
                         </constraints>
                     </view>
                     <connections>
                         <outlet property="ipField" destination="V9c-nY-s7O" id="yNz-qp-hyf"/>
+                        <outlet property="latency" destination="QbL-WF-sPw" id="8zv-uP-0eE"/>
+                        <outlet property="percentOk" destination="8QE-K1-Wkr" id="JyW-Ja-ZMq"/>
                         <outlet property="readerButton" destination="kHy-mi-mbG" id="Zzm-HE-S7z"/>
                         <outlet property="senderButton" destination="Geo-ER-zvU" id="J26-Eq-XE5"/>
                     </connections>
@@ -93,6 +114,8 @@
                 <relationship kind="action" name="readerGo:"/>
                 <relationship kind="action" name="senderGo:"/>
                 <relationship kind="outlet" name="ipField" candidateClass="UITextField"/>
+                <relationship kind="outlet" name="latency" candidateClass="UILabel"/>
+                <relationship kind="outlet" name="percentOk" candidateClass="UILabel"/>
                 <relationship kind="outlet" name="readerButton" candidateClass="UIButton"/>
                 <relationship kind="outlet" name="senderButton" candidateClass="UIButton"/>
             </relationships>
