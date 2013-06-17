@@ -53,6 +53,7 @@
 float ARVIDEO_Reader_PercentOk = 100.f;
 static int nbRead = 0;
 static int nbSkipped = 0;
+static int nbSkippedSinceLast = 0;
 
 ARSAL_Sem_t closeSem;
 static ARNETWORK_Manager_t *g_Manager = NULL;
@@ -155,6 +156,7 @@ uint8_t* ARVIDEO_ReaderTb_FrameCompleteCallback (eARVIDEO_READER_CAUSE cause, ui
             if (numberOfSkippedFrames > 0)
             {
                 nbSkipped += numberOfSkippedFrames;
+                nbSkippedSinceLast += numberOfSkippedFrames;
             }
         }
         ARVIDEO_Reader_PercentOk = (100.f * nbRead) / (1.f * (nbRead + nbSkipped));
@@ -358,4 +360,11 @@ int ARVIDEO_ReaderTb_GetLatency ()
     {
         return ARNETWORK_Manager_GetEstimatedLatency(g_Manager);
     }
+}
+
+int ARVIDEO_ReaderTb_GetMissedFrames ()
+{
+    int retval = nbSkippedSinceLast;
+    nbSkippedSinceLast = 0;
+    return retval;
 }

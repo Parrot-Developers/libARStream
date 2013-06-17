@@ -27,4 +27,9 @@ extern float ARVIDEO_Reader_PercentOk;
  */
 int ARVIDEO_ReaderTb_GetLatency ();
 
+/**
+ * Gets the number of missed frames since last call
+ */
+int ARVIDEO_ReaderTb_GetMissedFrames ();
+
 #endif /* _ARVIDEO_READER_TESTBENCH_H_ */

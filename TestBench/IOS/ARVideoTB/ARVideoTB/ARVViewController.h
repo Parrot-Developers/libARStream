@@ -7,13 +7,23 @@
 //
 
 #import <UIKit/UIKit.h>
+#import <CorePlot-CocoaTouch.h>
 
-@interface ARVViewController : UIViewController <UITextFieldDelegate> {
+@interface ARVViewController : UIViewController <UITextFieldDelegate, CPTPlotDataSource> {
     IBOutlet UITextField *ipField;
     IBOutlet UIButton *senderButton;
     IBOutlet UIButton *readerButton;
     IBOutlet UILabel *percentOk;
     IBOutlet UILabel *latency;
+    IBOutlet CPTGraphHostingView *latencyGraphView;
+    IBOutlet CPTGraphHostingView *lossFramesView;
+    
+    CPTXYGraph *latencyGraph;
+    NSMutableArray *latencyGraphData;
+    
+    CPTXYGraph *lossFramesGraph;
+    NSMutableArray *lossFramesData;
+    
 }
 
 - (IBAction)senderGo:(id)sender;

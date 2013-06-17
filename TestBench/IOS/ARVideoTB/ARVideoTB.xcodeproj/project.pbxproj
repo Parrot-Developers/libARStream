@@ -25,7 +25,19 @@
 		379378F2176B5C2C00AD5C9D /* ARVIDEO_Reader_TestBench.c in Sources */ = {isa = PBXBuildFile; fileRef = 379378F0176B5C2C00AD5C9D /* ARVIDEO_Reader_TestBench.c */; };
 		379378F5176B5C3600AD5C9D /* ARVIDEO_Sender_TestBench.c in Sources */ = {isa = PBXBuildFile; fileRef = 379378F3176B5C3600AD5C9D /* ARVIDEO_Sender_TestBench.c */; };
 		379378F8176B5CD300AD5C9D /* ARVIDEO_MP4Sender_TestBench.c in Sources */ = {isa = PBXBuildFile; fileRef = 379378F6176B5CD300AD5C9D /* ARVIDEO_MP4Sender_TestBench.c */; };
+		37F6E398176F114C00091546 /* QuartzCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 37F6E396176F113900091546 /* QuartzCore.framework */; };
+		37F6E3AB176F404100091546 /* libCorePlot-CocoaTouch.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 37F6E3AA176F3F9E00091546 /* libCorePlot-CocoaTouch.a */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		37F6E3A9176F3F9E00091546 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 37F6E3A3176F3F9D00091546 /* CorePlot-CocoaTouch.xcodeproj */;
+			proxyType = 2;
+			remoteGlobalIDString = BC9B83470FB8A0A40035D8DA;
+			remoteInfo = "CorePlot-CocoaTouch";
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		379378B9176B5A0C00AD5C9D /* ARVideoTB.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ARVideoTB.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -54,6 +66,8 @@
 		379378F4176B5C3600AD5C9D /* ARVIDEO_Sender_TestBench.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ARVIDEO_Sender_TestBench.h; path = ../../../Common/Sender/ARVIDEO_Sender_TestBench.h; sourceTree = "<group>"; };
 		379378F6176B5CD300AD5C9D /* ARVIDEO_MP4Sender_TestBench.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = ARVIDEO_MP4Sender_TestBench.c; path = ../../../Common/MP4Sender/ARVIDEO_MP4Sender_TestBench.c; sourceTree = "<group>"; };
 		379378F7176B5CD300AD5C9D /* ARVIDEO_MP4Sender_TestBench.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ARVIDEO_MP4Sender_TestBench.h; path = ../../../Common/MP4Sender/ARVIDEO_MP4Sender_TestBench.h; sourceTree = "<group>"; };
+		37F6E396176F113900091546 /* QuartzCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuartzCore.framework; path = System/Library/Frameworks/QuartzCore.framework; sourceTree = SDKROOT; };
+		37F6E3A3176F3F9D00091546 /* CorePlot-CocoaTouch.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; name = "CorePlot-CocoaTouch.xcodeproj"; path = "../CorePlot_1.2/Source/framework/CorePlot-CocoaTouch.xcodeproj"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -61,6 +75,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				37F6E398176F114C00091546 /* QuartzCore.framework in Frameworks */,
+				37F6E3AB176F404100091546 /* libCorePlot-CocoaTouch.a in Frameworks */,
 				379378BD176B5A0C00AD5C9D /* UIKit.framework in Frameworks */,
 				379378BF176B5A0C00AD5C9D /* Foundation.framework in Frameworks */,
 				379378C1176B5A0C00AD5C9D /* CoreGraphics.framework in Frameworks */,
@@ -77,6 +93,7 @@
 		379378B0176B5A0B00AD5C9D = {
 			isa = PBXGroup;
 			children = (
+				37F6E3A3176F3F9D00091546 /* CorePlot-CocoaTouch.xcodeproj */,
 				379378C2176B5A0C00AD5C9D /* ARVideoTB */,
 				379378BB176B5A0C00AD5C9D /* Frameworks */,
 				379378BA176B5A0C00AD5C9D /* Products */,
@@ -94,6 +111,7 @@
 		379378BB176B5A0C00AD5C9D /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				37F6E396176F113900091546 /* QuartzCore.framework */,
 				379378E2176B5A8A00AD5C9D /* libARNetwork.framework */,
 				379378E3176B5A8A00AD5C9D /* libARNetworkAL.framework */,
 				379378E4176B5A8A00AD5C9D /* libARSAL.framework */,
@@ -138,6 +156,14 @@
 			name = "Supporting Files";
 			sourceTree = "<group>";
 		};
+		37F6E3A4176F3F9D00091546 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				37F6E3AA176F3F9E00091546 /* libCorePlot-CocoaTouch.a */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -178,12 +204,28 @@
 			mainGroup = 379378B0176B5A0B00AD5C9D;
 			productRefGroup = 379378BA176B5A0C00AD5C9D /* Products */;
 			projectDirPath = "";
+			projectReferences = (
+				{
+					ProductGroup = 37F6E3A4176F3F9D00091546 /* Products */;
+					ProjectRef = 37F6E3A3176F3F9D00091546 /* CorePlot-CocoaTouch.xcodeproj */;
+				},
+			);
 			projectRoot = "";
 			targets = (
 				379378B8176B5A0C00AD5C9D /* ARVideoTB */,
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXReferenceProxy section */
+		37F6E3AA176F3F9E00091546 /* libCorePlot-CocoaTouch.a */ = {
+			isa = PBXReferenceProxy;
+			fileType = archive.ar;
+			path = "libCorePlot-CocoaTouch.a";
+			remoteRef = 37F6E3A9176F3F9E00091546 /* PBXContainerItemProxy */;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+/* End PBXReferenceProxy section */
 
 /* Begin PBXResourcesBuildPhase section */
 		379378B7176B5A0C00AD5C9D /* Resources */ = {
@@ -299,12 +341,14 @@
 			buildSettings = {
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
-					"\"$(SRCROOT)/../../../../IOS_InstallDir/Frameworks\"",
+					"\"$(SRCROOT)/../../../../Targets/Frameworks\"",
 				);
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "ARVideoTB/ARVideoTB-Prefix.pch";
+				HEADER_SEARCH_PATHS = "$(SRCROOT)/../CorePlot_1.2/Source/framework/**";
 				INFOPLIST_FILE = "ARVideoTB/ARVideoTB-Info.plist";
 				ONLY_ACTIVE_ARCH = NO;
+				OTHER_LDFLAGS = "-ObjC";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				VALID_ARCHS = armv7;
 				WRAPPER_EXTENSION = app;
@@ -316,12 +360,14 @@
 			buildSettings = {
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
-					"\"$(SRCROOT)/../../../../IOS_InstallDir/Frameworks\"",
+					"\"$(SRCROOT)/../../../../Targets/Frameworks\"",
 				);
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "ARVideoTB/ARVideoTB-Prefix.pch";
+				HEADER_SEARCH_PATHS = "$(SRCROOT)/../CorePlot_1.2/Source/framework/**";
 				INFOPLIST_FILE = "ARVideoTB/ARVideoTB-Info.plist";
 				ONLY_ACTIVE_ARCH = NO;
+				OTHER_LDFLAGS = "-ObjC";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				VALID_ARCHS = armv7;
 				WRAPPER_EXTENSION = app;
@@ -347,6 +393,7 @@
 				379378E1176B5A0C00AD5C9D /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};
