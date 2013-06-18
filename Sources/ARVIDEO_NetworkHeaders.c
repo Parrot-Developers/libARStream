@@ -49,7 +49,7 @@ int ARVIDEO_NetworkHeaders_AckPacketAllFlagsSet (ARVIDEO_NetworkHeaders_AckPacke
     {
         // Check only in first packet
         uint64_t lo_mask = (1ll << maxFlag) - 1ll;
-        res = ((packet->lowPacketsAck & lo_mask) == lo_mask) ? 1 : 0; 
+        res = ((packet->lowPacketsAck & lo_mask) == lo_mask) ? 1 : 0;
     }
     else if (64 <= maxFlag && maxFlag < 128)
     {
@@ -100,20 +100,39 @@ void ARVIDEO_NetworkHeaders_AckPacketSetFlag (ARVIDEO_NetworkHeaders_AckPacket_t
     }
 }
 
+void ARVIDEO_NetworkHeaders_AckPacketSetFlags (ARVIDEO_NetworkHeaders_AckPacket_t *dst, ARVIDEO_NetworkHeaders_AckPacket_t *src)
+{
+    dst->highPacketsAck |= src->highPacketsAck;
+    dst->lowPacketsAck  |= src->lowPacketsAck;
+}
+
 int ARVIDEO_NetworkHeaders_AckPacketUnsetFlag (ARVIDEO_NetworkHeaders_AckPacket_t *packet, int flagToRemove)
 {
     int retVal = 0;
     if (0 <= flagToRemove && flagToRemove < 64)
     {
-        packet->lowPacketsAck &= ~ (1ll << flagToRemove);
+        packet->lowPacketsAck &= ~(1ll << flagToRemove);
     }
     else if (64 <= flagToRemove && flagToRemove < 128)
     {
-        packet->highPacketsAck &= ~ (1ll << flagToRemove);
+        packet->highPacketsAck &= ~(1ll << flagToRemove);
     }
 
     if (0ll == packet->lowPacketsAck &&
         0ll == packet->highPacketsAck)
+    {
+        retVal = 1;
+    }
+    return retVal;
+}
+
+int ARVIDEO_NetworkHeaders_AckPacketUnsetFlags (ARVIDEO_NetworkHeaders_AckPacket_t *dst, ARVIDEO_NetworkHeaders_AckPacket_t *src)
+{
+    int retVal = 0;
+    dst->highPacketsAck &= ~(src->highPacketsAck);
+    dst->lowPacketsAck  &= ~(src->lowPacketsAck);
+    if (0ll == dst->lowPacketsAck &&
+        0ll == dst->highPacketsAck)
     {
         retVal = 1;
     }
