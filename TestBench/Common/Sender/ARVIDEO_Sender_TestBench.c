@@ -31,8 +31,13 @@
 #define SENDING_PORT (54321)
 #define READING_PORT (43210)
 
-#define FRAME_MIN_SIZE (5000)
-#define FRAME_MAX_SIZE (5000)
+#define BITRATE_KBPS (600)
+#define FPS          (30)
+
+#define FRAME_SIZE   (1000 * BITRATE_KBPS / FPS / 8)
+
+#define FRAME_MIN_SIZE (FRAME_SIZE)
+#define FRAME_MAX_SIZE (FRAME_SIZE)
 
 #define NB_BUFFERS (15)
 #define I_FRAME_EVERY_N (10)
@@ -42,7 +47,7 @@
 #if TEST_MODE
 # define TIME_BETWEEN_FRAMES_MS (1000)
 #else
-# define TIME_BETWEEN_FRAMES_MS (33)
+# define TIME_BETWEEN_FRAMES_MS (1000 / FPS)
 #endif
 
 #define __TAG__ "ARVIDEO_Sender_TB"
