@@ -68,11 +68,6 @@
     boundLinePlot.areaBaseValue = [[NSDecimalNumber zero] decimalValue];
     
     latencyGraphData = [[NSMutableArray alloc] initWithCapacity:kARVIDEONumberOfPoints];
-    for (int i = 0; i < kARVIDEONumberOfPoints; i++)
-    {
-        [latencyGraphData addObject:[NSNumber numberWithUnsignedInteger:0]];
-    }
-    
     
     // Create graph from theme
     lossFramesGraph = [[CPTXYGraph alloc] initWithFrame:CGRectZero];
@@ -117,10 +112,21 @@
     boundLinePlot.areaBaseValue = [[NSDecimalNumber zero] decimalValue];
     
     lossFramesData = [[NSMutableArray alloc] initWithCapacity:kARVIDEONumberOfPoints];
+    
+    [self resetDataArrays];
+}
+
+- (void)resetDataArrays
+{
+    [lossFramesData removeAllObjects];
+    [latencyGraphData removeAllObjects];
     for (int i = 0; i < kARVIDEONumberOfPoints; i++)
     {
+        [latencyGraphData addObject:[NSNumber numberWithUnsignedInteger:0]];
         [lossFramesData addObject:[NSNumber numberWithUnsignedInteger:0]];
     }
+    [latencyGraph reloadData];
+    [lossFramesGraph reloadData];
 }
 
 -(NSUInteger)numberOfRecordsForPlot:(CPTPlot *)plot
@@ -173,18 +179,22 @@
 {
     _running = NO;
     _isSender = NO;
-    _refreshTimer = [NSTimer scheduledTimerWithTimeInterval:kARVIDEODeltaTTimerSec target:self selector:@selector(updateStatus) userInfo:nil repeats:YES];
-}
-
-- (void)viewDidDisappear:(BOOL)animated
-{
-    [_refreshTimer invalidate];
 }
 
 - (void)didReceiveMemoryWarning
 {
     [super didReceiveMemoryWarning];
     // Dispose of any resources that can be recreated.
+}
+
+- (void) startTimer
+{
+    _refreshTimer = [NSTimer scheduledTimerWithTimeInterval:kARVIDEODeltaTTimerSec target:self selector:@selector(updateStatus) userInfo:nil repeats:YES];
+}
+
+- (void) stopTimer
+{
+    [_refreshTimer invalidate];
 }
 
 - (void) updateStatus
@@ -238,10 +248,15 @@
 
 - (void)senderGo:(id)sender
 {
-    [senderButton setEnabled:NO];
-    [readerButton setEnabled:NO];
+    [senderButton setHidden:YES];
+    [readerButton setHidden:YES];
+    [stopButton setHidden:NO];
+    
+    [self startTimer];
+    
     _running = YES;
     _isSender = YES;
+    
     [self performSelectorInBackground:@selector(runSender) withObject:nil];
 }
 
@@ -256,10 +271,15 @@
 
 - (void)readerGo:(id)sender
 {
-    [senderButton setEnabled:NO];
-    [readerButton setEnabled:NO];
+    [senderButton setHidden:YES];
+    [readerButton setHidden:YES];
+    [stopButton setHidden:NO];
+    
+    [self startTimer];
+    
     _running = YES;
     _isSender = NO;
+    
     [self performSelectorInBackground:@selector(runReader) withObject:nil];
 }
 
@@ -269,6 +289,20 @@
     char *cIp = (char *)[ip UTF8String];
     char *name = "ARVideo_TestBench_iOS";
     char *params[2] = { name, cIp };
-    ARVIDEO_Reader_TestBenchMain(2, params);}
+    ARVIDEO_Reader_TestBenchMain(2, params);
+}
+
+- (void)stop:(id)sender
+{
+    ARVIDEO_Sender_TestBenchStop();
+    ARVIDEO_Reader_TestBenchStop();
+    [self resetDataArrays];
+    [self stopTimer];
+    
+    
+    [senderButton setHidden:NO];
+    [readerButton setHidden:NO];
+    [stopButton setHidden:YES];
+}
 
 @end

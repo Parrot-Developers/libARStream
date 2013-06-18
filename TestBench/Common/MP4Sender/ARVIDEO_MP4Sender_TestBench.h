@@ -17,6 +17,11 @@
 int ARVIDEO_MP4Sender_TestBenchMain (int argc, char *argv[]);
 
 /**
+ * @brief Stops the testbench (if its running)
+ */
+void ARVIDEO_MP4Sender_TestBenchStop ();
+
+/**
  * Percentage of frames which were correclty sent
  */
 extern float ARVIDEO_MP4Sender_PercentOk;

@@ -22,6 +22,11 @@ int ARVIDEO_Reader_TestBenchMain (int argc, char *argv[]);
 extern float ARVIDEO_Reader_PercentOk;
 
 /**
+ * @brief Stops the testbench if it was running
+ */
+void ARVIDEO_Reader_TestBenchStop ();
+
+/**
  * Gets libARNetwork estimated Latency
  * @return estimated network latency in ms
  */

@@ -15,6 +15,7 @@
                             <textField opaque="NO" clipsSubviews="YES" contentMode="scaleToFill" contentHorizontalAlignment="left" contentVerticalAlignment="center" text="172.20.5.12" borderStyle="bezel" textAlignment="center" minimumFontSize="17" translatesAutoresizingMaskIntoConstraints="NO" id="V9c-nY-s7O">
                                 <constraints>
                                     <constraint firstAttribute="height" constant="29" type="user" id="If0-b2-hpg"/>
+                                    <constraint firstAttribute="width" constant="282" id="vGl-Fj-xnW"/>
                                 </constraints>
                                 <fontDescription key="fontDescription" name="HelveticaNeue-CondensedBold" family="Helvetica Neue" pointSize="14"/>
                                 <textInputTraits key="textInputTraits"/>
@@ -25,11 +26,29 @@
                             <label opaque="NO" clipsSubviews="YES" userInteractionEnabled="NO" contentMode="left" text="IP" textAlignment="center" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="joH-ER-zl3">
                                 <constraints>
                                     <constraint firstAttribute="height" constant="21" type="user" id="66j-b4-7UO"/>
+                                    <constraint firstAttribute="width" constant="284" id="BSr-K0-9md"/>
                                 </constraints>
                                 <fontDescription key="fontDescription" name="HelveticaNeue-CondensedBold" family="Helvetica Neue" pointSize="17"/>
                                 <color key="textColor" cocoaTouchSystemColor="darkTextColor"/>
                                 <nil key="highlightedColor"/>
                             </label>
+                            <button hidden="YES" opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="aT7-0a-Ez1">
+                                <color key="backgroundColor" white="0.0" alpha="0.90000000000000002" colorSpace="custom" customColorSpace="calibratedWhite"/>
+                                <constraints>
+                                    <constraint firstAttribute="height" constant="44" type="user" id="lG7-vm-iUp"/>
+                                </constraints>
+                                <fontDescription key="fontDescription" name="HelveticaNeue-CondensedBold" family="Helvetica Neue" pointSize="15"/>
+                                <state key="normal" title="STOP">
+                                    <color key="titleColor" red="1" green="0.47058823529999999" blue="0.0" alpha="1" colorSpace="calibratedRGB"/>
+                                    <color key="titleShadowColor" white="0.5" alpha="1" colorSpace="calibratedWhite"/>
+                                </state>
+                                <state key="highlighted">
+                                    <color key="titleColor" white="1" alpha="1" colorSpace="calibratedWhite"/>
+                                </state>
+                                <connections>
+                                    <action selector="stop:" destination="2" eventType="touchUpInside" id="7O8-dE-yOV"/>
+                                </connections>
+                            </button>
                             <button opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="kHy-mi-mbG">
                                 <color key="backgroundColor" white="0.0" alpha="0.90000000000000002" colorSpace="custom" customColorSpace="calibratedWhite"/>
                                 <constraints>
@@ -91,26 +110,27 @@
                             <constraint firstItem="FeZ-zo-acF" firstAttribute="top" secondItem="QbL-WF-sPw" secondAttribute="bottom" constant="8" symbolic="YES" type="user" id="1n3-5k-ojJ"/>
                             <constraint firstItem="FeZ-zo-acF" firstAttribute="leading" secondItem="3" secondAttribute="leading" constant="20" symbolic="YES" type="user" id="4B9-qm-goo"/>
                             <constraint firstAttribute="bottom" secondItem="Geo-ER-zvU" secondAttribute="bottom" constant="20" symbolic="YES" type="user" id="5ne-fV-Be0"/>
+                            <constraint firstItem="QbL-WF-sPw" firstAttribute="trailing" secondItem="8QE-K1-Wkr" secondAttribute="trailing" type="default" id="7L3-ns-zrA"/>
                             <constraint firstItem="V9c-nY-s7O" firstAttribute="top" secondItem="joH-ER-zl3" secondAttribute="bottom" constant="8" symbolic="YES" type="user" id="7QI-R9-hqT"/>
-                            <constraint firstAttribute="trailing" secondItem="joH-ER-zl3" secondAttribute="trailing" constant="18" type="user" id="BSG-NL-SGA"/>
+                            <constraint firstItem="aT7-0a-Ez1" firstAttribute="leading" secondItem="3" secondAttribute="leading" constant="20" symbolic="YES" type="default" id="849-kp-jKZ"/>
                             <constraint firstItem="V9c-nY-s7O" firstAttribute="leading" secondItem="3" secondAttribute="leading" constant="20" symbolic="YES" type="user" id="BTN-Ff-sKv"/>
                             <constraint firstItem="Geo-ER-zvU" firstAttribute="baseline" secondItem="kHy-mi-mbG" secondAttribute="baseline" type="user" id="CpR-QG-m59"/>
                             <constraint firstItem="8QE-K1-Wkr" firstAttribute="top" secondItem="V9c-nY-s7O" secondAttribute="bottom" constant="8" symbolic="YES" type="user" id="Ge6-HI-gtd"/>
                             <constraint firstItem="QbL-WF-sPw" firstAttribute="top" secondItem="8QE-K1-Wkr" secondAttribute="bottom" constant="8" symbolic="YES" type="user" id="PpE-ud-tiz"/>
-                            <constraint firstAttribute="trailing" secondItem="11S-CG-0k0" secondAttribute="trailing" constant="20" symbolic="YES" type="default" id="Q3l-jQ-ohQ"/>
-                            <constraint firstAttribute="trailing" secondItem="QbL-WF-sPw" secondAttribute="trailing" constant="20" symbolic="YES" type="default" id="Ruz-RB-Q3y"/>
-                            <constraint firstAttribute="trailing" secondItem="8QE-K1-Wkr" secondAttribute="trailing" constant="20" symbolic="YES" type="default" id="YKv-3F-uy9"/>
+                            <constraint firstItem="V9c-nY-s7O" firstAttribute="trailing" secondItem="8QE-K1-Wkr" secondAttribute="trailing" type="default" id="Y44-TN-DV4"/>
+                            <constraint firstItem="11S-CG-0k0" firstAttribute="trailing" secondItem="FeZ-zo-acF" secondAttribute="trailing" type="default" id="f0U-7e-9jh"/>
                             <constraint firstAttribute="trailing" secondItem="Geo-ER-zvU" secondAttribute="trailing" constant="20" symbolic="YES" type="user" id="f1O-QJ-UWG"/>
                             <constraint firstItem="joH-ER-zl3" firstAttribute="leading" secondItem="3" secondAttribute="leading" constant="20" symbolic="YES" type="user" id="hx5-Ed-DS3"/>
                             <constraint firstItem="Geo-ER-zvU" firstAttribute="height" secondItem="kHy-mi-mbG" secondAttribute="height" type="user" id="n6y-bQ-uhr"/>
-                            <constraint firstAttribute="trailing" secondItem="FeZ-zo-acF" secondAttribute="trailing" constant="20" symbolic="YES" type="user" id="nsf-EL-PPS"/>
                             <constraint firstItem="11S-CG-0k0" firstAttribute="top" secondItem="FeZ-zo-acF" secondAttribute="bottom" constant="8" symbolic="YES" type="default" id="obQ-z1-wYW"/>
                             <constraint firstItem="11S-CG-0k0" firstAttribute="leading" secondItem="3" secondAttribute="leading" constant="20" symbolic="YES" type="default" id="pws-ir-f9g"/>
-                            <constraint firstAttribute="trailing" secondItem="V9c-nY-s7O" secondAttribute="trailing" constant="20" symbolic="YES" type="user" id="taQ-J3-j53"/>
+                            <constraint firstItem="QbL-WF-sPw" firstAttribute="trailing" secondItem="FeZ-zo-acF" secondAttribute="trailing" type="default" id="sbM-2R-BCh"/>
                             <constraint firstItem="Geo-ER-zvU" firstAttribute="width" secondItem="kHy-mi-mbG" secondAttribute="width" type="user" id="u1Z-ti-JWD"/>
+                            <constraint firstAttribute="bottom" secondItem="aT7-0a-Ez1" secondAttribute="bottom" constant="20" symbolic="YES" type="default" id="utL-A0-lVR"/>
                             <constraint firstItem="8QE-K1-Wkr" firstAttribute="leading" secondItem="3" secondAttribute="leading" constant="20" symbolic="YES" type="default" id="vUC-oT-Drh"/>
                             <constraint firstAttribute="bottom" secondItem="kHy-mi-mbG" secondAttribute="bottom" constant="20" symbolic="YES" type="user" id="voi-E6-jMO"/>
                             <constraint firstItem="kHy-mi-mbG" firstAttribute="leading" secondItem="3" secondAttribute="leading" constant="20" symbolic="YES" type="user" id="wbX-tV-hk4"/>
+                            <constraint firstAttribute="trailing" secondItem="aT7-0a-Ez1" secondAttribute="trailing" constant="20" symbolic="YES" type="default" id="x9o-bZ-Yck"/>
                             <constraint firstItem="QbL-WF-sPw" firstAttribute="leading" secondItem="3" secondAttribute="leading" constant="20" symbolic="YES" type="default" id="xcS-x9-eXX"/>
                         </constraints>
                     </view>
@@ -122,6 +142,7 @@
                         <outlet property="percentOk" destination="8QE-K1-Wkr" id="JyW-Ja-ZMq"/>
                         <outlet property="readerButton" destination="kHy-mi-mbG" id="Zzm-HE-S7z"/>
                         <outlet property="senderButton" destination="Geo-ER-zvU" id="J26-Eq-XE5"/>
+                        <outlet property="stopButton" destination="aT7-0a-Ez1" id="lI3-kv-Bhz"/>
                     </connections>
                 </viewController>
                 <placeholder placeholderIdentifier="IBFirstResponder" id="4" sceneMemberID="firstResponder"/>
@@ -134,6 +155,7 @@
             <relationships>
                 <relationship kind="action" name="readerGo:"/>
                 <relationship kind="action" name="senderGo:"/>
+                <relationship kind="action" name="stop:"/>
                 <relationship kind="outlet" name="ipField" candidateClass="UITextField"/>
                 <relationship kind="outlet" name="latency" candidateClass="UILabel"/>
                 <relationship kind="outlet" name="latencyGraphView" candidateClass="CPTGraphHostingView"/>
@@ -141,6 +163,7 @@
                 <relationship kind="outlet" name="percentOk" candidateClass="UILabel"/>
                 <relationship kind="outlet" name="readerButton" candidateClass="UIButton"/>
                 <relationship kind="outlet" name="senderButton" candidateClass="UIButton"/>
+                <relationship kind="outlet" name="stopButton" candidateClass="UIButton"/>
             </relationships>
         </class>
         <class className="CPTGraphHostingView" superclassName="UIView">

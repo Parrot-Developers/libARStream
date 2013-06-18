@@ -55,6 +55,7 @@ static int nbRead = 0;
 static int nbSkipped = 0;
 static int nbSkippedSinceLast = 0;
 
+static int running;
 ARSAL_Sem_t closeSem;
 static ARNETWORK_Manager_t *g_Manager = NULL;
 
@@ -181,7 +182,6 @@ uint8_t* ARVIDEO_ReaderTb_FrameCompleteCallback (eARVIDEO_READER_CAUSE cause, ui
     case ARVIDEO_READER_CAUSE_CANCEL:
         ARSAL_PRINT (ARSAL_PRINT_WARNING, __TAG__, "Reader is closing");
         ARVIDEO_ReaderTb_SetBufferFree (framePointer);
-        ARSAL_Sem_Post (&closeSem);
         break;
 
     default:
@@ -258,7 +258,9 @@ int ARVIDEO_ReaderTb_StartVideoTest (ARNETWORK_Manager_t *manager, const char *o
 
     /* USER CODE */
 
+    running = 1;
     ARSAL_Sem_Wait (&closeSem);
+    running = 0;
 
     /* END OF USER CODE */
 
@@ -337,7 +339,7 @@ int ARVIDEO_Reader_TestBenchMain (int argc, char *argv[])
     pthread_t netsend, netread;
     pthread_create (&netsend, NULL, ARNETWORK_Manager_SendingThreadRun, g_Manager);
     pthread_create (&netread, NULL, ARNETWORK_Manager_ReceivingThreadRun, g_Manager);
-
+    
     retVal = ARVIDEO_ReaderTb_StartVideoTest (g_Manager, outPath);
 
     ARNETWORK_Manager_Stop (g_Manager);
@@ -348,6 +350,14 @@ int ARVIDEO_Reader_TestBenchMain (int argc, char *argv[])
     ARNETWORK_Manager_Delete (&g_Manager);
 
     return retVal;
+}
+
+void ARVIDEO_Reader_TestBenchStop ()
+{
+    if (running)
+    {
+        ARSAL_Sem_Post (&closeSem);
+    }
 }
 
 int ARVIDEO_ReaderTb_GetLatency ()

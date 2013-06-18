@@ -59,6 +59,8 @@
  * Globals
  */
 
+static int stillRunning = 1;
+
 float ARVIDEO_MP4Sender_PercentOk = 0.0;
 static int nbSent = 0;
 static int nbOk = 0;
@@ -239,7 +241,7 @@ void* fileReaderThread (void *ARVIDEO_Sender_t_Param)
     ARVIDEO_Sender_t *sender = (ARVIDEO_Sender_t *)ARVIDEO_Sender_t_Param;
     srand (time (NULL));
     ARSAL_PRINT (ARSAL_PRINT_WARNING, __TAG__, "Encoder thread running");
-    while (1)
+    while (stillRunning)
     {
         nextFrameAddr = ARVIDEO_MP4SenderTb_GetNextFreeBuffer (&frameCapacity);
         frameSize = ARVIDEO_MP4SenderTb_GetNextFrame (nextFrameAddr, frameCapacity);
@@ -585,6 +587,8 @@ int ARVIDEO_MP4Sender_TestBenchMain (int argc, char *argv[])
     pthread_t netsend, netread;
     pthread_create (&netsend, NULL, ARNETWORK_Manager_SendingThreadRun, manager);
     pthread_create (&netread, NULL, ARNETWORK_Manager_ReceivingThreadRun, manager);
+    
+    stillRunning = 1;
 
     retVal = ARVIDEO_MP4SenderTb_StartVideoTest (fpath, manager);
 
@@ -596,4 +600,9 @@ int ARVIDEO_MP4Sender_TestBenchMain (int argc, char *argv[])
     ARNETWORK_Manager_Delete (&manager);
 
     return retVal;
+}
+
+void ARVIDEO_MP4Sender_TestBenchStop ()
+{
+    stillRunning = 0;
 }

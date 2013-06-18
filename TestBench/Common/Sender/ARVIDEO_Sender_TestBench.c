@@ -59,6 +59,8 @@
  * Globals
  */
 
+static int stillRunning = 1;
+
 float ARVIDEO_Sender_PercentOk = 0.0;
 static int nbSent = 0;
 static int nbOk = 0;
@@ -204,7 +206,7 @@ void* fakeEncoderThread (void *ARVIDEO_Sender_t_Param)
     ARVIDEO_Sender_t *sender = (ARVIDEO_Sender_t *)ARVIDEO_Sender_t_Param;
     srand (time (NULL));
     ARSAL_PRINT (ARSAL_PRINT_WARNING, __TAG__, "Encoder thread running");
-    while (1)
+    while (stillRunning)
     {
         cnt++;
         frameSize = rand () % FRAME_MAX_SIZE;
@@ -344,6 +346,8 @@ int ARVIDEO_Sender_TestBenchMain (int argc, char *argv[])
     pthread_create (&netsend, NULL, ARNETWORK_Manager_SendingThreadRun, manager);
     pthread_create (&netread, NULL, ARNETWORK_Manager_ReceivingThreadRun, manager);
 
+    stillRunning = 1;
+    
     retVal = ARVIDEO_SenderTb_StartVideoTest (manager);
 
     ARNETWORK_Manager_Stop (manager);
@@ -354,4 +358,9 @@ int ARVIDEO_Sender_TestBenchMain (int argc, char *argv[])
     ARNETWORK_Manager_Delete (&manager);
 
     return retVal;
+}
+
+void ARVIDEO_Sender_TestBenchStop ()
+{
+    stillRunning = 0;
 }

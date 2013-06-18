@@ -13,6 +13,7 @@
     IBOutlet UITextField *ipField;
     IBOutlet UIButton *senderButton;
     IBOutlet UIButton *readerButton;
+    IBOutlet UIButton *stopButton;
     IBOutlet UILabel *percentOk;
     IBOutlet UILabel *latency;
     IBOutlet CPTGraphHostingView *latencyGraphView;
@@ -28,6 +29,7 @@
 
 - (IBAction)senderGo:(id)sender;
 - (IBAction)readerGo:(id)sender;
+- (IBAction)stop:(id)sender;
 
 @property (nonatomic) BOOL running;
 @property (nonatomic) BOOL isSender;
