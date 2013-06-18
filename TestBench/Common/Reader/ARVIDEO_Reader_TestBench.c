@@ -302,7 +302,7 @@ int ARVIDEO_Reader_TestBenchMain (int argc, char *argv[])
         outPath = argv[2];
     }
     
-    printf ("IP = %s", ip);
+    ARSAL_PRINT (ARSAL_PRINT_WARNING, __TAG__, "IP = %s", ip);
 
     int nbInBuff = 1;
     ARNETWORK_IOBufferParam_t inParams;
@@ -319,6 +319,10 @@ int ARVIDEO_Reader_TestBenchMain (int argc, char *argv[])
     {
         specificError = ARNETWORKAL_Manager_InitWiFiNetwork(osspecificManagerPtr, ip, SENDING_PORT, READING_PORT, 1000);
     }
+    else
+    {
+        ARSAL_PRINT (ARSAL_PRINT_ERROR, __TAG__, "Error during ARNETWORKAL_Manager_New call : %s", ARNETWORKAL_Error_ToString(specificError));
+    }
 
     if(specificError == ARNETWORKAL_OK)
     {
@@ -326,13 +330,14 @@ int ARVIDEO_Reader_TestBenchMain (int argc, char *argv[])
     }
     else
     {
+        ARSAL_PRINT (ARSAL_PRINT_ERROR, __TAG__, "Error during ARNETWORKAL_Manager_InitWifiNetwork call : %s", ARNETWORKAL_Error_ToString(specificError));
         error = ARNETWORK_ERROR;
     }
 
     if ((g_Manager == NULL) ||
         (error != ARNETWORK_OK))
     {
-        ARSAL_PRINT (ARSAL_PRINT_ERROR, __TAG__, "Error during ARNETWORK_Manager_New call : %d", error);
+        ARSAL_PRINT (ARSAL_PRINT_ERROR, __TAG__, "Error during ARNETWORK_Manager_New call : %s", ARNETWORK_Error_ToString(error));
         return 1;
     }
 
@@ -348,6 +353,8 @@ int ARVIDEO_Reader_TestBenchMain (int argc, char *argv[])
     pthread_join (netsend, NULL);
 
     ARNETWORK_Manager_Delete (&g_Manager);
+    ARNETWORKAL_Manager_CloseWiFiNetwork(osspecificManagerPtr);
+    ARNETWORKAL_Manager_Delete(&osspecificManagerPtr);
 
     return retVal;
 }
