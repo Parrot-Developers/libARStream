@@ -675,14 +675,15 @@ void* ARVIDEO_Sender_RunAckThread (void *ARVIDEO_Sender_t_Param)
             ARSAL_Mutex_Lock (&(sender->ackMutex));
             if (sender->ackPacket.numFrame == recvPacket.numFrame)
             {
-                //TODO: ARVIDEO_NetworkHeaders_Func !!!
-                sender->ackPacket.highPacketsAck |= recvPacket.highPacketsAck;
-                sender->ackPacket.lowPacketsAck |= recvPacket.lowPacketsAck;
+                ARVIDEO_NetworkHeaders_AckPacketSetFlags (&(sender->ackPacket), &recvPacket);
                 if ((sender->currentFrameCbWasCalled == 0) &&
                     (ARVIDEO_NetworkHeaders_AckPacketAllFlagsSet (&(sender->ackPacket), sender->currentFrameNbFragments) == 1))
                 {
                     sender->callback (ARVIDEO_SENDER_STATUS_FRAME_SENT, sender->currentFrame.frameBuffer, sender->currentFrame.frameSize);
                     sender->currentFrameCbWasCalled = 1;
+                    ARSAL_Mutex_Lock (&(sender->nextFrameMutex));
+                    ARSAL_Cond_Signal (&(sender->nextFrameCond));
+                    ARSAL_Mutex_Unlock (&(sender->nextFrameMutex));
                 }
             }
             ARSAL_Mutex_Unlock (&(sender->ackMutex));

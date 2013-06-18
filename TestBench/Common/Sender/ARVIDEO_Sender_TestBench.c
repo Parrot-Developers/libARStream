@@ -31,7 +31,7 @@
 #define SENDING_PORT (54321)
 #define READING_PORT (43210)
 
-#define BITRATE_KBPS (600)
+#define BITRATE_KBPS (1200)
 #define FPS          (30)
 
 #define FRAME_SIZE   (1000 * BITRATE_KBPS / FPS / 8)
