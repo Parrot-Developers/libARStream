@@ -42,13 +42,7 @@
 #define NB_BUFFERS (15)
 #define I_FRAME_EVERY_N (10)
 
-#define TEST_MODE (0)
-
-#if TEST_MODE
-# define TIME_BETWEEN_FRAMES_MS (1000)
-#else
-# define TIME_BETWEEN_FRAMES_MS (1000 / FPS)
-#endif
+#define TIME_BETWEEN_FRAMES_MS (1000 / FPS)
 
 #define __TAG__ "ARVIDEO_Sender_TB"
 

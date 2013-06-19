@@ -256,6 +256,7 @@ void* ARVIDEO_Reader_RunDataThread (void *ARVIDEO_Reader_t_Param)
     int recvSize;
     uint16_t previousFNum = UINT16_MAX;
     int skipCurrentFrame = 0;
+    int packetWasAlreadyAck = 0;
     ARVIDEO_Reader_t *reader = (ARVIDEO_Reader_t *)ARVIDEO_Reader_t_Param;
     ARVIDEO_NetworkHeaders_DataHeader_t *header = NULL;
 
@@ -296,6 +297,7 @@ void* ARVIDEO_Reader_RunDataThread (void *ARVIDEO_Reader_t_Param)
                 reader->ackPacket.numFrame = header->frameNumber;
                 ARVIDEO_NetworkHeaders_AckPacketReset (&(reader->ackPacket));
             }
+            packetWasAlreadyAck = ARVIDEO_NetworkHeaders_AckPacketFlagIsSet (&(reader->ackPacket), header->fragmentNumber);
             ARVIDEO_NetworkHeaders_AckPacketSetFlag (&(reader->ackPacket), header->fragmentNumber);
 
             ARSAL_Mutex_Unlock (&(reader->ackPacketMutex));
@@ -308,8 +310,8 @@ void* ARVIDEO_Reader_RunDataThread (void *ARVIDEO_Reader_t_Param)
             cpIndex = ARVIDEO_NETWORK_HEADERS_FRAGMENT_SIZE*header->fragmentNumber;
             cpSize = recvSize - sizeof (ARVIDEO_NetworkHeaders_DataHeader_t);
             endIndex = cpIndex + cpSize;
-            while ((endIndex > reader->currentFrameBufferSize) || 
-                   (skipCurrentFrame == 1))
+            while ((endIndex > reader->currentFrameBufferSize) &&
+                   (skipCurrentFrame == 0))
             {
                 uint32_t nextFrameBufferSize = 0;
                 uint32_t dummy;
@@ -330,8 +332,11 @@ void* ARVIDEO_Reader_RunDataThread (void *ARVIDEO_Reader_t_Param)
 
             if (skipCurrentFrame == 0)
             {
-                //TODO: Don't memcpy if we already ack'd the fragment
-                memcpy (&(reader->currentFrameBuffer)[cpIndex], &recvData[sizeof (ARVIDEO_NetworkHeaders_DataHeader_t)], recvSize - sizeof (ARVIDEO_NetworkHeaders_DataHeader_t));
+                if (packetWasAlreadyAck == 0)
+                {
+                    memcpy (&(reader->currentFrameBuffer)[cpIndex], &recvData[sizeof (ARVIDEO_NetworkHeaders_DataHeader_t)], recvSize - sizeof (ARVIDEO_NetworkHeaders_DataHeader_t));
+                }
+
                 if (endIndex > reader->currentFrameSize)
                 {
                     reader->currentFrameSize = endIndex;
@@ -381,7 +386,7 @@ void* ARVIDEO_Reader_RunAckThread (void *ARVIDEO_Reader_t_Param)
         ARSAL_Cond_Timedwait (&(reader->ackSendCond), &(reader->ackSendMutex), ARVIDEO_READER_MAX_TIME_BETWEEN_ACK_MS);
         ARSAL_Mutex_Unlock (&(reader->ackSendMutex));
         ARSAL_Mutex_Lock (&(reader->ackPacketMutex));
-        sendPacket.numFrame       = htodl  (reader->ackPacket.numFrame);
+        sendPacket.numFrame       = htods  (reader->ackPacket.numFrame);
         sendPacket.highPacketsAck = htodll (reader->ackPacket.highPacketsAck);
         sendPacket.lowPacketsAck  = htodll (reader->ackPacket.lowPacketsAck);
         ARSAL_Mutex_Unlock (&(reader->ackPacketMutex));

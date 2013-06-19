@@ -667,7 +667,7 @@ void* ARVIDEO_Sender_RunAckThread (void *ARVIDEO_Sender_t_Param)
         else
         {
             /* Switch recvPacket endianness */
-            recvPacket.numFrame = dtohl (recvPacket.numFrame);
+            recvPacket.numFrame = dtohs (recvPacket.numFrame);
             recvPacket.highPacketsAck = dtohll (recvPacket.highPacketsAck);
             recvPacket.lowPacketsAck = dtohll (recvPacket.lowPacketsAck);
 
