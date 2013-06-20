@@ -39,6 +39,18 @@
 #define ARVIDEO_READER_DATAREAD_TIMEOUT_MS (500)
 #define ARVIDEO_READER_MAX_TIME_BETWEEN_ACK_MS (5)
 
+/**
+ * Sets *PTR to VAL if PTR is not null
+ */
+#define SET_WITH_CHECK(PTR,VAL)                 \
+    do                                          \
+    {                                           \
+        if (PTR != NULL)                        \
+        {                                       \
+            *PTR = VAL;                         \
+        }                                       \
+    } while (0)
+
 /*
  * Types
  */
@@ -112,19 +124,20 @@ void ARVIDEO_Reader_InitVideoAckBuffer (ARNETWORK_IOBufferParam_t *bufferParams,
     ARVIDEO_Buffers_InitVideoAckBuffer (bufferParams, bufferID);
 }
 
-ARVIDEO_Reader_t* ARVIDEO_Reader_New (ARNETWORK_Manager_t *manager, int dataBufferID, int ackBufferID, ARVIDEO_Reader_FrameCompleteCallback_t callback, uint8_t *frameBuffer, uint32_t frameBufferSize)
+ARVIDEO_Reader_t* ARVIDEO_Reader_New (ARNETWORK_Manager_t *manager, int dataBufferID, int ackBufferID, ARVIDEO_Reader_FrameCompleteCallback_t callback, uint8_t *frameBuffer, uint32_t frameBufferSize, eARVIDEO_ERROR *error)
 {
     ARVIDEO_Reader_t *retReader = NULL;
-    int stillValid = 1;
     int ackPacketMutexWasInit = 0;
     int ackSendMutexWasInit = 0;
     int ackSendCondWasInit = 0;
+    eARVIDEO_ERROR internalError = ARVIDEO_ERROR_OK;
     /* ARGS Check */
     if ((manager == NULL) ||
         (callback == NULL) ||
         (frameBuffer == NULL) ||
         (frameBufferSize == 0))
     {
+        SET_WITH_CHECK (error, ARVIDEO_ERROR_BAD_PARAMETERS);
         return retReader;
     }
 
@@ -132,11 +145,11 @@ ARVIDEO_Reader_t* ARVIDEO_Reader_New (ARNETWORK_Manager_t *manager, int dataBuff
     retReader = malloc (sizeof (ARVIDEO_Reader_t));
     if (retReader == NULL)
     {
-        stillValid = 0;
+        internalError = ARVIDEO_ERROR_ALLOC;
     }
 
     /* Copy parameters */
-    if (stillValid == 1)
+    if (internalError == ARVIDEO_ERROR_OK)
     {
         retReader->manager = manager;
         retReader->dataBufferID = dataBufferID;
@@ -147,36 +160,36 @@ ARVIDEO_Reader_t* ARVIDEO_Reader_New (ARNETWORK_Manager_t *manager, int dataBuff
     }
 
     /* Setup internal mutexes/conditions */
-    if (stillValid == 1)
+    if (internalError == ARVIDEO_ERROR_OK)
     {
         int mutexInitRet = ARSAL_Mutex_Init (&(retReader->ackPacketMutex));
         if (mutexInitRet != 0)
         {
-            stillValid = 0;
+            internalError = ARVIDEO_ERROR_ALLOC;
         }
         else
         {
             ackPacketMutexWasInit = 1;
         }
     }
-    if (stillValid == 1)
+    if (internalError == ARVIDEO_ERROR_OK)
     {
         int mutexInitRet = ARSAL_Mutex_Init (&(retReader->ackSendMutex));
         if (mutexInitRet != 0)
         {
-            stillValid = 0;
+            internalError = ARVIDEO_ERROR_ALLOC;
         }
         else
         {
             ackSendMutexWasInit = 1;
         }
     }
-    if (stillValid == 1)
+    if (internalError == ARVIDEO_ERROR_OK)
     {
         int condInitRet = ARSAL_Cond_Init (&(retReader->ackSendCond));
         if (condInitRet != 0)
         {
-            stillValid = 0;
+            internalError = ARVIDEO_ERROR_ALLOC;
         }
         else
         {
@@ -185,7 +198,7 @@ ARVIDEO_Reader_t* ARVIDEO_Reader_New (ARNETWORK_Manager_t *manager, int dataBuff
     }
 
     /* Setup internal variables */
-    if (stillValid == 1)
+    if (internalError == ARVIDEO_ERROR_OK)
     {
         retReader->currentFrameSize = 0;
         retReader->threadsShouldStop = 0;
@@ -193,7 +206,7 @@ ARVIDEO_Reader_t* ARVIDEO_Reader_New (ARNETWORK_Manager_t *manager, int dataBuff
         retReader->ackThreadStarted = 0;
     }
 
-    if ((stillValid == 0) &&
+    if ((internalError != ARVIDEO_ERROR_OK) &&
         (retReader != NULL))
     {
         if (ackPacketMutexWasInit == 1)
@@ -212,6 +225,7 @@ ARVIDEO_Reader_t* ARVIDEO_Reader_New (ARNETWORK_Manager_t *manager, int dataBuff
         retReader = NULL;
     }
 
+    SET_WITH_CHECK (error, internalError);
     return retReader;
 }
 

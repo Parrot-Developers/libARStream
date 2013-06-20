@@ -90,13 +90,14 @@ void ARVIDEO_Reader_InitVideoAckBuffer (ARNETWORK_IOBufferParam_t *bufferParams,
  * @param[in] callback The callback which will be called every time a new frame is available
  * @param[in] frameBuffer The adress of the first frameBuffer to use
  * @param[in] frameBufferSize The length of the frameBuffer (to avoid overflow)
+ * @param[out] error Optionnal pointer to an eARVIDEO_ERROR to hold any error information
  * @return A pointer to the new ARVIDEO_Reader_t, or NULL if an error occured
  * @see ARVIDEO_Reader_InitVideoDataBuffer()
  * @see ARVIDEO_Reader_InitVideoAckBuffer()
  * @see ARVIDEO_Reader_StopReader()
  * @see ARVIDEO_Reader_Delete()
  */
-ARVIDEO_Reader_t* ARVIDEO_Reader_New (ARNETWORK_Manager_t *manager, int dataBufferID, int ackBufferID, ARVIDEO_Reader_FrameCompleteCallback_t callback, uint8_t *frameBuffer, uint32_t frameBufferSize);
+ARVIDEO_Reader_t* ARVIDEO_Reader_New (ARNETWORK_Manager_t *manager, int dataBufferID, int ackBufferID, ARVIDEO_Reader_FrameCompleteCallback_t callback, uint8_t *frameBuffer, uint32_t frameBufferSize, eARVIDEO_ERROR *error);
 
 /**
  * @brief Stops a running ARVIDEO_Reader_t

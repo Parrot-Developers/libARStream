@@ -42,6 +42,19 @@
  */
 #define ARVIDEO_SENDER_DEFAULT_ESTIMATED_LATENCY_MS (100)
 
+/**
+ * Sets *PTR to VAL if PTR is not null
+ */
+#define SET_WITH_CHECK(PTR,VAL)                 \
+    do                                          \
+    {                                           \
+        if (PTR != NULL)                        \
+        {                                       \
+            *PTR = VAL;                         \
+        }                                       \
+    } while (0)
+
+
 /*
  * Types
  */
@@ -306,19 +319,20 @@ void ARVIDEO_Sender_InitVideoAckBuffer (ARNETWORK_IOBufferParam_t *bufferParams,
     ARVIDEO_Buffers_InitVideoAckBuffer (bufferParams, bufferID);
 }
 
-ARVIDEO_Sender_t* ARVIDEO_Sender_New (ARNETWORK_Manager_t *manager, int dataBufferID, int ackBufferID, ARVIDEO_Sender_FrameUpdateCallback_t callback, uint32_t framesBufferSize)
+ARVIDEO_Sender_t* ARVIDEO_Sender_New (ARNETWORK_Manager_t *manager, int dataBufferID, int ackBufferID, ARVIDEO_Sender_FrameUpdateCallback_t callback, uint32_t framesBufferSize, eARVIDEO_ERROR *error)
 {
     ARVIDEO_Sender_t *retSender = NULL;
-    int stillValid = 1;
     int packetsToSendMutexWasInit = 0;
     int ackMutexWasInit = 0;
     int nextFrameMutexWasInit = 0;
     int nextFrameCondWasInit = 0;
     int nextFramesArrayWasCreated = 0;
+    eARVIDEO_ERROR internalError = ARVIDEO_ERROR_OK;
     /* ARGS Check */
     if ((manager == NULL) ||
         (callback == NULL))
     {
+        SET_WITH_CHECK (error, ARVIDEO_ERROR_BAD_PARAMETERS);
         return retSender;
     }
 
@@ -326,11 +340,11 @@ ARVIDEO_Sender_t* ARVIDEO_Sender_New (ARNETWORK_Manager_t *manager, int dataBuff
     retSender = malloc (sizeof (ARVIDEO_Sender_t));
     if (retSender == NULL)
     {
-        stillValid = 0;
+        internalError = ARVIDEO_ERROR_ALLOC;
     }
 
     /* Copy parameters */
-    if (stillValid == 1)
+    if (internalError == ARVIDEO_ERROR_OK)
     {
         retSender->manager = manager;
         retSender->dataBufferID = dataBufferID;
@@ -340,48 +354,48 @@ ARVIDEO_Sender_t* ARVIDEO_Sender_New (ARNETWORK_Manager_t *manager, int dataBuff
     }
 
     /* Setup internal mutexes/sems */
-    if (stillValid == 1)
+    if (internalError == ARVIDEO_ERROR_OK)
     {
         int mutexInitRet = ARSAL_Mutex_Init (&(retSender->packetsToSendMutex));
         if (mutexInitRet != 0)
         {
-            stillValid = 0;
+            internalError = ARVIDEO_ERROR_ALLOC;
         }
         else
         {
             packetsToSendMutexWasInit = 1;
         }
     }
-    if (stillValid == 1)
+    if (internalError == ARVIDEO_ERROR_OK)
     {
         int mutexInitRet = ARSAL_Mutex_Init (&(retSender->ackMutex));
         if (mutexInitRet != 0)
         {
-            stillValid = 0;
+            internalError = ARVIDEO_ERROR_ALLOC;
         }
         else
         {
             ackMutexWasInit = 1;
         }
     }
-    if (stillValid == 1)
+    if (internalError == ARVIDEO_ERROR_OK)
     {
         int mutexInitRet = ARSAL_Mutex_Init (&(retSender->nextFrameMutex));
         if (mutexInitRet != 0)
         {
-            stillValid = 0;
+            internalError = ARVIDEO_ERROR_ALLOC;
         }
         else
         {
             nextFrameMutexWasInit = 1;
         }
     }
-    if (stillValid == 1)
+    if (internalError == ARVIDEO_ERROR_OK)
     {
         int condInitRet = ARSAL_Cond_Init (&(retSender->nextFrameCond));
         if (condInitRet != 0)
         {
-            stillValid = 0;
+            internalError = ARVIDEO_ERROR_ALLOC;
         }
         else
         {
@@ -390,12 +404,12 @@ ARVIDEO_Sender_t* ARVIDEO_Sender_New (ARNETWORK_Manager_t *manager, int dataBuff
     }
 
     /* Allocate next frame storage */
-    if (stillValid == 1)
+    if (internalError == ARVIDEO_ERROR_OK)
     {
         retSender->nextFrames = malloc (framesBufferSize * sizeof (ARVIDEO_Sender_Frame_t));
         if (retSender->nextFrames == NULL)
         {
-            stillValid = 0;
+            internalError = ARVIDEO_ERROR_ALLOC;
         }
         else
         {
@@ -404,7 +418,7 @@ ARVIDEO_Sender_t* ARVIDEO_Sender_New (ARNETWORK_Manager_t *manager, int dataBuff
     }
 
     /* Setup internal variables */
-    if (stillValid == 1)
+    if (internalError == ARVIDEO_ERROR_OK)
     {
         retSender->currentFrame.frameNumber = 0;
         retSender->currentFrame.frameBuffer = NULL;
@@ -421,7 +435,7 @@ ARVIDEO_Sender_t* ARVIDEO_Sender_New (ARNETWORK_Manager_t *manager, int dataBuff
         retSender->ackThreadStarted = 0;
     }
 
-    if ((stillValid == 0) &&
+    if ((internalError != ARVIDEO_ERROR_OK) &&
         (retSender != NULL))
     {
         if (packetsToSendMutexWasInit == 1)
@@ -448,6 +462,7 @@ ARVIDEO_Sender_t* ARVIDEO_Sender_New (ARNETWORK_Manager_t *manager, int dataBuff
         retSender = NULL;
     }
 
+    SET_WITH_CHECK (error, internalError);
     return retSender;
 }
 
