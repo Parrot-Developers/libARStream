@@ -17,6 +17,7 @@
  * ARSDK Headers
  */
 #include <libARNetwork/ARNETWORK_Manager.h>
+#include <libARVideo/ARVIDEO_Error.h>
 
 /*
  * Macros
@@ -113,13 +114,13 @@ void ARVIDEO_Reader_StopReader (ARVIDEO_Reader_t *reader);
  *
  * @param reader Pointer to the ARVIDEO_Reader_t * to delete
  *
- * @return 1 if the ARVIDEO_Reader_t was deleted
- * @return 0 if the ARVIDEO_Reader_t is still busy and can not be stopped now (probably because ARVIDEO_Reader_StopReader() was not called yet)
- * @return -1 if reader does not point to a valid ARVIDEO_Reader_t
+ * @return ARVIDEO_ERROR_OK if the ARVIDEO_Reader_t was deleted
+ * @return ARVIDEO_ERROR_BUSY if the ARVIDEO_Reader_t is still busy and can not be stopped now (probably because ARVIDEO_Reader_StopReader() was not called yet)
+ * @return ARVIDEO_ERROR_BAD_PARAMETERS if reader does not point to a valid ARVIDEO_Reader_t
  *
  * @note The library use a double pointer, so it can set *reader to NULL after freeing it
  */
-int ARVIDEO_Reader_Delete (ARVIDEO_Reader_t **reader);
+eARVIDEO_ERROR ARVIDEO_Reader_Delete (ARVIDEO_Reader_t **reader);
 
 /**
  * @brief Runs the data loop of the ARVIDEO_Reader_t

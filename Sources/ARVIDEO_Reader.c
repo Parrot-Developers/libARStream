@@ -223,9 +223,9 @@ void ARVIDEO_Reader_StopReader (ARVIDEO_Reader_t *reader)
     }
 }
 
-int ARVIDEO_Reader_Delete (ARVIDEO_Reader_t **reader)
+eARVIDEO_ERROR ARVIDEO_Reader_Delete (ARVIDEO_Reader_t **reader)
 {
-    int retVal = -1;
+    eARVIDEO_ERROR retVal = ARVIDEO_ERROR_BAD_PARAMETERS;
     if ((reader != NULL) &&
         (*reader != NULL))
     {
@@ -243,8 +243,13 @@ int ARVIDEO_Reader_Delete (ARVIDEO_Reader_t **reader)
             ARSAL_Cond_Destroy (&((*reader)->ackSendCond));
             free (*reader);
             *reader = NULL;
+            retVal = ARVIDEO_ERROR_OK;
         }
-        retVal = canDelete;
+        else
+        {
+            ARSAL_PRINT (ARSAL_PRINT_ERROR, ARVIDEO_READER_TAG, "Call ARVIDEO_Reader_StopReader before calling this function");
+            retVal = ARVIDEO_ERROR_BUSY;
+        }
     }
     return retVal;
 }

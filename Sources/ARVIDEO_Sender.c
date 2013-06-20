@@ -100,6 +100,7 @@ typedef struct {
 /**
  * @brief Flush the new frame queue
  * @param sender The sender to flush
+ * @warning Must be called within a sender->nextFrameMutex lock
  */
 static void ARVIDEO_Sender_FlushQueue (ARVIDEO_Sender_t *sender);
 
@@ -119,7 +120,7 @@ static int ARVIDEO_Sender_AddToQueue (ARVIDEO_Sender_t *sender, uint32_t size, u
  * @param newFrame Pointer in which the function will save the new frame infos
  * @param previousFrameFinished Boolean-like (0/1) flag, active if the previous frame was finished
  * @return 1 if a new frame is available
- * @return 0 if no new frame should be sent (queue is empty, or filled with lo-priority frame)
+ * @return 0 if no new frame should be sent (queue is empty, or filled with low-priority frame)
  */
 static int ARVIDEO_Sender_PopFromQueue (ARVIDEO_Sender_t *sender, ARVIDEO_Sender_Frame_t *newFrame, int previousFrameFinished);
 
@@ -141,7 +142,6 @@ eARNETWORK_MANAGER_CALLBACK_RETURN ARVIDEO_Sender_NetworkCallback (int IoBufferI
 
 static void ARVIDEO_Sender_FlushQueue (ARVIDEO_Sender_t *sender)
 {
-    ARSAL_Mutex_Lock (&(sender->nextFrameMutex));
     while (sender->numberOfWaitingFrames > 0)
     {
         ARVIDEO_Sender_Frame_t *nextFrame = &(sender->nextFrames [sender->indexGetNextFrame]);
@@ -150,7 +150,6 @@ static void ARVIDEO_Sender_FlushQueue (ARVIDEO_Sender_t *sender)
         sender->indexGetNextFrame %= sender->maxNumberOfNextFrames;
         sender->numberOfWaitingFrames--;
     }
-    ARSAL_Mutex_Unlock (&(sender->nextFrameMutex));
 }
 
 static int ARVIDEO_Sender_AddToQueue (ARVIDEO_Sender_t *sender, uint32_t size, uint8_t *buffer, int wasFlushFrame)
@@ -158,6 +157,10 @@ static int ARVIDEO_Sender_AddToQueue (ARVIDEO_Sender_t *sender, uint32_t size, u
     int retVal;
     ARSAL_Mutex_Lock (&(sender->nextFrameMutex));
     retVal = sender->numberOfWaitingFrames;
+    if (wasFlushFrame == 1)
+    {
+        ARVIDEO_Sender_FlushQueue (sender);
+    }
     if (sender->numberOfWaitingFrames < sender->maxNumberOfNextFrames)
     {
         ARVIDEO_Sender_Frame_t *nextFrame = &(sender->nextFrames [sender->indexAddNextFrame]);
@@ -456,9 +459,9 @@ void ARVIDEO_Sender_StopSender (ARVIDEO_Sender_t *sender)
     }
 }
 
-int ARVIDEO_Sender_Delete (ARVIDEO_Sender_t **sender)
+eARVIDEO_ERROR ARVIDEO_Sender_Delete (ARVIDEO_Sender_t **sender)
 {
-    int retVal = -1;
+    eARVIDEO_ERROR retVal = ARVIDEO_ERROR_BAD_PARAMETERS;
     if ((sender != NULL) &&
         (*sender != NULL))
     {
@@ -478,33 +481,49 @@ int ARVIDEO_Sender_Delete (ARVIDEO_Sender_t **sender)
             free ((*sender)->nextFrames);
             free (*sender);
             *sender = NULL;
+            retVal = ARVIDEO_ERROR_OK;
         }
         else
         {
             ARSAL_PRINT (ARSAL_PRINT_ERROR, ARVIDEO_SENDER_TAG, "Call ARVIDEO_Sender_StopSender before calling this function");
+            retVal = ARVIDEO_ERROR_BUSY;
         }
-        retVal = canDelete;
     }
     return retVal;
 }
 
-int ARVIDEO_Sender_SendNewFrame (ARVIDEO_Sender_t *sender, uint8_t *frameBuffer, uint32_t frameSize, int flushPreviousFrames)
+eARVIDEO_ERROR ARVIDEO_Sender_SendNewFrame (ARVIDEO_Sender_t *sender, uint8_t *frameBuffer, uint32_t frameSize, int flushPreviousFrames, int *nbPreviousFrames)
 {
-    int res = -1;
+    eARVIDEO_ERROR retVal = ARVIDEO_ERROR_OK;
     // Args check
     if ((sender == NULL) ||
         (frameBuffer == NULL) ||
+        (frameSize == 0) ||
         ((flushPreviousFrames != 0) &&
          (flushPreviousFrames != 1)))
     {
-        return res;
+        retVal = ARVIDEO_ERROR_BAD_PARAMETERS;
     }
-    if (flushPreviousFrames == 1)
+    if ((retVal == ARVIDEO_ERROR_OK) &&
+        (frameSize > ARVIDEO_NETWORK_HEADERS_MAX_FRAME_SIZE))
     {
-        ARVIDEO_Sender_FlushQueue (sender);
+        retVal = ARVIDEO_ERROR_FRAME_TOO_LARGE;
     }
-    res = ARVIDEO_Sender_AddToQueue (sender, frameSize, frameBuffer, flushPreviousFrames);
-    return res;
+
+    if (retVal == ARVIDEO_ERROR_OK)
+    {
+        int res = ARVIDEO_Sender_AddToQueue (sender, frameSize, frameBuffer, flushPreviousFrames);
+        if (res < 0)
+        {
+            retVal = ARVIDEO_ERROR_QUEUE_FULL;
+        }
+        else if (nbPreviousFrames != NULL)
+        {
+            *nbPreviousFrames = res;
+        }
+        // No else : do nothing if the nbPreviousFrames pointer is not set
+    }
+    return retVal;
 }
 
 void* ARVIDEO_Sender_RunDataThread (void *ARVIDEO_Sender_t_Param)
