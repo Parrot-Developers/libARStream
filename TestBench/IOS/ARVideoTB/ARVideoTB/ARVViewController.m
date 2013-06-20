@@ -113,6 +113,50 @@
     
     lossFramesData = [[NSMutableArray alloc] initWithCapacity:kARVIDEONumberOfPoints];
     
+    // Create graph from theme
+    deltaTGraph = [[CPTXYGraph alloc] initWithFrame:CGRectZero];
+    [deltaTGraph applyTheme:theme];
+    deltaTView.collapsesLayers = NO; // Setting to YES reduces GPU memory usage, but can slow drawing/scrolling
+    deltaTView.hostedGraph     = deltaTGraph;
+    
+    deltaTGraph.paddingLeft   = 1.0;
+    deltaTGraph.paddingTop    = 1.0;
+    deltaTGraph.paddingRight  = 1.0;
+    deltaTGraph.paddingBottom = 1.0;
+    
+    // Setup plot space
+    plotSpace = (CPTXYPlotSpace *)deltaTGraph.defaultPlotSpace;
+    plotSpace.allowsUserInteraction = NO;
+    plotSpace.xRange                = [CPTPlotRange plotRangeWithLocation:CPTDecimalFromFloat(0.0) length:CPTDecimalFromFloat(kARVIDEONumberOfPoints * 1.f)];
+    plotSpace.yRange                = [CPTPlotRange plotRangeWithLocation:CPTDecimalFromFloat(0.0) length:CPTDecimalFromFloat(100.f)];
+    
+    // Axes
+    axisSet = (CPTXYAxisSet *)deltaTGraph.axisSet;
+    y = axisSet.yAxis;
+    y.majorIntervalLength         = CPTDecimalFromString(@"10");
+    y.minorTicksPerInterval       = 1;
+    
+    // Create a blue plot area
+    boundLinePlot  = [[CPTScatterPlot alloc] init];
+    lineStyle = [CPTMutableLineStyle lineStyle];
+    lineStyle.miterLimit        = 1.0f;
+    lineStyle.lineWidth         = 3.0f;
+    lineStyle.lineColor         = [CPTColor greenColor];
+    boundLinePlot.dataLineStyle = lineStyle;
+    boundLinePlot.identifier    = @"Delta Plot";
+    boundLinePlot.dataSource    = self;
+    [deltaTGraph addPlot:boundLinePlot];
+    
+    // Do a blue gradient
+    areaColor1       = [CPTColor colorWithComponentRed:0.3 green:1.0 blue:0.3 alpha:0.8];
+    areaGradient1 = [CPTGradient gradientWithBeginningColor:areaColor1 endingColor:[CPTColor clearColor]];
+    areaGradient1.angle = -90.0f;
+    areaGradientFill = [CPTFill fillWithGradient:areaGradient1];
+    boundLinePlot.areaFill      = areaGradientFill;
+    boundLinePlot.areaBaseValue = [[NSDecimalNumber zero] decimalValue];
+    
+    deltaTData = [[NSMutableArray alloc] initWithCapacity:kARVIDEONumberOfPoints];
+    
     [self resetDataArrays];
 }
 
@@ -120,13 +164,16 @@
 {
     [lossFramesData removeAllObjects];
     [latencyGraphData removeAllObjects];
+    [deltaTData removeAllObjects];
     for (int i = 0; i < kARVIDEONumberOfPoints; i++)
     {
         [latencyGraphData addObject:[NSNumber numberWithUnsignedInteger:0]];
         [lossFramesData addObject:[NSNumber numberWithUnsignedInteger:0]];
+        [deltaTData addObject:[NSNumber numberWithUnsignedInteger:0]];
     }
     [latencyGraph reloadData];
     [lossFramesGraph reloadData];
+    [deltaTGraph reloadData];
 }
 
 -(NSUInteger)numberOfRecordsForPlot:(CPTPlot *)plot
@@ -139,6 +186,10 @@
     else if ([plotId isEqualToString:@"Latency Plot"])
     {
         return [latencyGraphData count];
+    }
+    else if ([plotId isEqualToString:@"Delta Plot"])
+    {
+        return [deltaTData count];
     }
     else
     {
@@ -170,6 +221,17 @@
         else
         {
             retval = [latencyGraphData objectAtIndex:index];
+        }
+    }
+    else if ([plotId isEqualToString:@"Delta Plot"])
+    {
+        if (CPTScatterPlotFieldX == fieldEnum)
+        {
+            retval = [NSNumber numberWithUnsignedInteger:index];
+        }
+        else
+        {
+            retval = [deltaTData objectAtIndex:index];
         }
     }
     return retval;
@@ -236,6 +298,12 @@
             int missed = ARVIDEO_ReaderTb_GetMissedFrames();
             [lossFramesData addObject:[NSNumber numberWithUnsignedInteger:(NSUInteger)missed]];
             [lossFramesGraph reloadData];
+            
+            if ([deltaTData count] > 0)
+                [deltaTData removeObjectAtIndex:0];
+            int dt = ARVIDEO_ReaderTb_GetMeanTimeBetweenFrames();
+            [deltaTData addObject:[NSNumber numberWithUnsignedInteger:(NSUInteger)dt]];
+            [deltaTGraph reloadData];
         }
     }
 }

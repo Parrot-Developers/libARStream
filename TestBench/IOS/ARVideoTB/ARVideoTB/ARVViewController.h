@@ -18,12 +18,16 @@
     IBOutlet UILabel *latency;
     IBOutlet CPTGraphHostingView *latencyGraphView;
     IBOutlet CPTGraphHostingView *lossFramesView;
+    IBOutlet CPTGraphHostingView *deltaTView;
     
     CPTXYGraph *latencyGraph;
     NSMutableArray *latencyGraphData;
     
     CPTXYGraph *lossFramesGraph;
     NSMutableArray *lossFramesData;
+    
+    CPTXYGraph *deltaTGraph;
+    NSMutableArray *deltaTData;
     
 }
 

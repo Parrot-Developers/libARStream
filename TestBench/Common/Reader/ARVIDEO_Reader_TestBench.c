@@ -42,6 +42,8 @@
 #define __IP "127.0.0.1"
 #endif
 
+#define NB_FRAMES_FOR_AVERAGE (15)
+
 /*
  * Types
  */
@@ -49,6 +51,11 @@
 /*
  * Globals
  */
+
+
+static struct timeval lastRecv = {0};
+static int lastDt [NB_FRAMES_FOR_AVERAGE] = {0};
+static int currentIndexInDt = 0;
 
 float ARVIDEO_Reader_PercentOk = 100.f;
 static int nbRead = 0;
@@ -146,6 +153,8 @@ void reallocBuffer (int id, int newSize)
 uint8_t* ARVIDEO_ReaderTb_FrameCompleteCallback (eARVIDEO_READER_CAUSE cause, uint8_t *framePointer, uint32_t frameSize, int numberOfSkippedFrames, uint32_t *newBufferCapacity)
 {
     uint8_t *retVal = NULL;
+    struct timeval now;
+    int dt;
     switch (cause)
     {
     case ARVIDEO_READER_CAUSE_FRAME_COMPLETE:
@@ -165,6 +174,13 @@ uint8_t* ARVIDEO_ReaderTb_FrameCompleteCallback (eARVIDEO_READER_CAUSE cause, ui
         {
             fwrite (framePointer, 1, frameSize, outFile);
         }
+        gettimeofday(&now, NULL);
+        dt = ARSAL_Time_ComputeMsTimeDiff(&lastRecv, &now);
+        lastDt [currentIndexInDt] = dt;
+        currentIndexInDt ++;
+        currentIndexInDt %= NB_FRAMES_FOR_AVERAGE;
+        lastRecv.tv_sec = now.tv_sec;
+        lastRecv.tv_usec = now.tv_usec;
         ARVIDEO_ReaderTb_SetBufferFree (framePointer);
         retVal = ARVIDEO_ReaderTb_GetNextFreeBuffer (newBufferCapacity, 0);
         break;
@@ -366,6 +382,18 @@ void ARVIDEO_Reader_TestBenchStop ()
         ARSAL_Sem_Post (&closeSem);
     }
 }
+
+int ARVIDEO_ReaderTb_GetMeanTimeBetweenFrames ()
+{
+    int retVal = 0;
+    int i;
+    for (i = 0; i < NB_FRAMES_FOR_AVERAGE; i++)
+    {
+        retVal += lastDt [i];
+    }
+    return retVal / NB_FRAMES_FOR_AVERAGE;
+}
+
 
 int ARVIDEO_ReaderTb_GetLatency ()
 {

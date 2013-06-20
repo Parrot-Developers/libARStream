@@ -27,6 +27,11 @@ extern float ARVIDEO_Reader_PercentOk;
 void ARVIDEO_Reader_TestBenchStop ();
 
 /**
+ * Gets the mean time between frame (averaged over 15 frames)
+ */
+int ARVIDEO_ReaderTb_GetMeanTimeBetweenFrames ();
+
+/**
  * Gets libARNetwork estimated Latency
  * @return estimated network latency in ms
  */
