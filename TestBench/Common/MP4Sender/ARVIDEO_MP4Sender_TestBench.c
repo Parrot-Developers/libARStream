@@ -249,18 +249,21 @@ void* fileReaderThread (void *ARVIDEO_Sender_t_Param)
 
         if (frameSize != 0)
         {
+            int nbPrevious = 0;
             int flush = ((cnt % I_FRAME_EVERY_N) == 1) ? 1 : 0;
-            int res = ARVIDEO_Sender_SendNewFrame (sender, nextFrameAddr, frameSize, flush);
+            eARVIDEO_ERROR res = ARVIDEO_Sender_SendNewFrame (sender, nextFrameAddr, frameSize, flush, &nbPrevious);
             switch (res)
             {
-            case -1:
-                ARSAL_PRINT (ARSAL_PRINT_ERROR, __TAG__, "Unable to send the new frame");
+            case ARVIDEO_ERROR_OK:
+                ARSAL_PRINT (ARSAL_PRINT_WARNING, __TAG__, "Added a frame of size %u to the Sender (already %d in queue)", frameSize, nbPrevious);
                 break;
-            case 0:
-                ARSAL_PRINT (ARSAL_PRINT_WARNING, __TAG__, "Try to send a frame of size %u", frameSize);
+            case ARVIDEO_ERROR_BAD_PARAMETERS:
+            case ARVIDEO_ERROR_FRAME_TOO_LARGE:
+            case ARVIDEO_ERROR_QUEUE_FULL:
+                ARSAL_PRINT (ARSAL_PRINT_ERROR, __TAG__, "Unable to send the new frame : %s", ARVIDEO_Error_ToString(res));
                 break;
-            case 1:
-                ARSAL_PRINT (ARSAL_PRINT_WARNING, __TAG__, "Try to send a frame of size %u, will cancel previous frame sending", frameSize);
+            default:
+                ARSAL_PRINT (ARSAL_PRINT_ERROR, __TAG__, "Unknown error code for SendNewFrame");
                 break;
             }
         }
@@ -278,12 +281,13 @@ void* fileReaderThread (void *ARVIDEO_Sender_t_Param)
 int ARVIDEO_MP4SenderTb_StartVideoTest (const char *fpath, ARNETWORK_Manager_t *manager)
 {
     int retVal = 0;
+    eARVIDEO_ERROR err;
     ARVIDEO_Sender_t *sender;
     ARVIDEO_MP4SenderTb_initMultiBuffers (ARVIDEO_MP4SenderTb_OpenVideoFile (fpath));
-    sender = ARVIDEO_Sender_New (manager, DATA_BUFFER_ID, ACK_BUFFER_ID, ARVIDEO_MP4SenderTb_FrameUpdateCallback, NB_BUFFERS);
+    sender = ARVIDEO_Sender_New (manager, DATA_BUFFER_ID, ACK_BUFFER_ID, ARVIDEO_MP4SenderTb_FrameUpdateCallback, NB_BUFFERS, &err);
     if (sender == NULL)
     {
-        ARSAL_PRINT (ARSAL_PRINT_ERROR, __TAG__, "Error during ARVIDEO_Sender_New call");
+        ARSAL_PRINT (ARSAL_PRINT_ERROR, __TAG__, "Error during ARVIDEO_Sender_New call : %s", ARVIDEO_Error_ToString(err));
         return 1;
     }
 

@@ -250,6 +250,7 @@ int ARVIDEO_ReaderTb_StartVideoTest (ARNETWORK_Manager_t *manager, const char *o
     ARVIDEO_Reader_t *reader;
     uint8_t *firstFrame;
     uint32_t firstFrameSize;
+    eARVIDEO_ERROR err;
     if (NULL != outPath)
     {
         outFile = fopen (outPath, "wb");
@@ -261,10 +262,10 @@ int ARVIDEO_ReaderTb_StartVideoTest (ARNETWORK_Manager_t *manager, const char *o
     ARVIDEO_ReaderTb_initMultiBuffers (FRAME_MAX_SIZE);
     ARSAL_Sem_Init (&closeSem, 0, 0);
     firstFrame = ARVIDEO_ReaderTb_GetNextFreeBuffer (&firstFrameSize, 0);
-    reader = ARVIDEO_Reader_New (manager, DATA_BUFFER_ID, ACK_BUFFER_ID, ARVIDEO_ReaderTb_FrameCompleteCallback, firstFrame, firstFrameSize);
+    reader = ARVIDEO_Reader_New (manager, DATA_BUFFER_ID, ACK_BUFFER_ID, ARVIDEO_ReaderTb_FrameCompleteCallback, firstFrame, firstFrameSize, &err);
     if (reader == NULL)
     {
-        ARSAL_PRINT (ARSAL_PRINT_ERROR, __TAG__, "Error during ARVIDEO_Reader_New call");
+        ARSAL_PRINT (ARSAL_PRINT_ERROR, __TAG__, "Error during ARVIDEO_Reader_New call : %s", ARVIDEO_Error_ToString(err));
         return 1;
     }
 
