@@ -25,6 +25,10 @@
 		379378F2176B5C2C00AD5C9D /* ARVIDEO_Reader_TestBench.c in Sources */ = {isa = PBXBuildFile; fileRef = 379378F0176B5C2C00AD5C9D /* ARVIDEO_Reader_TestBench.c */; };
 		379378F5176B5C3600AD5C9D /* ARVIDEO_Sender_TestBench.c in Sources */ = {isa = PBXBuildFile; fileRef = 379378F3176B5C3600AD5C9D /* ARVIDEO_Sender_TestBench.c */; };
 		379378F8176B5CD300AD5C9D /* ARVIDEO_MP4Sender_TestBench.c in Sources */ = {isa = PBXBuildFile; fileRef = 379378F6176B5CD300AD5C9D /* ARVIDEO_MP4Sender_TestBench.c */; };
+		37F158A317732F7700113797 /* Icon.png in Resources */ = {isa = PBXBuildFile; fileRef = 37F158A217732F7700113797 /* Icon.png */; };
+		37F158A817732F7E00113797 /* Icon@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = 37F158A717732F7E00113797 /* Icon@2x.png */; };
+		37F158AA17732F8700113797 /* Icon-72.png in Resources */ = {isa = PBXBuildFile; fileRef = 37F158A917732F8700113797 /* Icon-72.png */; };
+		37F158AC17732F8C00113797 /* Icon-72@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = 37F158AB17732F8C00113797 /* Icon-72@2x.png */; };
 		37F6E398176F114C00091546 /* QuartzCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 37F6E396176F113900091546 /* QuartzCore.framework */; };
 		37F6E3AB176F404100091546 /* libCorePlot-CocoaTouch.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 37F6E3AA176F3F9E00091546 /* libCorePlot-CocoaTouch.a */; };
 /* End PBXBuildFile section */
@@ -66,6 +70,10 @@
 		379378F4176B5C3600AD5C9D /* ARVIDEO_Sender_TestBench.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ARVIDEO_Sender_TestBench.h; path = ../../../Common/Sender/ARVIDEO_Sender_TestBench.h; sourceTree = "<group>"; };
 		379378F6176B5CD300AD5C9D /* ARVIDEO_MP4Sender_TestBench.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = ARVIDEO_MP4Sender_TestBench.c; path = ../../../Common/MP4Sender/ARVIDEO_MP4Sender_TestBench.c; sourceTree = "<group>"; };
 		379378F7176B5CD300AD5C9D /* ARVIDEO_MP4Sender_TestBench.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ARVIDEO_MP4Sender_TestBench.h; path = ../../../Common/MP4Sender/ARVIDEO_MP4Sender_TestBench.h; sourceTree = "<group>"; };
+		37F158A217732F7700113797 /* Icon.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = Icon.png; path = ../Icon.png; sourceTree = "<group>"; };
+		37F158A717732F7E00113797 /* Icon@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = "Icon@2x.png"; path = "../Icon@2x.png"; sourceTree = "<group>"; };
+		37F158A917732F8700113797 /* Icon-72.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = "Icon-72.png"; path = "../Icon-72.png"; sourceTree = "<group>"; };
+		37F158AB17732F8C00113797 /* Icon-72@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = "Icon-72@2x.png"; path = "../Icon-72@2x.png"; sourceTree = "<group>"; };
 		37F6E396176F113900091546 /* QuartzCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuartzCore.framework; path = System/Library/Frameworks/QuartzCore.framework; sourceTree = SDKROOT; };
 		37F6E3A3176F3F9D00091546 /* CorePlot-CocoaTouch.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; name = "CorePlot-CocoaTouch.xcodeproj"; path = "../CorePlot_1.2/Source/framework/CorePlot-CocoaTouch.xcodeproj"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -145,6 +153,10 @@
 		379378C3176B5A0C00AD5C9D /* Supporting Files */ = {
 			isa = PBXGroup;
 			children = (
+				37F158AB17732F8C00113797 /* Icon-72@2x.png */,
+				37F158A917732F8700113797 /* Icon-72.png */,
+				37F158A717732F7E00113797 /* Icon@2x.png */,
+				37F158A217732F7700113797 /* Icon.png */,
 				379378C4176B5A0C00AD5C9D /* ARVideoTB-Info.plist */,
 				379378C5176B5A0C00AD5C9D /* InfoPlist.strings */,
 				379378C8176B5A0C00AD5C9D /* main.m */,
@@ -237,6 +249,10 @@
 				379378D1176B5A0C00AD5C9D /* Default@2x.png in Resources */,
 				379378D3176B5A0C00AD5C9D /* Default-568h@2x.png in Resources */,
 				379378D6176B5A0C00AD5C9D /* MainStoryboard_iPhone.storyboard in Resources */,
+				37F158A317732F7700113797 /* Icon.png in Resources */,
+				37F158A817732F7E00113797 /* Icon@2x.png in Resources */,
+				37F158AA17732F8700113797 /* Icon-72.png in Resources */,
+				37F158AC17732F8C00113797 /* Icon-72@2x.png in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
