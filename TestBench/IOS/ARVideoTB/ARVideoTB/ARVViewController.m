@@ -24,7 +24,10 @@
 {
     [super viewDidLoad];
     
+    nbGraphs = 0;
+    
     // Create graph from theme
+    nbGraphs++;
     latencyGraph = [[CPTXYGraph alloc] initWithFrame:CGRectZero];
     CPTTheme *theme = [CPTTheme themeNamed:kCPTPlainWhiteTheme];
     [latencyGraph applyTheme:theme];
@@ -73,6 +76,7 @@
     latencyGraphData = [[NSMutableArray alloc] initWithCapacity:kARVIDEONumberOfPoints];
     
     // Create graph from theme
+    nbGraphs++;
     lossFramesGraph = [[CPTXYGraph alloc] initWithFrame:CGRectZero];
     [lossFramesGraph applyTheme:theme];
     lossFramesView.collapsesLayers = NO; // Setting to YES reduces GPU memory usage, but can slow drawing/scrolling
@@ -120,6 +124,7 @@
     lossFramesData = [[NSMutableArray alloc] initWithCapacity:kARVIDEONumberOfPoints];
     
     // Create graph from theme
+    nbGraphs++;
     deltaTGraph = [[CPTXYGraph alloc] initWithFrame:CGRectZero];
     [deltaTGraph applyTheme:theme];
     deltaTView.collapsesLayers = NO; // Setting to YES reduces GPU memory usage, but can slow drawing/scrolling
@@ -166,6 +171,54 @@
     
     deltaTData = [[NSMutableArray alloc] initWithCapacity:kARVIDEONumberOfPoints];
     
+    // Create graph from theme
+    nbGraphs++;
+    efficiencyGraph = [[CPTXYGraph alloc] initWithFrame:CGRectZero];
+    [efficiencyGraph applyTheme:theme];
+    efficiencyView.collapsesLayers = NO; // Setting to YES reduces GPU memory usage, but can slow drawing/scrolling
+    efficiencyView.hostedGraph     = efficiencyGraph;
+    
+    efficiencyGraph.paddingLeft   = 1.0;
+    efficiencyGraph.paddingTop    = 1.0;
+    efficiencyGraph.paddingRight  = 1.0;
+    efficiencyGraph.paddingBottom = 1.0;
+    
+    // Setup plot space
+    plotSpace = (CPTXYPlotSpace *)efficiencyGraph.defaultPlotSpace;
+    plotSpace.allowsUserInteraction = NO;
+    plotSpace.xRange                = [CPTPlotRange plotRangeWithLocation:CPTDecimalFromFloat(0.0) length:CPTDecimalFromFloat(kARVIDEONumberOfPoints * 1.f)];
+    plotSpace.yRange                = [CPTPlotRange plotRangeWithLocation:CPTDecimalFromFloat(0.0) length:CPTDecimalFromFloat(1.f)];
+    
+    // Axes
+    axisSet = (CPTXYAxisSet *)efficiencyGraph.axisSet;
+    y = axisSet.yAxis;
+    y.majorIntervalLength         = CPTDecimalFromString(@"0.1");
+    y.minorTicksPerInterval       = 0;
+    x = axisSet.xAxis;
+    x.majorIntervalLength         = CPTDecimalFromInt(kARVIDEONumberOfPoints);
+    x.minorTicksPerInterval       = 0;
+    
+    // Create a yellow plot area
+    boundLinePlot  = [[CPTScatterPlot alloc] init];
+    lineStyle = [CPTMutableLineStyle lineStyle];
+    lineStyle.miterLimit        = 1.0f;
+    lineStyle.lineWidth         = 3.0f;
+    lineStyle.lineColor         = [CPTColor yellowColor];
+    boundLinePlot.dataLineStyle = lineStyle;
+    boundLinePlot.identifier    = @"Eff Plot";
+    boundLinePlot.dataSource    = self;
+    [efficiencyGraph addPlot:boundLinePlot];
+    
+    // Do a yellow gradient
+    areaColor1       = [CPTColor colorWithComponentRed:0.8 green:0.8 blue:0.3 alpha:0.8];
+    areaGradient1 = [CPTGradient gradientWithBeginningColor:areaColor1 endingColor:[CPTColor clearColor]];
+    areaGradient1.angle = -90.0f;
+    areaGradientFill = [CPTFill fillWithGradient:areaGradient1];
+    boundLinePlot.areaFill      = areaGradientFill;
+    boundLinePlot.areaBaseValue = [[NSDecimalNumber zero] decimalValue];
+    
+    efficiencyData = [[NSMutableArray alloc] initWithCapacity:kARVIDEONumberOfPoints];
+    
     [self resetDataArrays];
 }
 
@@ -174,15 +227,15 @@
     [lossFramesData removeAllObjects];
     [latencyGraphData removeAllObjects];
     [deltaTData removeAllObjects];
+    [efficiencyData removeAllObjects];
     for (int i = 0; i < kARVIDEONumberOfPoints; i++)
     {
         [latencyGraphData addObject:[NSNumber numberWithUnsignedInteger:0]];
         [lossFramesData addObject:[NSNumber numberWithUnsignedInteger:0]];
         [deltaTData addObject:[NSNumber numberWithUnsignedInteger:0]];
+        [efficiencyData addObject:[NSNumber numberWithUnsignedInteger:0]];
     }
-    [latencyGraph reloadData];
-    [lossFramesGraph reloadData];
-    [deltaTGraph reloadData];
+    [self refreshGraphs];
 }
 
 -(NSUInteger)numberOfRecordsForPlot:(CPTPlot *)plot
@@ -199,6 +252,10 @@
     else if ([plotId isEqualToString:@"Delta Plot"])
     {
         return [deltaTData count];
+    }
+    else if ([plotId isEqualToString:@"Eff Plot"])
+    {
+        return [efficiencyData count];
     }
     else
     {
@@ -243,6 +300,17 @@
             retval = [deltaTData objectAtIndex:index];
         }
     }
+    else if ([plotId isEqualToString:@"Eff Plot"])
+    {
+        if (CPTScatterPlotFieldX == fieldEnum)
+        {
+            retval = [NSNumber numberWithUnsignedInteger:index];
+        }
+        else
+        {
+            retval = [efficiencyData objectAtIndex:index];
+        }
+    }
     return retval;
 }
 
@@ -250,6 +318,9 @@
 {
     _running = NO;
     _isSender = NO;
+    
+    CGSize contentSize = CGSizeMake(graphScrollView.frame.size.width, 108.f * nbGraphs);
+    [graphScrollView setContentSize:contentSize];
 }
 
 - (void)didReceiveMemoryWarning
@@ -258,9 +329,25 @@
     // Dispose of any resources that can be recreated.
 }
 
+- (void) refreshGraphs
+{
+    if (! [NSThread isMainThread])
+    {
+        [self performSelectorOnMainThread:@selector(refreshGraphs) withObject:nil waitUntilDone:NO];
+    }
+    else
+    {
+        [latencyGraph reloadData];
+        [lossFramesGraph reloadData];
+        [deltaTGraph reloadData];
+        [efficiencyGraph reloadData];
+    }
+}
+
 - (void) startTimer
 {
-    _refreshTimer = [NSTimer scheduledTimerWithTimeInterval:kARVIDEODeltaTTimerSec target:self selector:@selector(updateStatus) userInfo:nil repeats:YES];
+    _refreshTimer = [NSTimer timerWithTimeInterval:kARVIDEODeltaTTimerSec target:self selector:@selector(updateStatus) userInfo:nil repeats:YES];
+    [[NSRunLoop mainRunLoop] addTimer:_refreshTimer forMode:NSRunLoopCommonModes];
 }
 
 - (void) stopTimer
@@ -291,7 +378,6 @@
                 if ([latencyGraphData count] > 0)
                     [latencyGraphData removeObjectAtIndex:0];
                 [latencyGraphData addObject:[NSNumber numberWithUnsignedInteger:1000]];
-                [latencyGraph reloadData];
             }
             else
             {
@@ -299,20 +385,24 @@
                 if ([latencyGraphData count] > 0)
                     [latencyGraphData removeObjectAtIndex:0];
                 [latencyGraphData addObject:[NSNumber numberWithUnsignedInteger:estLat]];
-                [latencyGraph reloadData];
 
             }
             if ([lossFramesData count] > 0)
                 [lossFramesData removeObjectAtIndex:0];
             int missed = ARVIDEO_ReaderTb_GetMissedFrames();
             [lossFramesData addObject:[NSNumber numberWithUnsignedInteger:(NSUInteger)missed]];
-            [lossFramesGraph reloadData];
             
             if ([deltaTData count] > 0)
                 [deltaTData removeObjectAtIndex:0];
             int dt = ARVIDEO_ReaderTb_GetMeanTimeBetweenFrames();
             [deltaTData addObject:[NSNumber numberWithUnsignedInteger:(NSUInteger)dt]];
-            [deltaTGraph reloadData];
+            
+            if ([efficiencyData count] > 0)
+                [efficiencyData removeObjectAtIndex:0];
+            float eff = ARVIDEO_ReaderTb_GetEfficiency();
+            [efficiencyData addObject:[NSNumber numberWithFloat:eff]];
+            
+            [self refreshGraphs];
         }
     }
 }

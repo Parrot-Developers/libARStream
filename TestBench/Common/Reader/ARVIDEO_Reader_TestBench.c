@@ -65,6 +65,7 @@ static int nbSkippedSinceLast = 0;
 static int running;
 ARSAL_Sem_t closeSem;
 static ARNETWORK_Manager_t *g_Manager = NULL;
+static ARVIDEO_Reader_t *g_Reader = NULL;
 
 static int currentBufferIndex = 0;
 static uint8_t *multiBuffer[NB_BUFFERS];
@@ -247,7 +248,7 @@ uint8_t* ARVIDEO_ReaderTb_GetNextFreeBuffer (uint32_t *retSize, int reallocToDou
 int ARVIDEO_ReaderTb_StartVideoTest (ARNETWORK_Manager_t *manager, const char *outPath)
 {
     int retVal = 0;
-    ARVIDEO_Reader_t *reader;
+
     uint8_t *firstFrame;
     uint32_t firstFrameSize;
     eARVIDEO_ERROR err;
@@ -262,16 +263,16 @@ int ARVIDEO_ReaderTb_StartVideoTest (ARNETWORK_Manager_t *manager, const char *o
     ARVIDEO_ReaderTb_initMultiBuffers (FRAME_MAX_SIZE);
     ARSAL_Sem_Init (&closeSem, 0, 0);
     firstFrame = ARVIDEO_ReaderTb_GetNextFreeBuffer (&firstFrameSize, 0);
-    reader = ARVIDEO_Reader_New (manager, DATA_BUFFER_ID, ACK_BUFFER_ID, ARVIDEO_ReaderTb_FrameCompleteCallback, firstFrame, firstFrameSize, &err);
-    if (reader == NULL)
+    g_Reader = ARVIDEO_Reader_New (manager, DATA_BUFFER_ID, ACK_BUFFER_ID, ARVIDEO_ReaderTb_FrameCompleteCallback, firstFrame, firstFrameSize, &err);
+    if (g_Reader == NULL)
     {
         ARSAL_PRINT (ARSAL_PRINT_ERROR, __TAG__, "Error during ARVIDEO_Reader_New call : %s", ARVIDEO_Error_ToString(err));
         return 1;
     }
 
     pthread_t videosend, videoread;
-    pthread_create (&videosend, NULL, ARVIDEO_Reader_RunDataThread, reader);
-    pthread_create (&videoread, NULL, ARVIDEO_Reader_RunAckThread, reader);
+    pthread_create (&videosend, NULL, ARVIDEO_Reader_RunDataThread, g_Reader);
+    pthread_create (&videoread, NULL, ARVIDEO_Reader_RunAckThread, g_Reader);
 
     /* USER CODE */
 
@@ -281,12 +282,12 @@ int ARVIDEO_ReaderTb_StartVideoTest (ARNETWORK_Manager_t *manager, const char *o
 
     /* END OF USER CODE */
 
-    ARVIDEO_Reader_StopReader (reader);
+    ARVIDEO_Reader_StopReader (g_Reader);
 
     pthread_join (videoread, NULL);
     pthread_join (videosend, NULL);
 
-    ARVIDEO_Reader_Delete (&reader);
+    ARVIDEO_Reader_Delete (&g_Reader);
 
     ARSAL_Sem_Destroy (&closeSem);
 
@@ -414,3 +415,13 @@ int ARVIDEO_ReaderTb_GetMissedFrames ()
     nbSkippedSinceLast = 0;
     return retval;
 }
+
+float ARVIDEO_ReaderTb_GetEfficiency ()
+{
+    if (g_Reader == NULL)
+    {
+        return 0.f;
+    }
+    return ARVIDEO_Reader_GetEstimatedEfficiency(g_Reader);
+}
+

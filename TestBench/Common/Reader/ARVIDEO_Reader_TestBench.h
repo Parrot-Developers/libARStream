@@ -42,4 +42,9 @@ int ARVIDEO_ReaderTb_GetLatency ();
  */
 int ARVIDEO_ReaderTb_GetMissedFrames ();
 
+/**
+ * Gets the estimated efficiency of the reader
+ */
+float ARVIDEO_ReaderTb_GetEfficiency ();
+
 #endif /* _ARVIDEO_READER_TESTBENCH_H_ */

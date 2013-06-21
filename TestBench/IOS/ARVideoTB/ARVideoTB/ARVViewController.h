@@ -16,9 +16,13 @@
     IBOutlet UIButton *stopButton;
     IBOutlet UILabel *percentOk;
     IBOutlet UILabel *latency;
+    
+    IBOutlet UIScrollView *graphScrollView;
+    
     IBOutlet CPTGraphHostingView *latencyGraphView;
     IBOutlet CPTGraphHostingView *lossFramesView;
     IBOutlet CPTGraphHostingView *deltaTView;
+    IBOutlet CPTGraphHostingView *efficiencyView;
     
     CPTXYGraph *latencyGraph;
     NSMutableArray *latencyGraphData;
@@ -28,6 +32,11 @@
     
     CPTXYGraph *deltaTGraph;
     NSMutableArray *deltaTData;
+    
+    CPTXYGraph *efficiencyGraph;
+    NSMutableArray *efficiencyData;
+    
+    int nbGraphs;
     
 }
 
