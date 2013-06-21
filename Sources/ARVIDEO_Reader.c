@@ -39,6 +39,8 @@
 #define ARVIDEO_READER_DATAREAD_TIMEOUT_MS (500)
 #define ARVIDEO_READER_MAX_TIME_BETWEEN_ACK_MS (5)
 
+#define ARVIDEO_READER_EFFICIENCY_AVERAGE_NB_FRAMES (15)
+
 /**
  * Sets *PTR to VAL if PTR is not null
  */
@@ -77,6 +79,11 @@ struct ARVIDEO_Reader_t {
     int threadsShouldStop;
     int dataThreadStarted;
     int ackThreadStarted;
+
+    /* Efficiency calculations */
+    int efficiency_nbUseful [ARVIDEO_READER_EFFICIENCY_AVERAGE_NB_FRAMES];
+    int efficiency_nbTotal  [ARVIDEO_READER_EFFICIENCY_AVERAGE_NB_FRAMES];
+    int efficiency_index;
 };
 
 /*
@@ -200,10 +207,17 @@ ARVIDEO_Reader_t* ARVIDEO_Reader_New (ARNETWORK_Manager_t *manager, int dataBuff
     /* Setup internal variables */
     if (internalError == ARVIDEO_ERROR_OK)
     {
+        int i;
         retReader->currentFrameSize = 0;
         retReader->threadsShouldStop = 0;
         retReader->dataThreadStarted = 0;
         retReader->ackThreadStarted = 0;
+        retReader->efficiency_index = 0;
+        for (i = 0; i < ARVIDEO_READER_EFFICIENCY_AVERAGE_NB_FRAMES; i++)
+        {
+            retReader->efficiency_nbTotal [i] = 0;
+            retReader->efficiency_nbUseful [i] = 0;
+        }
     }
 
     if ((internalError != ARVIDEO_ERROR_OK) &&
@@ -311,6 +325,10 @@ void* ARVIDEO_Reader_RunDataThread (void *ARVIDEO_Reader_t_Param)
             ARSAL_Mutex_Lock (&(reader->ackPacketMutex));
             if (header->frameNumber != reader->ackPacket.numFrame)
             {
+                reader->efficiency_index ++;
+                reader->efficiency_index %= ARVIDEO_READER_EFFICIENCY_AVERAGE_NB_FRAMES;
+                reader->efficiency_nbTotal [reader->efficiency_index] = 0;
+                reader->efficiency_nbUseful [reader->efficiency_index] = 0;
                 skipCurrentFrame = 0;
                 reader->currentFrameSize = 0;
                 reader->ackPacket.numFrame = header->frameNumber;
@@ -318,6 +336,12 @@ void* ARVIDEO_Reader_RunDataThread (void *ARVIDEO_Reader_t_Param)
             }
             packetWasAlreadyAck = ARVIDEO_NetworkHeaders_AckPacketFlagIsSet (&(reader->ackPacket), header->fragmentNumber);
             ARVIDEO_NetworkHeaders_AckPacketSetFlag (&(reader->ackPacket), header->fragmentNumber);
+
+            reader->efficiency_nbTotal [reader->efficiency_index] ++;
+            if (packetWasAlreadyAck == 0)
+            {
+                reader->efficiency_nbUseful [reader->efficiency_index] ++;
+            }
 
             ARSAL_Mutex_Unlock (&(reader->ackPacketMutex));
 
@@ -416,4 +440,33 @@ void* ARVIDEO_Reader_RunAckThread (void *ARVIDEO_Reader_t_Param)
     ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARVIDEO_READER_TAG, "Ack sender thread ended");
     reader->ackThreadStarted = 0;
     return (void *)0;
+}
+
+float ARVIDEO_Reader_GetEstimatedEfficiency (ARVIDEO_Reader_t *reader)
+{
+    float retVal = 1.0f;
+    uint32_t totalPackets = 0;
+    uint32_t usefulPackets = 0;
+    int i;
+    ARSAL_Mutex_Lock (&(reader->ackPacketMutex));
+    for (i = 0; i < ARVIDEO_READER_EFFICIENCY_AVERAGE_NB_FRAMES; i++)
+    {
+        totalPackets += reader->efficiency_nbTotal [i];
+        usefulPackets += reader->efficiency_nbUseful [i];
+    }
+    ARSAL_Mutex_Unlock (&(reader->ackPacketMutex));
+    if (totalPackets == 0)
+    {
+        retVal = 0.0f; // We didn't receive anything yet ... not really efficient
+    }
+    else if (usefulPackets > totalPackets)
+    {
+        retVal = 1.0f; // If this happens, it means that we have a big problem
+        ARSAL_PRINT (ARSAL_PRINT_ERROR, ARVIDEO_READER_TAG, "Computed efficiency is greater that 1.0 ...");
+    }
+    else
+    {
+        retVal = (1.f * usefulPackets) / (1.f * totalPackets);
+    }
+    return retVal;
 }

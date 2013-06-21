@@ -139,4 +139,13 @@ void* ARVIDEO_Reader_RunDataThread (void *ARVIDEO_Reader_t_Param);
  */
 void* ARVIDEO_Reader_RunAckThread (void *ARVIDEO_Reader_t_Param);
 
+/**
+ * @brief Gets the estimated network efficiency for the ARVIDEO link
+ * An efficiency of 1.0f means that we did not receive any useless packet.
+ * Efficiency is computed on all frames for which the Reader got at least a packet, even if the frame was not complete.
+ * @warning This function is a debug-only function and will disappear on release builds
+ * @param[in] reader The ARVIDEO_Reader_t
+ */
+float ARVIDEO_Reader_GetEstimatedEfficiency (ARVIDEO_Reader_t *reader);
+
 #endif /* _ARVIDEO_READER_H_ */
