@@ -46,7 +46,10 @@
     CPTXYAxisSet *axisSet = (CPTXYAxisSet *)latencyGraph.axisSet;
     CPTXYAxis *y = axisSet.yAxis;
     y.majorIntervalLength         = CPTDecimalFromString(@"100");
-    y.minorTicksPerInterval       = 1;
+    y.minorTicksPerInterval       = 0;
+    CPTXYAxis *x = axisSet.xAxis;
+    x.majorIntervalLength         = CPTDecimalFromInt(kARVIDEONumberOfPoints);
+    x.minorTicksPerInterval       = 0;
     
     // Create an orange plot area
     CPTScatterPlot *boundLinePlot  = [[CPTScatterPlot alloc] init];
@@ -90,7 +93,10 @@
     axisSet = (CPTXYAxisSet *)lossFramesGraph.axisSet;
     y = axisSet.yAxis;
     y.majorIntervalLength         = CPTDecimalFromString(@"1");
-    y.minorTicksPerInterval       = 1;
+    y.minorTicksPerInterval       = 0;
+    x = axisSet.xAxis;
+    x.majorIntervalLength         = CPTDecimalFromInt(kARVIDEONumberOfPoints);
+    x.minorTicksPerInterval       = 0;
     
     // Create a blue plot area
     boundLinePlot  = [[CPTScatterPlot alloc] init];
@@ -134,7 +140,10 @@
     axisSet = (CPTXYAxisSet *)deltaTGraph.axisSet;
     y = axisSet.yAxis;
     y.majorIntervalLength         = CPTDecimalFromString(@"10");
-    y.minorTicksPerInterval       = 1;
+    y.minorTicksPerInterval       = 0;
+    x = axisSet.xAxis;
+    x.majorIntervalLength         = CPTDecimalFromInt(kARVIDEONumberOfPoints);
+    x.minorTicksPerInterval       = 0;
     
     // Create a blue plot area
     boundLinePlot  = [[CPTScatterPlot alloc] init];
