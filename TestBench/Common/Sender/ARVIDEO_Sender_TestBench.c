@@ -39,8 +39,8 @@
 #define FRAME_MIN_SIZE (FRAME_SIZE)
 #define FRAME_MAX_SIZE (FRAME_SIZE)
 
-#define NB_BUFFERS (15)
-#define I_FRAME_EVERY_N (10)
+#define I_FRAME_EVERY_N (15)
+#define NB_BUFFERS (2 * I_FRAME_EVERY_N)
 
 #define TIME_BETWEEN_FRAMES_MS (1000 / FPS)
 
