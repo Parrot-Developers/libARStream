@@ -38,12 +38,14 @@ int ARVIDEO_ReaderTb_GetMeanTimeBetweenFrames ();
 int ARVIDEO_ReaderTb_GetLatency ();
 
 /**
- * Gets the number of missed frames since last call
+ * @brief Gets the number of missed frames since last call
+ * @return Number of frames missed since last call
  */
 int ARVIDEO_ReaderTb_GetMissedFrames ();
 
 /**
- * Gets the estimated efficiency of the reader
+ * @brief Gets the estimated efficiency of the reader
+ * @return Estimated efficiency (0.0 is bad, 1.0 is perfect)
  */
 float ARVIDEO_ReaderTb_GetEfficiency ();
 

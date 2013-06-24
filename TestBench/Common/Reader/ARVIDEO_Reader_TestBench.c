@@ -319,7 +319,7 @@ int ARVIDEO_Reader_TestBenchMain (int argc, char *argv[])
     {
         outPath = argv[2];
     }
-    
+
     ARSAL_PRINT (ARSAL_PRINT_WARNING, __TAG__, "IP = %s", ip);
 
     int nbInBuff = 1;
@@ -362,7 +362,7 @@ int ARVIDEO_Reader_TestBenchMain (int argc, char *argv[])
     pthread_t netsend, netread;
     pthread_create (&netsend, NULL, ARNETWORK_Manager_SendingThreadRun, g_Manager);
     pthread_create (&netread, NULL, ARNETWORK_Manager_ReceivingThreadRun, g_Manager);
-    
+
     retVal = ARVIDEO_ReaderTb_StartVideoTest (g_Manager, outPath);
 
     ARNETWORK_Manager_Stop (g_Manager);
@@ -424,4 +424,3 @@ float ARVIDEO_ReaderTb_GetEfficiency ()
     }
     return ARVIDEO_Reader_GetEstimatedEfficiency(g_Reader);
 }
-

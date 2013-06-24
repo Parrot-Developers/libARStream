@@ -37,10 +37,16 @@
  */
 
 #define ARVIDEO_SENDER_TAG "ARVIDEO_Sender"
+
 /**
  * Latency used when the network can't give us a valid value
  */
 #define ARVIDEO_SENDER_DEFAULT_ESTIMATED_LATENCY_MS (100)
+
+#define ARVIDEO_SENDER_MINIMUM_TIME_BETWEEN_RETRIES_MS (15)
+#define ARVIDEO_SENDER_MAXIMUM_TIME_BETWEEN_RETRIES_MS (200)
+
+#define ARVIDEO_SENDER_EFFICIENCY_AVERAGE_NB_FRAMES (15)
 
 /**
  * Sets *PTR to VAL if PTR is not null
@@ -98,6 +104,11 @@ struct ARVIDEO_Sender_t {
     int threadsShouldStop;
     int dataThreadStarted;
     int ackThreadStarted;
+
+    /* Efficiency calculations */
+    int efficiency_nbFragments [ARVIDEO_SENDER_EFFICIENCY_AVERAGE_NB_FRAMES];
+    int efficiency_nbSent [ARVIDEO_SENDER_EFFICIENCY_AVERAGE_NB_FRAMES];
+    int efficiency_index;
 };
 
 typedef struct {
@@ -131,11 +142,10 @@ static int ARVIDEO_Sender_AddToQueue (ARVIDEO_Sender_t *sender, uint32_t size, u
  * @brief Pop a frame from the new frame queue
  * @param sender The sender
  * @param newFrame Pointer in which the function will save the new frame infos
- * @param previousFrameFinished Boolean-like (0/1) flag, active if the previous frame was finished
  * @return 1 if a new frame is available
  * @return 0 if no new frame should be sent (queue is empty, or filled with low-priority frame)
  */
-static int ARVIDEO_Sender_PopFromQueue (ARVIDEO_Sender_t *sender, ARVIDEO_Sender_Frame_t *newFrame, int previousFrameFinished);
+static int ARVIDEO_Sender_PopFromQueue (ARVIDEO_Sender_t *sender, ARVIDEO_Sender_Frame_t *newFrame);
 
 /**
  * @brief ARNETWORK_Manager_Callback_t for ARNETWORK_... calls
@@ -187,11 +197,8 @@ static int ARVIDEO_Sender_AddToQueue (ARVIDEO_Sender_t *sender, uint32_t size, u
         sender->indexAddNextFrame %= sender->maxNumberOfNextFrames;
 
         sender->numberOfWaitingFrames++;
-        if (wasFlushFrame == 1)
-        {
-            // First frame in the buffer, send signal
-            ARSAL_Cond_Signal (&(sender->nextFrameCond));
-        }
+
+        ARSAL_Cond_Signal (&(sender->nextFrameCond));
     }
     else
     {
@@ -201,16 +208,17 @@ static int ARVIDEO_Sender_AddToQueue (ARVIDEO_Sender_t *sender, uint32_t size, u
     return retVal;
 }
 
-static int ARVIDEO_Sender_PopFromQueue (ARVIDEO_Sender_t *sender, ARVIDEO_Sender_Frame_t *newFrame, int previousFrameFinished)
+static int ARVIDEO_Sender_PopFromQueue (ARVIDEO_Sender_t *sender, ARVIDEO_Sender_Frame_t *newFrame)
 {
     int retVal = 0;
+    int hadTimeout = 0;
     ARSAL_Mutex_Lock (&(sender->nextFrameMutex));
     // Check if a frame is ready and of good priority
     if (sender->numberOfWaitingFrames > 0)
     {
         ARVIDEO_Sender_Frame_t *frame = &(sender->nextFrames [sender->indexGetNextFrame]);
         if ((frame->isHighPriority == 1) ||
-            (previousFrameFinished == 1))
+            (sender->currentFrameCbWasCalled == 1))
         {
             retVal = 1;
             sender->numberOfWaitingFrames--;
@@ -219,23 +227,41 @@ static int ARVIDEO_Sender_PopFromQueue (ARVIDEO_Sender_t *sender, ARVIDEO_Sender
     // If not, wait for a frame ready event
     if (retVal == 0)
     {
-        int latency = ARNETWORK_Manager_GetEstimatedLatency (sender->manager);
-        if (latency < 0) // Unable to get latency
+        struct timeval start, end;
+        int timewaited = 0;
+        int waitTime = ARNETWORK_Manager_GetEstimatedLatency (sender->manager);
+        if (waitTime < 0) // Unable to get latency
         {
-            latency = ARVIDEO_SENDER_DEFAULT_ESTIMATED_LATENCY_MS;
+            waitTime = ARVIDEO_SENDER_DEFAULT_ESTIMATED_LATENCY_MS;
         }
-        latency++; // Add 1ms to avoid optimistic latency, and 0ms latency
+        waitTime += 15; // Add some time to avoid optimistic waitTime, and 0ms waitTime
+        //waitTime *= 5;
+        if (waitTime > ARVIDEO_SENDER_MAXIMUM_TIME_BETWEEN_RETRIES_MS)
+            waitTime = ARVIDEO_SENDER_MAXIMUM_TIME_BETWEEN_RETRIES_MS;
+        if (waitTime < ARVIDEO_SENDER_MINIMUM_TIME_BETWEEN_RETRIES_MS)
+            waitTime = ARVIDEO_SENDER_MINIMUM_TIME_BETWEEN_RETRIES_MS;
 
-        ARSAL_Cond_Timedwait (&(sender->nextFrameCond), &(sender->nextFrameMutex), latency);
-        if (sender->numberOfWaitingFrames > 0)
+        while ((retVal == 0) &&
+               (hadTimeout == 0))
         {
-            // Accept new frame only if it's high priority, or if we have finished the current one
-            ARVIDEO_Sender_Frame_t *frame = &(sender->nextFrames [sender->indexGetNextFrame]);
-            if ((frame->isHighPriority == 1) ||
-                (previousFrameFinished == 1))
+            gettimeofday (&start, NULL);
+            int err = ARSAL_Cond_Timedwait (&(sender->nextFrameCond), &(sender->nextFrameMutex), waitTime - timewaited);
+            gettimeofday (&end, NULL);
+            timewaited += ARSAL_Time_ComputeMsTimeDiff (&start, &end);
+            if (err == ETIMEDOUT)
             {
-                retVal = 1;
-                sender->numberOfWaitingFrames--;
+                hadTimeout = 1;
+            }
+            if (sender->numberOfWaitingFrames > 0)
+            {
+                // Accept new frame only if it's high priority, or if we have finished the current one
+                ARVIDEO_Sender_Frame_t *frame = &(sender->nextFrames [sender->indexGetNextFrame]);
+                if ((frame->isHighPriority == 1) ||
+                    (sender->currentFrameCbWasCalled == 1))
+                {
+                    retVal = 1;
+                    sender->numberOfWaitingFrames--;
+                }
             }
         }
     }
@@ -420,6 +446,7 @@ ARVIDEO_Sender_t* ARVIDEO_Sender_New (ARNETWORK_Manager_t *manager, int dataBuff
     /* Setup internal variables */
     if (internalError == ARVIDEO_ERROR_OK)
     {
+        int i;
         retSender->currentFrame.frameNumber = 0;
         retSender->currentFrame.frameBuffer = NULL;
         retSender->currentFrame.frameSize   = 0;
@@ -433,6 +460,12 @@ ARVIDEO_Sender_t* ARVIDEO_Sender_New (ARNETWORK_Manager_t *manager, int dataBuff
         retSender->threadsShouldStop = 0;
         retSender->dataThreadStarted = 0;
         retSender->ackThreadStarted = 0;
+        retSender->efficiency_index = 0;
+        for (i = 0; i < ARVIDEO_SENDER_EFFICIENCY_AVERAGE_NB_FRAMES; i++)
+        {
+            retSender->efficiency_nbFragments [i] = 0;
+            retSender->efficiency_nbSent [i] = 0;
+        }
     }
 
     if ((internalError != ARVIDEO_ERROR_OK) &&
@@ -576,14 +609,20 @@ void* ARVIDEO_Sender_RunDataThread (void *ARVIDEO_Sender_t_Param)
     while (sender->threadsShouldStop == 0)
     {
         int waitRes;
-        waitRes = ARVIDEO_Sender_PopFromQueue (sender, &nextFrame, sender->currentFrameCbWasCalled);
+        waitRes = ARVIDEO_Sender_PopFromQueue (sender, &nextFrame);
         ARSAL_Mutex_Lock (&(sender->ackMutex));
         if (waitRes == 1)
         {
             ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARVIDEO_SENDER_TAG, "Previous frame was sent in %d packets. Frame size was %d packets", numbersOfFragmentsSentForCurrentFrame, nbPackets);
+            sender->efficiency_nbFragments [sender->efficiency_index ] = nbPackets;
+            sender->efficiency_nbSent [sender->efficiency_index] = numbersOfFragmentsSentForCurrentFrame;
             numbersOfFragmentsSentForCurrentFrame = 0;
             /* We have a new frame to send */
             ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARVIDEO_SENDER_TAG, "New frame needs to be sent");
+            sender->efficiency_index ++;
+            sender->efficiency_index %= ARVIDEO_SENDER_EFFICIENCY_AVERAGE_NB_FRAMES;
+            sender->efficiency_nbSent [sender->efficiency_index] = 0;
+            sender->efficiency_nbFragments [sender->efficiency_index] = 0;
 
             /* Cancel current frame if it was not already sent */
             if (sender->currentFrameCbWasCalled == 0)
@@ -628,6 +667,7 @@ void* ARVIDEO_Sender_RunDataThread (void *ARVIDEO_Sender_t_Param)
                     lastFragmentSize = sendSize % ARVIDEO_NETWORK_HEADERS_FRAGMENT_SIZE;
                 }
             }
+            sender->currentFrameNbFragments = nbPackets;
 
             ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARVIDEO_SENDER_TAG, "New frame has size %d (=%d packets)", sendSize, nbPackets);
         }
@@ -637,6 +677,7 @@ void* ARVIDEO_Sender_RunDataThread (void *ARVIDEO_Sender_t_Param)
         /* Flag all non-ack packets as "packet to send" */
         ARSAL_Mutex_Lock (&(sender->packetsToSendMutex));
         ARSAL_Mutex_Lock (&(sender->ackMutex));
+        ARVIDEO_NetworkHeaders_AckPacketReset (&(sender->packetsToSend));
         for (cnt = 0; cnt < nbPackets; cnt++)
         {
             if (0 == ARVIDEO_NetworkHeaders_AckPacketFlagIsSet (&(sender->ackPacket), cnt))
@@ -644,7 +685,6 @@ void* ARVIDEO_Sender_RunDataThread (void *ARVIDEO_Sender_t_Param)
                 ARVIDEO_NetworkHeaders_AckPacketSetFlag (&(sender->packetsToSend), cnt);
             }
         }
-        ARSAL_Mutex_Unlock (&(sender->ackMutex));
 
         /* Send all "packets to send" */
         for (cnt = 0; cnt < nbPackets; cnt++)
@@ -665,6 +705,7 @@ void* ARVIDEO_Sender_RunDataThread (void *ARVIDEO_Sender_t_Param)
                 ARSAL_Mutex_Lock (&(sender->packetsToSendMutex));
             }
         }
+        ARSAL_Mutex_Unlock (&(sender->ackMutex));
         ARSAL_Mutex_Unlock (&(sender->packetsToSendMutex));
     }
     /* END OF PROCESS LOOP */
@@ -727,4 +768,33 @@ void* ARVIDEO_Sender_RunAckThread (void *ARVIDEO_Sender_t_Param)
     ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARVIDEO_SENDER_TAG, "Ack thread ended");
     sender->ackThreadStarted = 0;
     return (void *)0;
+}
+
+float ARVIDEO_Sender_GetEstimatedEfficiency (ARVIDEO_Sender_t *sender)
+{
+    float retVal = 1.0f;
+    uint32_t totalPackets = 0;
+    uint32_t sentPackets = 0;
+    int i;
+    ARSAL_Mutex_Lock (&(sender->ackMutex));
+    for (i = 0; i < ARVIDEO_SENDER_EFFICIENCY_AVERAGE_NB_FRAMES; i++)
+    {
+        totalPackets += sender->efficiency_nbFragments [i];
+        sentPackets += sender->efficiency_nbSent [i];
+    }
+    ARSAL_Mutex_Unlock (&(sender->ackMutex));
+    if (sentPackets == 0)
+    {
+         retVal = 1.0f; // We didn't send any packet yet, so wa have a 100% success !
+    }
+    else if (totalPackets > sentPackets)
+    {
+        retVal = 1.0f; // If this happens, it means that we have a big problem
+        ARSAL_PRINT (ARSAL_PRINT_ERROR, ARVIDEO_SENDER_TAG, "Computed efficiency is greater that 1.0 ...");
+    }
+    else
+    {
+        retVal = (1.f * totalPackets) / (1.f * sentPackets);
+    }
+    return retVal;
 }

@@ -26,4 +26,10 @@ void ARVIDEO_Sender_TestBenchStop ();
  */
 extern float ARVIDEO_Sender_PercentOk;
 
+/**
+ * @brief Gets the estimated efficiency of the sender
+ * @return Estimated efficiency (0.0 is bad, 1.0 is perfect)
+ */
+float ARVIDEO_SenderTb_GetEfficiency ();
+
 #endif /* _ARVIDEO_SENDER_TESTBENCH_H_ */

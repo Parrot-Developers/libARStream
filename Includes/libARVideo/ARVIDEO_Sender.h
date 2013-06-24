@@ -146,4 +146,12 @@ void* ARVIDEO_Sender_RunDataThread (void *ARVIDEO_Sender_t_Param);
  */
 void* ARVIDEO_Sender_RunAckThread (void *ARVIDEO_Sender_t_Param);
 
+/**
+ * @brief Gets the estimated network efficiency for the ARVIDEO link
+ * An efficiency of 1.0f means that we did not do any retries
+ * @warning This function is a debug-only function and will disappear on release builds
+ * @param[in] sender The ARVIDEO_Sender_t
+ */
+float ARVIDEO_Sender_GetEstimatedEfficiency (ARVIDEO_Sender_t *sender);
+
 #endif /* _ARVIDEO_SENDER_H_ */

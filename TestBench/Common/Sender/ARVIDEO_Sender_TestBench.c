@@ -58,6 +58,8 @@
  * Globals
  */
 
+static ARVIDEO_Sender_t *g_Sender;
+
 static int stillRunning = 1;
 
 float ARVIDEO_Sender_PercentOk = 0.0;
@@ -260,33 +262,32 @@ int ARVIDEO_SenderTb_StartVideoTest (ARNETWORK_Manager_t *manager)
 {
     int retVal = 0;
     eARVIDEO_ERROR err;
-    ARVIDEO_Sender_t *sender;
     ARVIDEO_SenderTb_initMultiBuffers ();
-    sender = ARVIDEO_Sender_New (manager, DATA_BUFFER_ID, ACK_BUFFER_ID, ARVIDEO_SenderTb_FrameUpdateCallback, NB_BUFFERS, &err);
-    if (sender == NULL)
+    g_Sender = ARVIDEO_Sender_New (manager, DATA_BUFFER_ID, ACK_BUFFER_ID, ARVIDEO_SenderTb_FrameUpdateCallback, NB_BUFFERS, &err);
+    if (g_Sender == NULL)
     {
         ARSAL_PRINT (ARSAL_PRINT_ERROR, __TAG__, "Error during ARVIDEO_Sender_New call : %s", ARVIDEO_Error_ToString(err));
         return 1;
     }
 
     pthread_t videosend, videoread;
-    pthread_create (&videosend, NULL, ARVIDEO_Sender_RunDataThread, sender);
-    pthread_create (&videoread, NULL, ARVIDEO_Sender_RunAckThread, sender);
+    pthread_create (&videosend, NULL, ARVIDEO_Sender_RunDataThread, g_Sender);
+    pthread_create (&videoread, NULL, ARVIDEO_Sender_RunAckThread, g_Sender);
 
     /* USER CODE */
 
     pthread_t sourceThread;
-    pthread_create (&sourceThread, NULL, fakeEncoderThread, sender);
+    pthread_create (&sourceThread, NULL, fakeEncoderThread, g_Sender);
     pthread_join (sourceThread, NULL);
 
     /* END OF USER CODE */
 
-    ARVIDEO_Sender_StopSender (sender);
+    ARVIDEO_Sender_StopSender (g_Sender);
 
     pthread_join (videoread, NULL);
     pthread_join (videosend, NULL);
 
-    ARVIDEO_Sender_Delete (&sender);
+    ARVIDEO_Sender_Delete (&g_Sender);
 
     return retVal;
 }
@@ -350,7 +351,7 @@ int ARVIDEO_Sender_TestBenchMain (int argc, char *argv[])
     pthread_create (&netread, NULL, ARNETWORK_Manager_ReceivingThreadRun, manager);
 
     stillRunning = 1;
-    
+
     retVal = ARVIDEO_SenderTb_StartVideoTest (manager);
 
     ARNETWORK_Manager_Stop (manager);
@@ -366,4 +367,14 @@ int ARVIDEO_Sender_TestBenchMain (int argc, char *argv[])
 void ARVIDEO_Sender_TestBenchStop ()
 {
     stillRunning = 0;
+}
+
+
+float ARVIDEO_SenderTb_GetEfficiency ()
+{
+    if (g_Sender == NULL)
+    {
+        return 0.f;
+    }
+    return ARVIDEO_Sender_GetEstimatedEfficiency (g_Sender);
 }
