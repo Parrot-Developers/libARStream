@@ -31,8 +31,8 @@
     latencyGraph = [[CPTXYGraph alloc] initWithFrame:CGRectZero];
     CPTTheme *theme = [CPTTheme themeNamed:kCPTPlainWhiteTheme];
     [latencyGraph applyTheme:theme];
-    latencyGraphView.collapsesLayers = NO; // Setting to YES reduces GPU memory usage, but can slow drawing/scrolling
-    latencyGraphView.hostedGraph     = latencyGraph;
+    latencyView.collapsesLayers = NO; // Setting to YES reduces GPU memory usage, but can slow drawing/scrolling
+    latencyView.hostedGraph     = latencyGraph;
     
     latencyGraph.paddingLeft   = 1.0;
     latencyGraph.paddingTop    = 1.0;

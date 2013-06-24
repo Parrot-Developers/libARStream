@@ -19,7 +19,7 @@
     
     IBOutlet UIScrollView *graphScrollView;
     
-    IBOutlet CPTGraphHostingView *latencyGraphView;
+    IBOutlet CPTGraphHostingView *latencyView;
     IBOutlet CPTGraphHostingView *lossFramesView;
     IBOutlet CPTGraphHostingView *deltaTView;
     IBOutlet CPTGraphHostingView *efficiencyView;

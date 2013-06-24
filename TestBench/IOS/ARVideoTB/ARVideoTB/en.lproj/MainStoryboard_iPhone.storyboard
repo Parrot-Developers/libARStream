@@ -220,7 +220,7 @@
                         <outlet property="graphScrollView" destination="oUx-kX-lp4" id="amB-Ja-uHw"/>
                         <outlet property="ipField" destination="V9c-nY-s7O" id="yNz-qp-hyf"/>
                         <outlet property="latency" destination="QbL-WF-sPw" id="8zv-uP-0eE"/>
-                        <outlet property="latencyGraphView" destination="FeZ-zo-acF" id="vrh-6u-qbp"/>
+                        <outlet property="latencyView" destination="FeZ-zo-acF" id="twG-nz-sbO"/>
                         <outlet property="lossFramesView" destination="11S-CG-0k0" id="mCw-Kc-Eil"/>
                         <outlet property="percentOk" destination="8QE-K1-Wkr" id="JyW-Ja-ZMq"/>
                         <outlet property="readerButton" destination="kHy-mi-mbG" id="Zzm-HE-S7z"/>
@@ -244,7 +244,7 @@
                 <relationship kind="outlet" name="graphScrollView" candidateClass="UIScrollView"/>
                 <relationship kind="outlet" name="ipField" candidateClass="UITextField"/>
                 <relationship kind="outlet" name="latency" candidateClass="UILabel"/>
-                <relationship kind="outlet" name="latencyGraphView" candidateClass="CPTGraphHostingView"/>
+                <relationship kind="outlet" name="latencyView" candidateClass="CPTGraphHostingView"/>
                 <relationship kind="outlet" name="lossFramesView" candidateClass="CPTGraphHostingView"/>
                 <relationship kind="outlet" name="percentOk" candidateClass="UILabel"/>
                 <relationship kind="outlet" name="readerButton" candidateClass="UIButton"/>
