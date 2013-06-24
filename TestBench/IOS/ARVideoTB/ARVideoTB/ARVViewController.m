@@ -367,6 +367,38 @@
         if (_isSender)
         {
             [percentOk setText:[NSString stringWithFormat:@"%f%%", ARVIDEO_Sender_PercentOk]];
+            int estLat = ARVIDEO_SenderTb_GetLatency();
+            if (estLat < 0)
+            {
+                [latency setText:@"Not connected"];
+                if ([latencyGraphData count] > 0)
+                    [latencyGraphData removeObjectAtIndex:0];
+                [latencyGraphData addObject:[NSNumber numberWithUnsignedInteger:1000]];
+            }
+            else
+            {
+                [latency setText:[NSString stringWithFormat:@"%dms", estLat]];
+                if ([latencyGraphData count] > 0)
+                    [latencyGraphData removeObjectAtIndex:0];
+                [latencyGraphData addObject:[NSNumber numberWithUnsignedInteger:estLat]];
+                
+            }
+            if ([lossFramesData count] > 0)
+                [lossFramesData removeObjectAtIndex:0];
+            int missed = ARVIDEO_SenderTb_GetMissedFrames();
+            [lossFramesData addObject:[NSNumber numberWithUnsignedInteger:(NSUInteger)missed]];
+            
+            if ([deltaTData count] > 0)
+                [deltaTData removeObjectAtIndex:0];
+            int dt = ARVIDEO_SenderTb_GetMeanTimeBetweenFrames();
+            [deltaTData addObject:[NSNumber numberWithUnsignedInteger:(NSUInteger)dt]];
+            
+            if ([efficiencyData count] > 0)
+                [efficiencyData removeObjectAtIndex:0];
+            float eff = ARVIDEO_SenderTb_GetEfficiency();
+            [efficiencyData addObject:[NSNumber numberWithFloat:eff]];
+            
+            [self refreshGraphs];
         }
         else
         {
@@ -418,6 +450,7 @@
     [senderButton setHidden:YES];
     [readerButton setHidden:YES];
     [stopButton setHidden:NO];
+    [stopButton setTitle:@"STOP - SENDER" forState:UIControlStateNormal];
     
     [self startTimer];
     
@@ -441,6 +474,7 @@
     [senderButton setHidden:YES];
     [readerButton setHidden:YES];
     [stopButton setHidden:NO];
+    [stopButton setTitle:@"STOP - READER" forState:UIControlStateNormal];
     
     [self startTimer];
     

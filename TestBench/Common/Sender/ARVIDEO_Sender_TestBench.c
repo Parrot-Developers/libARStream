@@ -50,6 +50,8 @@
 #define __IP "127.0.0.1"
 #endif
 
+#define NB_FRAMES_FOR_AVERAGE (15)
+
 /*
  * Types
  */
@@ -59,6 +61,12 @@
  */
 
 static ARVIDEO_Sender_t *g_Sender;
+static ARNETWORK_Manager_t *g_Manager;
+
+static int lastDt [NB_FRAMES_FOR_AVERAGE] = {0};
+static int currentIndexInDt = 0;
+
+static int nbSkippedSinceLast = 0;
 
 static int stillRunning = 1;
 
@@ -143,11 +151,21 @@ void ARVIDEO_SenderTb_initMultiBuffers ()
 
 void ARVIDEO_SenderTb_FrameUpdateCallback (eARVIDEO_SENDER_STATUS status, uint8_t *framePointer, uint32_t frameSize)
 {
+    static struct timeval prev = {0};
+    struct timeval now = {0};
+    int dt;
     switch (status)
     {
     case ARVIDEO_SENDER_STATUS_FRAME_SENT:
         ARVIDEO_SenderTb_SetBufferFree (framePointer);
         ARSAL_PRINT (ARSAL_PRINT_WARNING, __TAG__, "Successfully sent a frame of size %u", frameSize);
+        gettimeofday (&now, NULL);
+        dt = ARSAL_Time_ComputeMsTimeDiff(&prev, &now);
+        prev.tv_sec = now.tv_sec;
+        prev.tv_usec = now.tv_usec;
+        lastDt[currentIndexInDt] = dt;
+        currentIndexInDt ++;
+        currentIndexInDt %= NB_FRAMES_FOR_AVERAGE;
         nbSent++;
         nbOk++;
         ARVIDEO_Sender_PercentOk = (100.f * nbOk) / (1.f * nbSent);
@@ -156,6 +174,7 @@ void ARVIDEO_SenderTb_FrameUpdateCallback (eARVIDEO_SENDER_STATUS status, uint8_
         ARVIDEO_SenderTb_SetBufferFree (framePointer);
         ARSAL_PRINT (ARSAL_PRINT_WARNING, __TAG__, "Cancelled a frame of size %u", frameSize);
         nbSent++;
+        nbSkippedSinceLast++;
         ARVIDEO_Sender_PercentOk = (100.f * nbOk) / (1.f * nbSent);
         break;
     default:
@@ -321,7 +340,6 @@ int ARVIDEO_Sender_TestBenchMain (int argc, char *argv[])
     ARVIDEO_Sender_InitVideoAckBuffer (&outParams, ACK_BUFFER_ID);
 
     eARNETWORK_ERROR error;
-    ARNETWORK_Manager_t *manager = NULL;
     eARNETWORKAL_ERROR specificError = ARNETWORKAL_OK;
     ARNETWORKAL_Manager_t *osspecificManagerPtr = ARNETWORKAL_Manager_New(&specificError);
 
@@ -332,14 +350,14 @@ int ARVIDEO_Sender_TestBenchMain (int argc, char *argv[])
 
     if(specificError == ARNETWORKAL_OK)
     {
-        manager = ARNETWORK_Manager_New(osspecificManagerPtr, nbInBuff, &inParams, nbOutBuff, &outParams, &error);
+        g_Manager = ARNETWORK_Manager_New(osspecificManagerPtr, nbInBuff, &inParams, nbOutBuff, &outParams, &error);
     }
     else
     {
         error = ARNETWORK_ERROR;
     }
 
-    if ((manager == NULL) ||
+    if ((g_Manager == NULL) ||
         (error != ARNETWORK_OK))
     {
         ARSAL_PRINT (ARSAL_PRINT_ERROR, __TAG__, "Error during ARNETWORK_Manager_New call : %d", error);
@@ -347,19 +365,19 @@ int ARVIDEO_Sender_TestBenchMain (int argc, char *argv[])
     }
 
     pthread_t netsend, netread;
-    pthread_create (&netsend, NULL, ARNETWORK_Manager_SendingThreadRun, manager);
-    pthread_create (&netread, NULL, ARNETWORK_Manager_ReceivingThreadRun, manager);
+    pthread_create (&netsend, NULL, ARNETWORK_Manager_SendingThreadRun, g_Manager);
+    pthread_create (&netread, NULL, ARNETWORK_Manager_ReceivingThreadRun, g_Manager);
 
     stillRunning = 1;
 
-    retVal = ARVIDEO_SenderTb_StartVideoTest (manager);
+    retVal = ARVIDEO_SenderTb_StartVideoTest (g_Manager);
 
-    ARNETWORK_Manager_Stop (manager);
+    ARNETWORK_Manager_Stop (g_Manager);
 
     pthread_join (netread, NULL);
     pthread_join (netsend, NULL);
 
-    ARNETWORK_Manager_Delete (&manager);
+    ARNETWORK_Manager_Delete (&g_Manager);
 
     return retVal;
 }
@@ -367,6 +385,37 @@ int ARVIDEO_Sender_TestBenchMain (int argc, char *argv[])
 void ARVIDEO_Sender_TestBenchStop ()
 {
     stillRunning = 0;
+}
+
+int ARVIDEO_SenderTb_GetMeanTimeBetweenFrames ()
+{
+    int retVal = 0;
+    int i;
+    for (i = 0; i < NB_FRAMES_FOR_AVERAGE; i++)
+    {
+        retVal += lastDt [i];
+    }
+    return retVal / NB_FRAMES_FOR_AVERAGE;
+}
+
+
+int ARVIDEO_SenderTb_GetLatency ()
+{
+    if (g_Manager == NULL)
+    {
+        return -1;
+    }
+    else
+    {
+        return ARNETWORK_Manager_GetEstimatedLatency(g_Manager);
+    }
+}
+
+int ARVIDEO_SenderTb_GetMissedFrames ()
+{
+    int retval = nbSkippedSinceLast;
+    nbSkippedSinceLast = 0;
+    return retval;
 }
 
 
