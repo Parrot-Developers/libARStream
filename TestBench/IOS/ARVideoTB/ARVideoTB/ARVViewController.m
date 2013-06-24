@@ -14,6 +14,11 @@
 #define kARVIDEONumberOfPoints 50
 #define kARVIDEODeltaTTimerSec 0.1
 
+#define kLATENCY_PLOT_NAME @"Latency"
+#define kLOSS_PLOT_NAME @"Loss"
+#define kDELTAT_PLOT_NAME @"DeltatT"
+#define kEFFICIENCY_PLOT_NAME @"Efficiency"
+
 @interface ARVViewController ()
 
 @end
@@ -61,7 +66,7 @@
     lineStyle.lineWidth         = 3.0f;
     lineStyle.lineColor         = [CPTColor orangeColor];
     boundLinePlot.dataLineStyle = lineStyle;
-    boundLinePlot.identifier    = @"Latency Plot";
+    boundLinePlot.identifier    = kLATENCY_PLOT_NAME;
     boundLinePlot.dataSource    = self;
     [latencyGraph addPlot:boundLinePlot];
     
@@ -109,7 +114,7 @@
     lineStyle.lineWidth         = 3.0f;
     lineStyle.lineColor         = [CPTColor blueColor];
     boundLinePlot.dataLineStyle = lineStyle;
-    boundLinePlot.identifier    = @"Loss Plot";
+    boundLinePlot.identifier    = kLOSS_PLOT_NAME;
     boundLinePlot.dataSource    = self;
     [lossFramesGraph addPlot:boundLinePlot];
     
@@ -157,7 +162,7 @@
     lineStyle.lineWidth         = 3.0f;
     lineStyle.lineColor         = [CPTColor greenColor];
     boundLinePlot.dataLineStyle = lineStyle;
-    boundLinePlot.identifier    = @"Delta Plot";
+    boundLinePlot.identifier    = kDELTAT_PLOT_NAME;
     boundLinePlot.dataSource    = self;
     [deltaTGraph addPlot:boundLinePlot];
     
@@ -205,7 +210,7 @@
     lineStyle.lineWidth         = 3.0f;
     lineStyle.lineColor         = [CPTColor yellowColor];
     boundLinePlot.dataLineStyle = lineStyle;
-    boundLinePlot.identifier    = @"Eff Plot";
+    boundLinePlot.identifier    = kEFFICIENCY_PLOT_NAME;
     boundLinePlot.dataSource    = self;
     [efficiencyGraph addPlot:boundLinePlot];
     
@@ -241,19 +246,19 @@
 -(NSUInteger)numberOfRecordsForPlot:(CPTPlot *)plot
 {
     NSString *plotId = (NSString *)plot.identifier;
-    if ([plotId isEqualToString:@"Loss Plot"])
+    if ([plotId isEqualToString:kLOSS_PLOT_NAME])
     {
         return [lossFramesData count];
     }
-    else if ([plotId isEqualToString:@"Latency Plot"])
+    else if ([plotId isEqualToString:kLATENCY_PLOT_NAME])
     {
         return [latencyGraphData count];
     }
-    else if ([plotId isEqualToString:@"Delta Plot"])
+    else if ([plotId isEqualToString:kDELTAT_PLOT_NAME])
     {
         return [deltaTData count];
     }
-    else if ([plotId isEqualToString:@"Eff Plot"])
+    else if ([plotId isEqualToString:kEFFICIENCY_PLOT_NAME])
     {
         return [efficiencyData count];
     }
@@ -267,7 +272,7 @@
 {
     NSNumber *retval = nil;
     NSString *plotId = (NSString *)plot.identifier;
-    if ([plotId isEqualToString:@"Loss Plot"])
+    if ([plotId isEqualToString:kLOSS_PLOT_NAME])
     {
         if (CPTScatterPlotFieldX == fieldEnum)
         {
@@ -278,7 +283,7 @@
             retval = [lossFramesData objectAtIndex:index];
         }
     }
-    else if ([plotId isEqualToString:@"Latency Plot"])
+    else if ([plotId isEqualToString:kLATENCY_PLOT_NAME])
     {
         if (CPTScatterPlotFieldX == fieldEnum)
         {
@@ -289,7 +294,7 @@
             retval = [latencyGraphData objectAtIndex:index];
         }
     }
-    else if ([plotId isEqualToString:@"Delta Plot"])
+    else if ([plotId isEqualToString:kDELTAT_PLOT_NAME])
     {
         if (CPTScatterPlotFieldX == fieldEnum)
         {
@@ -300,7 +305,7 @@
             retval = [deltaTData objectAtIndex:index];
         }
     }
-    else if ([plotId isEqualToString:@"Eff Plot"])
+    else if ([plotId isEqualToString:kEFFICIENCY_PLOT_NAME])
     {
         if (CPTScatterPlotFieldX == fieldEnum)
         {
