@@ -53,7 +53,7 @@
     // Axes
     CPTXYAxisSet *axisSet = (CPTXYAxisSet *)latencyGraph.axisSet;
     CPTXYAxis *y = axisSet.yAxis;
-    y.majorIntervalLength         = CPTDecimalFromString(@"100");
+    y.majorIntervalLength         = CPTDecimalFromFloat(100.0);
     y.minorTicksPerInterval       = 0;
     CPTXYAxis *x = axisSet.xAxis;
     x.majorIntervalLength         = CPTDecimalFromInt(kARVIDEONumberOfPoints);
@@ -101,7 +101,7 @@
     // Axes
     axisSet = (CPTXYAxisSet *)lossFramesGraph.axisSet;
     y = axisSet.yAxis;
-    y.majorIntervalLength         = CPTDecimalFromString(@"1");
+    y.majorIntervalLength         = CPTDecimalFromFloat(1.0);
     y.minorTicksPerInterval       = 0;
     x = axisSet.xAxis;
     x.majorIntervalLength         = CPTDecimalFromInt(kARVIDEONumberOfPoints);
@@ -149,7 +149,7 @@
     // Axes
     axisSet = (CPTXYAxisSet *)deltaTGraph.axisSet;
     y = axisSet.yAxis;
-    y.majorIntervalLength         = CPTDecimalFromString(@"10");
+    y.majorIntervalLength         = CPTDecimalFromFloat(10.0);
     y.minorTicksPerInterval       = 0;
     x = axisSet.xAxis;
     x.majorIntervalLength         = CPTDecimalFromInt(kARVIDEONumberOfPoints);
@@ -197,7 +197,7 @@
     // Axes
     axisSet = (CPTXYAxisSet *)efficiencyGraph.axisSet;
     y = axisSet.yAxis;
-    y.majorIntervalLength         = CPTDecimalFromString(@"0.1");
+    y.majorIntervalLength         = CPTDecimalFromFloat(0.1);
     y.minorTicksPerInterval       = 0;
     x = axisSet.xAxis;
     x.majorIntervalLength         = CPTDecimalFromInt(kARVIDEONumberOfPoints);
