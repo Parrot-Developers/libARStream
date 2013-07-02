@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		371815E0178304340030D4FA /* CoreBluetooth.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 371815DF178304340030D4FA /* CoreBluetooth.framework */; };
 		372671401779F75000D61680 /* libARNetwork.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3726713C1779F75000D61680 /* libARNetwork.framework */; };
 		372671411779F75000D61680 /* libARNetworkAL.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3726713D1779F75000D61680 /* libARNetworkAL.framework */; };
 		372671421779F75000D61680 /* libARSAL.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3726713E1779F75000D61680 /* libARSAL.framework */; };
@@ -44,6 +45,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		371815DF178304340030D4FA /* CoreBluetooth.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreBluetooth.framework; path = System/Library/Frameworks/CoreBluetooth.framework; sourceTree = SDKROOT; };
 		3726713C1779F75000D61680 /* libARNetwork.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = libARNetwork.framework; path = ../../../../IOS_InstallDir/Frameworks/libARNetwork.framework; sourceTree = "<group>"; };
 		3726713D1779F75000D61680 /* libARNetworkAL.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = libARNetworkAL.framework; path = ../../../../IOS_InstallDir/Frameworks/libARNetworkAL.framework; sourceTree = "<group>"; };
 		3726713E1779F75000D61680 /* libARSAL.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = libARSAL.framework; path = ../../../../IOS_InstallDir/Frameworks/libARSAL.framework; sourceTree = "<group>"; };
@@ -83,6 +85,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				371815E0178304340030D4FA /* CoreBluetooth.framework in Frameworks */,
 				37F6E398176F114C00091546 /* QuartzCore.framework in Frameworks */,
 				37F6E3AB176F404100091546 /* libCorePlot-CocoaTouch.a in Frameworks */,
 				379378BD176B5A0C00AD5C9D /* UIKit.framework in Frameworks */,
@@ -123,6 +126,7 @@
 				3726713D1779F75000D61680 /* libARNetworkAL.framework */,
 				3726713E1779F75000D61680 /* libARSAL.framework */,
 				3726713F1779F75000D61680 /* libARVideo.framework */,
+				371815DF178304340030D4FA /* CoreBluetooth.framework */,
 				37F6E396176F113900091546 /* QuartzCore.framework */,
 				379378BC176B5A0C00AD5C9D /* UIKit.framework */,
 				379378BE176B5A0C00AD5C9D /* Foundation.framework */,
@@ -357,8 +361,7 @@
 			buildSettings = {
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
-					"\"$(SRCROOT)/../../../../Targets/Frameworks\"",
-					"\"$(SRCROOT)/../../../../IOS_InstallDir/Frameworks\"",
+					"\"$(SRCROOT)/../../../../TargetsIOS/Frameworks\"",
 				);
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "ARVideoTB/ARVideoTB-Prefix.pch";
@@ -377,8 +380,7 @@
 			buildSettings = {
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
-					"\"$(SRCROOT)/../../../../Targets/Frameworks\"",
-					"\"$(SRCROOT)/../../../../IOS_InstallDir/Frameworks\"",
+					"\"$(SRCROOT)/../../../../TargetsIOS/Frameworks\"",
 				);
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "ARVideoTB/ARVideoTB-Prefix.pch";
