@@ -38,6 +38,8 @@
 
 #define __TAG__ "ARVIDEO_Reader_TB"
 
+#define READER_PING_DELAY (0) // Use default value
+
 #ifndef __IP
 #define __IP "127.0.0.1"
 #endif
@@ -344,7 +346,7 @@ int ARVIDEO_Reader_TestBenchMain (int argc, char *argv[])
 
     if(specificError == ARNETWORKAL_OK)
     {
-        g_Manager = ARNETWORK_Manager_New(osspecificManagerPtr, nbInBuff, &inParams, nbOutBuff, &outParams, &error);
+        g_Manager = ARNETWORK_Manager_New(osspecificManagerPtr, nbInBuff, &inParams, nbOutBuff, &outParams, READER_PING_DELAY, &error);
     }
     else
     {

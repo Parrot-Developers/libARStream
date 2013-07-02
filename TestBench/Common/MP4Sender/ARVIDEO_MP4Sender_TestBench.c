@@ -47,6 +47,8 @@
 
 #define __TAG__ "ARVIDEO_MP4Sender_TB"
 
+#define MP4SENDER_PING_DELAY (0) // Use default value
+
 #ifndef __IP
 #define __IP "127.0.0.1"
 #endif
@@ -574,7 +576,7 @@ int ARVIDEO_MP4Sender_TestBenchMain (int argc, char *argv[])
 
     if(specificError == ARNETWORKAL_OK)
     {
-        manager = ARNETWORK_Manager_New(osspecificManagerPtr, nbInBuff, &inParams, nbOutBuff, &outParams, &error);
+        manager = ARNETWORK_Manager_New(osspecificManagerPtr, nbInBuff, &inParams, nbOutBuff, &outParams, MP4SENDER_PING_DELAY, &error);
     }
     else
     {
