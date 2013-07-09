@@ -12,6 +12,7 @@
 		372671411779F75000D61680 /* libARNetworkAL.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3726713D1779F75000D61680 /* libARNetworkAL.framework */; };
 		372671421779F75000D61680 /* libARSAL.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3726713E1779F75000D61680 /* libARSAL.framework */; };
 		372671431779F75000D61680 /* libARVideo.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3726713F1779F75000D61680 /* libARVideo.framework */; };
+		3782C4BD178BFE0200B73166 /* ARVLogger.m in Sources */ = {isa = PBXBuildFile; fileRef = 3782C4BC178BFE0200B73166 /* ARVLogger.m */; };
 		379378BD176B5A0C00AD5C9D /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 379378BC176B5A0C00AD5C9D /* UIKit.framework */; };
 		379378BF176B5A0C00AD5C9D /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 379378BE176B5A0C00AD5C9D /* Foundation.framework */; };
 		379378C1176B5A0C00AD5C9D /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 379378C0176B5A0C00AD5C9D /* CoreGraphics.framework */; };
@@ -50,6 +51,8 @@
 		3726713D1779F75000D61680 /* libARNetworkAL.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = libARNetworkAL.framework; path = ../../../../IOS_InstallDir/Frameworks/libARNetworkAL.framework; sourceTree = "<group>"; };
 		3726713E1779F75000D61680 /* libARSAL.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = libARSAL.framework; path = ../../../../IOS_InstallDir/Frameworks/libARSAL.framework; sourceTree = "<group>"; };
 		3726713F1779F75000D61680 /* libARVideo.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = libARVideo.framework; path = ../../../../IOS_InstallDir/Frameworks/libARVideo.framework; sourceTree = "<group>"; };
+		3782C4BB178BFE0200B73166 /* ARVLogger.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ARVLogger.h; sourceTree = "<group>"; };
+		3782C4BC178BFE0200B73166 /* ARVLogger.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = ARVLogger.m; sourceTree = "<group>"; };
 		379378B9176B5A0C00AD5C9D /* ARVideoTB.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ARVideoTB.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		379378BC176B5A0C00AD5C9D /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = System/Library/Frameworks/UIKit.framework; sourceTree = SDKROOT; };
 		379378BE176B5A0C00AD5C9D /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
@@ -149,6 +152,8 @@
 				379378D4176B5A0C00AD5C9D /* MainStoryboard_iPhone.storyboard */,
 				379378DA176B5A0C00AD5C9D /* ARVViewController.h */,
 				379378DB176B5A0C00AD5C9D /* ARVViewController.m */,
+				3782C4BB178BFE0200B73166 /* ARVLogger.h */,
+				3782C4BC178BFE0200B73166 /* ARVLogger.m */,
 				379378C3176B5A0C00AD5C9D /* Supporting Files */,
 			);
 			path = ARVideoTB;
@@ -273,6 +278,7 @@
 				379378F2176B5C2C00AD5C9D /* ARVIDEO_Reader_TestBench.c in Sources */,
 				379378F5176B5C3600AD5C9D /* ARVIDEO_Sender_TestBench.c in Sources */,
 				379378F8176B5CD300AD5C9D /* ARVIDEO_MP4Sender_TestBench.c in Sources */,
+				3782C4BD178BFE0200B73166 /* ARVLogger.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

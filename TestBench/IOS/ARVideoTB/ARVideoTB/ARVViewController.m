@@ -404,6 +404,7 @@
             [efficiencyData addObject:[NSNumber numberWithFloat:eff]];
             
             [self refreshGraphs];
+            [logger log:[NSString stringWithFormat:@"%4d; %5.2f; %3d; %4d; %5.3f", estLat, ARVIDEO_Sender_PercentOk, missed, dt, eff]];
         }
         else
         {
@@ -440,6 +441,7 @@
             [efficiencyData addObject:[NSNumber numberWithFloat:eff]];
             
             [self refreshGraphs];
+            [logger log:[NSString stringWithFormat:@"%4d; %5.2f; %3d; %4d; %5.3f", estLat, ARVIDEO_Reader_PercentOk, missed, dt, eff]];
         }
     }
 }
@@ -471,7 +473,12 @@
     char *cIp = (char *)[ip UTF8String];
     char *name = "ARVideo_TestBench_iOS";
     char *params[2] = { name, cIp };
+    
+    logger = [[ARVLogger alloc] init];
+    [logger log:@"Latency (ms); PercentOK (%%); Missed frames; Mean time between frame (ms); Efficiency"];
     ARVIDEO_Sender_TestBenchMain(2, params);
+    [logger close];
+    logger = nil;
 }
 
 - (void)readerGo:(id)sender
@@ -495,7 +502,12 @@
     char *cIp = (char *)[ip UTF8String];
     char *name = "ARVideo_TestBench_iOS";
     char *params[2] = { name, cIp };
+    
+    logger = [[ARVLogger alloc] init];
+    [logger log:@"Latency (ms); PercentOK (%%); Missed frames; Mean time between frame (ms); Efficiency"];
     ARVIDEO_Reader_TestBenchMain(2, params);
+    [logger close];
+    logger = nil;
 }
 
 - (void)stop:(id)sender

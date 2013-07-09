@@ -7,6 +7,7 @@
 //
 
 #import <UIKit/UIKit.h>
+#import "ARVLogger.h"
 #import <CorePlot-CocoaTouch.h>
 
 @interface ARVViewController : UIViewController <UITextFieldDelegate, CPTPlotDataSource> {
@@ -38,6 +39,7 @@
     
     int nbGraphs;
     
+    ARVLogger *logger;
 }
 
 - (IBAction)senderGo:(id)sender;
