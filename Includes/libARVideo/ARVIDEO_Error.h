@@ -28,7 +28,7 @@
  * @brief Error codes for ARVIDEO_xxx calls
  */
 typedef enum {
-    ARVIDEO_ERROR_OK = 0, /**< No error */
+    ARVIDEO_OK = 0, /**< No error */
     ARVIDEO_ERROR_BAD_PARAMETERS, /**< Bad parameters */
     ARVIDEO_ERROR_ALLOC, /**< Unable to allocate data */
     ARVIDEO_ERROR_FRAME_TOO_LARGE, /**< Bad parameter : frame too large */

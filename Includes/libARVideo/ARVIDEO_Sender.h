@@ -107,7 +107,7 @@ void ARVIDEO_Sender_StopSender (ARVIDEO_Sender_t *sender);
  *
  * @param sender Pointer to the ARVIDEO_Sender_t * to delete
  *
- * @return ARVIDEO_ERROR_OK if the ARVIDEO_Sender_t was deleted
+ * @return ARVIDEO_OK if the ARVIDEO_Sender_t was deleted
  * @return ARVIDEO_ERROR_BUSY if the ARVIDEO_Sender_t is still busy and can not be stopped now (probably because ARVIDEO_Sender_StopSender() was not called yet)
  * @return ARVIDEO_ERROR_BAD_PARAMETERS if sender does not point to a valid ARVIDEO_Sender_t
  *
@@ -123,7 +123,7 @@ eARVIDEO_ERROR ARVIDEO_Sender_Delete (ARVIDEO_Sender_t **sender);
  * @param[in] frameSize size of the frame in memory
  * @param[in] flushPreviousFrames Boolean-like flag (0/1). If active, tells the sender to flush the frame queue when adding this frame.
  * @param[out] nbPreviousFrames Optionnal int pointer which will store the number of frames previously in the buffer (even if the buffer is flushed)
- * @return ARVIDEO_ERROR_OK if no error happened
+ * @return ARVIDEO_OK if no error happened
  * @return ARVIDEO_ERROR_BAD_PARAMETERS if the sender or frameBuffer pointer is invalid, or if frameSize is zero
  * @return ARVIDEO_ERROR_FRAME_TOO_LARGE if the frameSize is greater that the maximum frame size of the libARVideo (typically 128000 bytes)
  * @return ARVIDEO_ERROR_QUEUE_FULL if the frame can not be added to queue. This value can not happen if flushPreviousFrames is active

@@ -137,7 +137,7 @@ ARVIDEO_Reader_t* ARVIDEO_Reader_New (ARNETWORK_Manager_t *manager, int dataBuff
     int ackPacketMutexWasInit = 0;
     int ackSendMutexWasInit = 0;
     int ackSendCondWasInit = 0;
-    eARVIDEO_ERROR internalError = ARVIDEO_ERROR_OK;
+    eARVIDEO_ERROR internalError = ARVIDEO_OK;
     /* ARGS Check */
     if ((manager == NULL) ||
         (callback == NULL) ||
@@ -156,7 +156,7 @@ ARVIDEO_Reader_t* ARVIDEO_Reader_New (ARNETWORK_Manager_t *manager, int dataBuff
     }
 
     /* Copy parameters */
-    if (internalError == ARVIDEO_ERROR_OK)
+    if (internalError == ARVIDEO_OK)
     {
         retReader->manager = manager;
         retReader->dataBufferID = dataBufferID;
@@ -167,7 +167,7 @@ ARVIDEO_Reader_t* ARVIDEO_Reader_New (ARNETWORK_Manager_t *manager, int dataBuff
     }
 
     /* Setup internal mutexes/conditions */
-    if (internalError == ARVIDEO_ERROR_OK)
+    if (internalError == ARVIDEO_OK)
     {
         int mutexInitRet = ARSAL_Mutex_Init (&(retReader->ackPacketMutex));
         if (mutexInitRet != 0)
@@ -179,7 +179,7 @@ ARVIDEO_Reader_t* ARVIDEO_Reader_New (ARNETWORK_Manager_t *manager, int dataBuff
             ackPacketMutexWasInit = 1;
         }
     }
-    if (internalError == ARVIDEO_ERROR_OK)
+    if (internalError == ARVIDEO_OK)
     {
         int mutexInitRet = ARSAL_Mutex_Init (&(retReader->ackSendMutex));
         if (mutexInitRet != 0)
@@ -191,7 +191,7 @@ ARVIDEO_Reader_t* ARVIDEO_Reader_New (ARNETWORK_Manager_t *manager, int dataBuff
             ackSendMutexWasInit = 1;
         }
     }
-    if (internalError == ARVIDEO_ERROR_OK)
+    if (internalError == ARVIDEO_OK)
     {
         int condInitRet = ARSAL_Cond_Init (&(retReader->ackSendCond));
         if (condInitRet != 0)
@@ -205,7 +205,7 @@ ARVIDEO_Reader_t* ARVIDEO_Reader_New (ARNETWORK_Manager_t *manager, int dataBuff
     }
 
     /* Setup internal variables */
-    if (internalError == ARVIDEO_ERROR_OK)
+    if (internalError == ARVIDEO_OK)
     {
         int i;
         retReader->currentFrameSize = 0;
@@ -220,7 +220,7 @@ ARVIDEO_Reader_t* ARVIDEO_Reader_New (ARNETWORK_Manager_t *manager, int dataBuff
         }
     }
 
-    if ((internalError != ARVIDEO_ERROR_OK) &&
+    if ((internalError != ARVIDEO_OK) &&
         (retReader != NULL))
     {
         if (ackPacketMutexWasInit == 1)
@@ -271,7 +271,7 @@ eARVIDEO_ERROR ARVIDEO_Reader_Delete (ARVIDEO_Reader_t **reader)
             ARSAL_Cond_Destroy (&((*reader)->ackSendCond));
             free (*reader);
             *reader = NULL;
-            retVal = ARVIDEO_ERROR_OK;
+            retVal = ARVIDEO_OK;
         }
         else
         {

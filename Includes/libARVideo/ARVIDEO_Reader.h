@@ -115,7 +115,7 @@ void ARVIDEO_Reader_StopReader (ARVIDEO_Reader_t *reader);
  *
  * @param reader Pointer to the ARVIDEO_Reader_t * to delete
  *
- * @return ARVIDEO_ERROR_OK if the ARVIDEO_Reader_t was deleted
+ * @return ARVIDEO_OK if the ARVIDEO_Reader_t was deleted
  * @return ARVIDEO_ERROR_BUSY if the ARVIDEO_Reader_t is still busy and can not be stopped now (probably because ARVIDEO_Reader_StopReader() was not called yet)
  * @return ARVIDEO_ERROR_BAD_PARAMETERS if reader does not point to a valid ARVIDEO_Reader_t
  *
