@@ -28,8 +28,8 @@
  * Macros
  */
 
-#define ACK_BUFFER_ID (50)
-#define DATA_BUFFER_ID (51)
+#define ACK_BUFFER_ID (13)
+#define DATA_BUFFER_ID (125)
 
 #define SENDING_PORT (54321)
 #define READING_PORT (43210)
