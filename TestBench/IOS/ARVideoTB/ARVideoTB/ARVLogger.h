@@ -8,7 +8,7 @@
 
 #import <Foundation/Foundation.h>
 
-@interface ARVLogger : NSObject
+@interface ARVLogger : NSObject <UIAlertViewDelegate>
 
 /**
  * Init with default file name
@@ -23,6 +23,12 @@
 - (id)initWithFileName:(NSString *)fileName withDate:(BOOL)useDate;
 
 /**
+ * Init without file
+ * This logger can't log anything
+ */
+- (id)initWithoutFile;
+
+/**
  * Log a new line in the log file
  */
 - (void)log:(NSString *)message;
@@ -31,5 +37,10 @@
  * Close the current logfile
  */
 - (void)close;
+
+/**
+ * Delete all logs
+ */
+- (void)deleteAllLogs;
 
 @end

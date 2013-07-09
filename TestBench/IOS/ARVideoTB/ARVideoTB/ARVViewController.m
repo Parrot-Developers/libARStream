@@ -523,4 +523,13 @@
     [stopButton setHidden:YES];
 }
 
+- (void)deleteLogs:(id)sender
+{
+    if (logger == nil)
+    {
+        logger = [[ARVLogger alloc] initWithoutFile];
+    }
+    [logger deleteAllLogs];
+}
+
 @end

@@ -15,6 +15,7 @@
     IBOutlet UIButton *senderButton;
     IBOutlet UIButton *readerButton;
     IBOutlet UIButton *stopButton;
+    IBOutlet UIButton *deleteLogsButton;
     IBOutlet UILabel *percentOk;
     IBOutlet UILabel *latency;
     
@@ -45,6 +46,7 @@
 - (IBAction)senderGo:(id)sender;
 - (IBAction)readerGo:(id)sender;
 - (IBAction)stop:(id)sender;
+- (IBAction)deleteLogs:(id)sender;
 
 @property (nonatomic) BOOL running;
 @property (nonatomic) BOOL isSender;

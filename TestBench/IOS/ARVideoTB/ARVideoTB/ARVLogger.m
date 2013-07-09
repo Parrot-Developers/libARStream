@@ -50,6 +50,16 @@
     return self;
 }
 
+- (id)initWithoutFile
+{
+    self = [super init];
+    if (self)
+    {
+        _file = nil;
+    }
+    return self;
+}
+
 - (void)log:(NSString *)message
 {
     NSLog (@"Adding message : %@", message);
@@ -60,11 +70,39 @@
 - (void)close
 {
     [_file closeFile];
+    _file = nil;
 }
 
 - (void)dealloc
 {
     [self close];
+}
+
+- (void)deleteAllLogs
+{
+    [self close];
+    UIAlertView *av = [[UIAlertView alloc] initWithTitle:@"Delete all logs" message:@"Are you sure ?" delegate:self cancelButtonTitle:@"YES" otherButtonTitles:@"NO", nil];
+    [av show];
+}
+
+- (void)alertView:(UIAlertView *)alertView clickedButtonAtIndex:(NSInteger)buttonIndex
+{
+    if (buttonIndex == 0)
+    {
+        [self confirmDeleteAllLogs];
+    }
+}
+
+- (void)confirmDeleteAllLogs
+{
+    NSFileManager *manager = [NSFileManager defaultManager];
+    NSArray *content = [manager contentsOfDirectoryAtPath:[self applicationDocumentsDirectory] error:nil];
+    for (NSString *path in content)
+    {
+        if ([[path pathExtension] isEqualToString:@"log"])
+        {            [manager removeItemAtPath:[NSString stringWithFormat:@"%@/%@", [self applicationDocumentsDirectory],path] error:nil];
+        }
+    }
 }
 
 - (NSString *)nowTime:(BOOL)useDate
