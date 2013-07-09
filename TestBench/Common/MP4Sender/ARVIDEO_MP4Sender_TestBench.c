@@ -256,7 +256,7 @@ void* fileReaderThread (void *ARVIDEO_Sender_t_Param)
             eARVIDEO_ERROR res = ARVIDEO_Sender_SendNewFrame (sender, nextFrameAddr, frameSize, flush, &nbPrevious);
             switch (res)
             {
-            case ARVIDEO_ERROR_OK:
+            case ARVIDEO_OK:
                 ARSAL_PRINT (ARSAL_PRINT_WARNING, __TAG__, "Added a frame of size %u to the Sender (already %d in queue)", frameSize, nbPrevious);
                 break;
             case ARVIDEO_ERROR_BAD_PARAMETERS:

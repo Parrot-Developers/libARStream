@@ -37,10 +37,13 @@ check_PROGRAMS                                              =   ../TestBench/Lin
                                                                 ../TestBench/Linux/MP4Sender/ARVIDEO_MP4Sender_TestBench
 
 ___TestBench_Linux_Sender_ARVIDEO_Sender_TestBench_SOURCES          =   ../TestBench/Linux/Sender/ARVIDEO_Sender_LinuxTestBench.c       \
+                                                                        ../TestBench/Common/Logger/ARVIDEO_Logger.c                     \
                                                                         ../TestBench/Common/Sender/ARVIDEO_Sender_TestBench.c
 ___TestBench_Linux_Reader_ARVIDEO_Reader_TestBench_SOURCES          =   ../TestBench/Linux/Reader/ARVIDEO_Reader_LinuxTestBench.c       \
+                                                                        ../TestBench/Common/Logger/ARVIDEO_Logger.c                     \
                                                                         ../TestBench/Common/Reader/ARVIDEO_Reader_TestBench.c
 ___TestBench_Linux_MP4Sender_ARVIDEO_MP4Sender_TestBench_SOURCES    =   ../TestBench/Linux/MP4Sender/ARVIDEO_MP4Sender_LinuxTestBench.c \
+                                                                        ../TestBench/Common/Logger/ARVIDEO_Logger.c                     \
                                                                         ../TestBench/Common/MP4Sender/ARVIDEO_MP4Sender_TestBench.c
 if DEBUG_MODE
 ___TestBench_Linux_Sender_ARVIDEO_Sender_TestBench_LDADD            =   -larsal                         \

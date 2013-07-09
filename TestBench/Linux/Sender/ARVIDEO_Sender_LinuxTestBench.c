@@ -17,6 +17,7 @@
 
 #include <libARSAL/ARSAL_Print.h>
 #include "../../Common/Sender/ARVIDEO_Sender_TestBench.h"
+#include "../../Common/Logger/ARVIDEO_Logger.h"
 
 /*
  * Macros
@@ -75,12 +76,20 @@ void* reportMain (void *params)
     /* Avoid unused warnings */
     params = params;
 
+    ARVIDEO_Logger_t *logger = ARVIDEO_Logger_NewWithDefaultName ();
+    ARVIDEO_Logger_Log (logger, "Latency (ms); PercentOK (%%); Missed frames; Mean time between frames (ms); Efficiency");
+    ARSAL_PRINT (ARSAL_PRINT_DEBUG, __TAG__, "Latency (ms); PercentOK (%%); Missed frames; Mean time between frames (ms); Efficiency");
     while (1)
     {
+        int lat = ARVIDEO_SenderTb_GetLatency ();
+        int missed = ARVIDEO_SenderTb_GetMissedFrames ();
+        int dt = ARVIDEO_SenderTb_GetMeanTimeBetweenFrames ();
         float eff = ARVIDEO_SenderTb_GetEfficiency ();
-        ARSAL_PRINT (ARSAL_PRINT_ERROR, __TAG__, "Efficiency : %f", eff);
+        ARSAL_PRINT (ARSAL_PRINT_DEBUG, __TAG__,"%4d; %5.2f; %3d; %4d; %5.3f", lat, ARVIDEO_Sender_PercentOk, missed, dt, eff);
+        ARVIDEO_Logger_Log (logger, "%4d; %5.2f; %3d; %4d; %5.3f", lat, ARVIDEO_Sender_PercentOk, missed, dt, eff);
         usleep (1000 * REPORT_DELAY_MS);
     }
+    ARVIDEO_Logger_Delete (&logger);
 
     return (void *)0;
 }
