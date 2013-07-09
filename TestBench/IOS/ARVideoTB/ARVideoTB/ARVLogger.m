@@ -87,9 +87,13 @@
 
 - (void)alertView:(UIAlertView *)alertView clickedButtonAtIndex:(NSInteger)buttonIndex
 {
-    if (buttonIndex == 0)
+    switch (buttonIndex)
     {
-        [self confirmDeleteAllLogs];
+        case 0:
+            [self confirmDeleteAllLogs];
+            break;
+        default:
+            break;
     }
 }
 
