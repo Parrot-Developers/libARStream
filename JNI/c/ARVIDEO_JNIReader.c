@@ -13,7 +13,7 @@ uint8_t* internalCallback (eARVIDEO_READER_CAUSE cause, uint8_t *framePointer, u
 }
 
 JNIEXPORT void JNICALL
-Java_com_parrot_arsdk_arvideo_ARVideoReader_nativeInitialize (JNIEnv *env, jclass clazz)
+Java_com_parrot_arsdk_arvideo_ARVideoReader_nativeInitClass (JNIEnv *env, jclass clazz)
 {
     jint res = (*env)->GetJavaVM(env, &g_vm);
     if (res < 0)

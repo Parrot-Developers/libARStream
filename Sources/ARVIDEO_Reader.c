@@ -317,7 +317,10 @@ void* ARVIDEO_Reader_RunDataThread (void *ARVIDEO_Reader_t_Param)
         eARNETWORK_ERROR err = ARNETWORK_Manager_ReadDataWithTimeout (reader->manager, reader->dataBufferID, recvData, recvDataLen, &recvSize, ARVIDEO_READER_DATAREAD_TIMEOUT_MS);
         if (ARNETWORK_OK != err)
         {
-            ARSAL_PRINT (ARSAL_PRINT_ERROR, ARVIDEO_READER_TAG, "Error while reading video data: %s", ARNETWORK_Error_ToString (err));
+            if (ARNETWORK_ERROR_BUFFER_EMPTY != err)
+            {
+                ARSAL_PRINT (ARSAL_PRINT_ERROR, ARVIDEO_READER_TAG, "Error while reading video data: %s", ARNETWORK_Error_ToString (err));
+            }
         }
         else
         {

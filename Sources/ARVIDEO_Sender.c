@@ -733,7 +733,10 @@ void* ARVIDEO_Sender_RunAckThread (void *ARVIDEO_Sender_t_Param)
         eARNETWORK_ERROR err = ARNETWORK_Manager_ReadDataWithTimeout (sender->manager, sender->ackBufferID, (uint8_t *)&recvPacket, sizeof (recvPacket), &recvSize, 1000);
         if (ARNETWORK_OK != err)
         {
-            ARSAL_PRINT (ARSAL_PRINT_ERROR, ARVIDEO_SENDER_TAG, "Error while reading ACK data: %s", ARNETWORK_Error_ToString (err));
+            if (ARNETWORK_ERROR_BUFFER_EMPTY != err)
+            {
+                ARSAL_PRINT (ARSAL_PRINT_ERROR, ARVIDEO_SENDER_TAG, "Error while reading ACK data: %s", ARNETWORK_Error_ToString (err));
+            }
         }
         else if (recvSize != sizeof (recvPacket))
         {
