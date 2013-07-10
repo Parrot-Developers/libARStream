@@ -34,7 +34,9 @@ endif
 
 check_PROGRAMS                                              =   ../TestBench/Linux/Sender/ARVIDEO_Sender_TestBench                      \
                                                                 ../TestBench/Linux/Reader/ARVIDEO_Reader_TestBench                      \
-                                                                ../TestBench/Linux/MP4Sender/ARVIDEO_MP4Sender_TestBench
+                                                                ../TestBench/Linux/MP4Sender/ARVIDEO_MP4Sender_TestBench                \
+                                                                ../TestBench/Linux/TCPSender/ARVIDEO_TCPSender_TestBench                \
+                                                                ../TestBench/Linux/TCPReader/ARVIDEO_TCPReader_TestBench
 
 ___TestBench_Linux_Sender_ARVIDEO_Sender_TestBench_SOURCES          =   ../TestBench/Linux/Sender/ARVIDEO_Sender_LinuxTestBench.c       \
                                                                         ../TestBench/Common/Logger/ARVIDEO_Logger.c                     \
@@ -45,6 +47,11 @@ ___TestBench_Linux_Reader_ARVIDEO_Reader_TestBench_SOURCES          =   ../TestB
 ___TestBench_Linux_MP4Sender_ARVIDEO_MP4Sender_TestBench_SOURCES    =   ../TestBench/Linux/MP4Sender/ARVIDEO_MP4Sender_LinuxTestBench.c \
                                                                         ../TestBench/Common/Logger/ARVIDEO_Logger.c                     \
                                                                         ../TestBench/Common/MP4Sender/ARVIDEO_MP4Sender_TestBench.c
+___TestBench_Linux_TCPSender_ARVIDEO_TCPSender_TestBench_SOURCES    =   ../TestBench/Linux/TCPSender/ARVIDEO_TCPSender_LinuxTb.c        \
+                                                                        ../TestBench/Common/TCPSender/ARVIDEO_TCPSender.c
+___TestBench_Linux_TCPReader_ARVIDEO_TCPReader_TestBench_SOURCES    =   ../TestBench/Linux/TCPReader/ARVIDEO_TCPReader_LinuxTb.c        \
+                                                                        ../TestBench/Common/Logger/ARVIDEO_Logger.c                     \
+                                                                        ../TestBench/Common/TCPReader/ARVIDEO_TCPReader.c
 if DEBUG_MODE
 ___TestBench_Linux_Sender_ARVIDEO_Sender_TestBench_LDADD            =   -larsal                         \
                                                                         -larnetworkal                   \
@@ -58,6 +65,14 @@ ___TestBench_Linux_MP4Sender_ARVIDEO_MP4Sender_TestBench_LDADD      =   -larsal 
                                                                         -larnetworkal                   \
                                                                         -larnetwork                     \
                                                                         libarvideo_dbg.la
+___TestBench_Linux_TCPSender_ARVIDEO_TCPSender_TestBench_LDADD      =   -larsal                         \
+                                                                        -larnetworkal                   \
+                                                                        -larnetwork                     \
+                                                                        libarvideo_dbg.la
+___TestBench_Linux_TCPReader_ARVIDEO_TCPReader_TestBench_LDADD      =   -larsal                         \
+                                                                        -larnetworkal                   \
+                                                                        -larnetwork                     \
+                                                                        libarvideo_dbg.la
 else
 ___TestBench_Linux_Sender_ARVIDEO_Sender_TestBench_LDADD            =   -larsal                         \
                                                                         -larnetworkal                   \
@@ -68,6 +83,14 @@ ___TestBench_Linux_Reader_ARVIDEO_Reader_TestBench_LDADD            =   -larsal 
                                                                         -larnetwork                     \
                                                                         libarvideo.la
 ___TestBench_Linux_MP4Sender_ARVIDEO_MP4Sender_TestBench_LDADD      =   -larsal                         \
+                                                                        -larnetworkal                   \
+                                                                        -larnetwork                     \
+                                                                        libarvideo.la
+___TestBench_Linux_TCPSender_ARVIDEO_TCPSender_TestBench_LDADD      =   -larsal                         \
+                                                                        -larnetworkal                   \
+                                                                        -larnetwork                     \
+                                                                        libarvideo.la
+___TestBench_Linux_TCPReader_ARVIDEO_TCPReader_TestBench_LDADD      =   -larsal                         \
                                                                         -larnetworkal                   \
                                                                         -larnetwork                     \
                                                                         libarvideo.la
