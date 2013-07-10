@@ -1,5 +1,5 @@
 /**
- * @file ARVIDEO_Sender_TestBench.c
+ * @file ARVIDEO_Sender_LinuxTestBench.c
  * @brief Testbench for the ARVIDEO_Sender submodule
  * @date 03/25/2013
  * @author nicolas.brulez@parrot.com

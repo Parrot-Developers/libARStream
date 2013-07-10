@@ -1,5 +1,5 @@
 /**
- * @file ARVIDEO_Reader_TestBench.c
+ * @file ARVIDEO_Reader_LinuxTestBench.c
  * @brief Testbench for the ARVIDEO_Reader submodule
  * @date 03/25/2013
  * @author nicolas.brulez@parrot.com
