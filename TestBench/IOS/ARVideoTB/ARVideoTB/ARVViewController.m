@@ -10,6 +10,8 @@
 
 #import "ARVIDEO_Reader_TestBench.h"
 #import "ARVIDEO_Sender_TestBench.h"
+#import "ARVIDEO_TCPReader.h"
+#import "ARVIDEO_TCPSender.h"
 
 #define kARVIDEONumberOfPoints 50
 #define kARVIDEODeltaTTimerSec 0.1
@@ -322,7 +324,7 @@
 - (void)viewDidAppear:(BOOL)animated
 {
     _running = NO;
-    _isSender = NO;
+    _mode = ARV_None;
     
     CGSize contentSize = CGSizeMake(graphScrollView.frame.size.width, 108.f * nbGraphs);
     [graphScrollView setContentSize:contentSize];
@@ -369,79 +371,125 @@
     }
     else
     {
-        if (_isSender)
+        switch (_mode)
         {
-            [percentOk setText:[NSString stringWithFormat:@"%f%%", ARVIDEO_Sender_PercentOk]];
-            int estLat = ARVIDEO_SenderTb_GetLatency();
-            if (estLat < 0)
+            case ARV_Sender:
             {
-                [latency setText:@"Not connected"];
-                if ([latencyGraphData count] > 0)
-                    [latencyGraphData removeObjectAtIndex:0];
-                [latencyGraphData addObject:[NSNumber numberWithUnsignedInteger:1000]];
-            }
-            else
-            {
-                [latency setText:[NSString stringWithFormat:@"%dms", estLat]];
-                if ([latencyGraphData count] > 0)
-                    [latencyGraphData removeObjectAtIndex:0];
-                [latencyGraphData addObject:[NSNumber numberWithUnsignedInteger:estLat]];
+                [percentOk setText:[NSString stringWithFormat:@"%f%%", ARVIDEO_Sender_PercentOk]];
+                int estLat = ARVIDEO_SenderTb_GetLatency();
+                if (estLat < 0)
+                {
+                    [latency setText:@"Not connected"];
+                    if ([latencyGraphData count] > 0)
+                        [latencyGraphData removeObjectAtIndex:0];
+                    [latencyGraphData addObject:[NSNumber numberWithUnsignedInteger:1000]];
+                }
+                else
+                {
+                    [latency setText:[NSString stringWithFormat:@"%dms", estLat]];
+                    if ([latencyGraphData count] > 0)
+                        [latencyGraphData removeObjectAtIndex:0];
+                    [latencyGraphData addObject:[NSNumber numberWithUnsignedInteger:estLat]];
+                    
+                }
+                if ([lossFramesData count] > 0)
+                    [lossFramesData removeObjectAtIndex:0];
+                int missed = ARVIDEO_SenderTb_GetMissedFrames();
+                [lossFramesData addObject:[NSNumber numberWithUnsignedInteger:(NSUInteger)missed]];
                 
+                if ([deltaTData count] > 0)
+                    [deltaTData removeObjectAtIndex:0];
+                int dt = ARVIDEO_SenderTb_GetMeanTimeBetweenFrames();
+                [deltaTData addObject:[NSNumber numberWithUnsignedInteger:(NSUInteger)dt]];
+                
+                if ([efficiencyData count] > 0)
+                    [efficiencyData removeObjectAtIndex:0];
+                float eff = ARVIDEO_SenderTb_GetEfficiency();
+                [efficiencyData addObject:[NSNumber numberWithFloat:eff]];
+                
+                [self refreshGraphs];
+                [logger log:[NSString stringWithFormat:@"%4d; %5.2f; %3d; %4d; %5.3f", estLat, ARVIDEO_Sender_PercentOk, missed, dt, eff]];
             }
-            if ([lossFramesData count] > 0)
-                [lossFramesData removeObjectAtIndex:0];
-            int missed = ARVIDEO_SenderTb_GetMissedFrames();
-            [lossFramesData addObject:[NSNumber numberWithUnsignedInteger:(NSUInteger)missed]];
-            
-            if ([deltaTData count] > 0)
-                [deltaTData removeObjectAtIndex:0];
-            int dt = ARVIDEO_SenderTb_GetMeanTimeBetweenFrames();
-            [deltaTData addObject:[NSNumber numberWithUnsignedInteger:(NSUInteger)dt]];
-            
-            if ([efficiencyData count] > 0)
-                [efficiencyData removeObjectAtIndex:0];
-            float eff = ARVIDEO_SenderTb_GetEfficiency();
-            [efficiencyData addObject:[NSNumber numberWithFloat:eff]];
-            
-            [self refreshGraphs];
-            [logger log:[NSString stringWithFormat:@"%4d; %5.2f; %3d; %4d; %5.3f", estLat, ARVIDEO_Sender_PercentOk, missed, dt, eff]];
-        }
-        else
-        {
-            [percentOk setText:[NSString stringWithFormat:@"%f%%", ARVIDEO_Reader_PercentOk]];
-            int estLat = ARVIDEO_ReaderTb_GetLatency();
-            if (estLat < 0)
+                break;
+            case ARV_Reader:
             {
-                [latency setText:@"Not connected"];
+                [percentOk setText:[NSString stringWithFormat:@"%f%%", ARVIDEO_Reader_PercentOk]];
+                int estLat = ARVIDEO_ReaderTb_GetLatency();
+                if (estLat < 0)
+                {
+                    [latency setText:@"Not connected"];
+                    if ([latencyGraphData count] > 0)
+                        [latencyGraphData removeObjectAtIndex:0];
+                    [latencyGraphData addObject:[NSNumber numberWithUnsignedInteger:1000]];
+                }
+                else
+                {
+                    [latency setText:[NSString stringWithFormat:@"%dms", estLat]];
+                    if ([latencyGraphData count] > 0)
+                        [latencyGraphData removeObjectAtIndex:0];
+                    [latencyGraphData addObject:[NSNumber numberWithUnsignedInteger:estLat]];
+                    
+                }
+                if ([lossFramesData count] > 0)
+                    [lossFramesData removeObjectAtIndex:0];
+                int missed = ARVIDEO_ReaderTb_GetMissedFrames();
+                [lossFramesData addObject:[NSNumber numberWithUnsignedInteger:(NSUInteger)missed]];
+                
+                if ([deltaTData count] > 0)
+                    [deltaTData removeObjectAtIndex:0];
+                int dt = ARVIDEO_ReaderTb_GetMeanTimeBetweenFrames();
+                [deltaTData addObject:[NSNumber numberWithUnsignedInteger:(NSUInteger)dt]];
+                
+                if ([efficiencyData count] > 0)
+                    [efficiencyData removeObjectAtIndex:0];
+                float eff = ARVIDEO_ReaderTb_GetEfficiency();
+                [efficiencyData addObject:[NSNumber numberWithFloat:eff]];
+                
+                [self refreshGraphs];
+                [logger log:[NSString stringWithFormat:@"%4d; %5.2f; %3d; %4d; %5.3f", estLat, ARVIDEO_Reader_PercentOk, missed, dt, eff]];
+            }
+                break;
+            case ARV_TCP_Sender:
+                // Do nothing for TCP sender
+                [percentOk setText:@""];
+                [latency setText:@""];
                 if ([latencyGraphData count] > 0)
                     [latencyGraphData removeObjectAtIndex:0];
-                [latencyGraphData addObject:[NSNumber numberWithUnsignedInteger:1000]];
-            }
-            else
-            {
-                [latency setText:[NSString stringWithFormat:@"%dms", estLat]];
+                [latencyGraphData addObject:[NSNumber numberWithUnsignedInteger:0]];
+                if ([lossFramesData count] > 0)
+                    [lossFramesData removeObjectAtIndex:0];
+                [lossFramesData addObject:[NSNumber numberWithUnsignedInteger:0]];
+                if ([deltaTData count] > 0)
+                    [deltaTData removeObjectAtIndex:0];
+                [deltaTData addObject:[NSNumber numberWithUnsignedInteger:0]];
+                if ([efficiencyData count] > 0)
+                    [efficiencyData removeObjectAtIndex:0];
+                [efficiencyData addObject:[NSNumber numberWithFloat:0.0]];
+                
+                [self refreshGraphs];
+                
+                break;
+            case ARV_TCP_Reader:
+                [percentOk setText:@""];
+                [latency setText:@""];
                 if ([latencyGraphData count] > 0)
                     [latencyGraphData removeObjectAtIndex:0];
-                [latencyGraphData addObject:[NSNumber numberWithUnsignedInteger:estLat]];
-
-            }
-            if ([lossFramesData count] > 0)
-                [lossFramesData removeObjectAtIndex:0];
-            int missed = ARVIDEO_ReaderTb_GetMissedFrames();
-            [lossFramesData addObject:[NSNumber numberWithUnsignedInteger:(NSUInteger)missed]];
-            
-            if ([deltaTData count] > 0)
-                [deltaTData removeObjectAtIndex:0];
-            int dt = ARVIDEO_ReaderTb_GetMeanTimeBetweenFrames();
-            [deltaTData addObject:[NSNumber numberWithUnsignedInteger:(NSUInteger)dt]];
-            
-            if ([efficiencyData count] > 0)
-                [efficiencyData removeObjectAtIndex:0];
-            float eff = ARVIDEO_ReaderTb_GetEfficiency();
-            [efficiencyData addObject:[NSNumber numberWithFloat:eff]];
-            
-            [self refreshGraphs];
-            [logger log:[NSString stringWithFormat:@"%4d; %5.2f; %3d; %4d; %5.3f", estLat, ARVIDEO_Reader_PercentOk, missed, dt, eff]];
+                [latencyGraphData addObject:[NSNumber numberWithUnsignedInteger:0]];
+                if ([lossFramesData count] > 0)
+                    [lossFramesData removeObjectAtIndex:0];
+                [lossFramesData addObject:[NSNumber numberWithUnsignedInteger:0]];
+                if ([deltaTData count] > 0)
+                    [deltaTData removeObjectAtIndex:0];
+                int dt = ARVIDEO_TCPReader_GetMeanTimeBetweenFrames ();
+                [deltaTData addObject:[NSNumber numberWithUnsignedInteger:(NSUInteger)dt]];
+                if ([efficiencyData count] > 0)
+                    [efficiencyData removeObjectAtIndex:0];
+                [efficiencyData addObject:[NSNumber numberWithFloat:0.0]];
+                
+                [self refreshGraphs];
+                break;
+            default:
+                break;
         }
     }
 }
@@ -456,13 +504,15 @@
 {
     [senderButton setHidden:YES];
     [readerButton setHidden:YES];
+    [tcpSenderButton setHidden:YES];
+    [tcpReaderButton setHidden:YES];
     [stopButton setHidden:NO];
     [stopButton setTitle:@"STOP - SENDER" forState:UIControlStateNormal];
     
     [self startTimer];
     
     _running = YES;
-    _isSender = YES;
+    _mode = ARV_Sender;
     
     [self performSelectorInBackground:@selector(runSender) withObject:nil];
 }
@@ -485,13 +535,15 @@
 {
     [senderButton setHidden:YES];
     [readerButton setHidden:YES];
+    [tcpSenderButton setHidden:YES];
+    [tcpReaderButton setHidden:YES];
     [stopButton setHidden:NO];
     [stopButton setTitle:@"STOP - READER" forState:UIControlStateNormal];
     
     [self startTimer];
     
     _running = YES;
-    _isSender = NO;
+    _mode = ARV_Reader;
     
     [self performSelectorInBackground:@selector(runReader) withObject:nil];
 }
@@ -510,16 +562,76 @@
     logger = nil;
 }
 
+- (void)tcpSenderGo:(id)sender
+{
+    [senderButton setHidden:YES];
+    [readerButton setHidden:YES];
+    [tcpSenderButton setHidden:YES];
+    [tcpReaderButton setHidden:YES];
+    [stopButton setHidden:NO];
+    [stopButton setTitle:@"STOP - TCPSENDER" forState:UIControlStateNormal];
+    
+    [self startTimer];
+    
+    _running = YES;
+    _mode = ARV_TCP_Sender;
+    
+    [self performSelectorInBackground:@selector(runTcpSender) withObject:nil];
+}
+
+- (void)runTcpSender
+{
+    char *name = "ARVideo_TestBench_iOS";
+    char *params[1] = { name };
+    
+    ARVIDEO_TCPSender_Main(1, params);
+}
+
+- (void)tcpReaderGo:(id)sender
+{
+    [senderButton setHidden:YES];
+    [readerButton setHidden:YES];
+    [tcpSenderButton setHidden:YES];
+    [tcpReaderButton setHidden:YES];
+    [stopButton setHidden:NO];
+    [stopButton setTitle:@"STOP - READER" forState:UIControlStateNormal];
+    
+    [self startTimer];
+    
+    _running = YES;
+    _mode = ARV_TCP_Reader;
+    
+    [self performSelectorInBackground:@selector(runTcpReader) withObject:nil];
+}
+
+- (void)runTcpReader
+{
+    NSString *ip = ipField.text;
+    char *cIp = (char *)[ip UTF8String];
+    char *name = "ARVideo_TestBench_iOS";
+    char *params[2] = { name, cIp };
+    
+    logger = [[ARVLogger alloc] init];
+    [logger log:@"Mean time between frame (ms)"];
+    ARVIDEO_TCPReader_Main(2, params);
+    [logger close];
+    logger = nil;
+}
+
 - (void)stop:(id)sender
 {
     ARVIDEO_Sender_TestBenchStop();
     ARVIDEO_Reader_TestBenchStop();
+    ARVIDEO_TCPReader_Stop();
+    ARVIDEO_TCPSender_Stop();
     [self resetDataArrays];
     [self stopTimer];
     
     
     [senderButton setHidden:NO];
     [readerButton setHidden:NO];
+    [tcpSenderButton setHidden:NO];
+    [tcpReaderButton setHidden:NO];
     [stopButton setHidden:YES];
 }
 

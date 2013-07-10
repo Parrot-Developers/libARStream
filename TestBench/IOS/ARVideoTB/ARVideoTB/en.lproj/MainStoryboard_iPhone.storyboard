@@ -108,7 +108,6 @@
                                 <constraints>
                                     <constraint firstItem="FeZ-zo-acF" firstAttribute="leading" secondItem="oUx-kX-lp4" secondAttribute="leading" type="user" id="0i6-qV-3Cq"/>
                                     <constraint firstItem="15W-LY-245" firstAttribute="trailing" secondItem="oUx-kX-lp4" secondAttribute="trailing" type="user" id="0mf-R6-hKG"/>
-                                    <constraint firstAttribute="bottom" secondItem="Xuu-vM-oep" secondAttribute="bottom" constant="350" id="2OK-TM-EpU"/>
                                     <constraint firstItem="Xuu-vM-oep" firstAttribute="trailing" secondItem="oUx-kX-lp4" secondAttribute="trailing" type="user" id="CVW-Q4-PiX"/>
                                     <constraint firstItem="Xuu-vM-oep" firstAttribute="top" secondItem="bpZ-qV-Eth" secondAttribute="bottom" type="user" id="Dii-4w-OFq"/>
                                     <constraint firstItem="Lh2-47-7mu" firstAttribute="top" secondItem="FeZ-zo-acF" secondAttribute="bottom" type="user" id="ETi-Va-8g5"/>
@@ -116,16 +115,17 @@
                                     <constraint firstItem="11S-CG-0k0" firstAttribute="leading" secondItem="oUx-kX-lp4" secondAttribute="leading" type="user" id="J0o-Dp-n3R"/>
                                     <constraint firstItem="qDd-Wf-dq1" firstAttribute="leading" secondItem="oUx-kX-lp4" secondAttribute="leading" type="user" id="KQ9-A9-oOO"/>
                                     <constraint firstItem="15W-LY-245" firstAttribute="top" secondItem="mxS-ex-wC3" secondAttribute="bottom" type="user" id="Oax-E9-Nz0"/>
-                                    <constraint firstItem="15W-LY-245" firstAttribute="centerX" secondItem="oUx-kX-lp4" secondAttribute="centerX" type="default" id="SAd-Wg-bjE"/>
                                     <constraint firstItem="qDd-Wf-dq1" firstAttribute="top" secondItem="11S-CG-0k0" secondAttribute="bottom" type="user" id="XUb-UR-KdY"/>
                                     <constraint firstItem="mxS-ex-wC3" firstAttribute="leading" secondItem="oUx-kX-lp4" secondAttribute="leading" type="user" id="YOR-WU-mJz"/>
                                     <constraint firstItem="FeZ-zo-acF" firstAttribute="top" secondItem="oUx-kX-lp4" secondAttribute="top" type="user" id="aEO-y3-A5n"/>
                                     <constraint firstItem="bpZ-qV-Eth" firstAttribute="top" secondItem="15W-LY-245" secondAttribute="bottom" type="user" id="aM8-kG-IPr"/>
                                     <constraint firstItem="Xuu-vM-oep" firstAttribute="leading" secondItem="oUx-kX-lp4" secondAttribute="leading" type="user" id="bza-HN-FTS"/>
+                                    <constraint firstItem="qDd-Wf-dq1" firstAttribute="centerX" secondItem="oUx-kX-lp4" secondAttribute="centerX" type="default" id="enB-UE-0g9"/>
                                     <constraint firstItem="mxS-ex-wC3" firstAttribute="trailing" secondItem="oUx-kX-lp4" secondAttribute="trailing" type="user" id="glm-mt-dfv"/>
                                     <constraint firstItem="mxS-ex-wC3" firstAttribute="top" secondItem="qDd-Wf-dq1" secondAttribute="bottom" type="user" id="hcq-aA-cTT"/>
                                     <constraint firstItem="bpZ-qV-Eth" firstAttribute="trailing" secondItem="oUx-kX-lp4" secondAttribute="trailing" type="user" id="heV-Ml-LYL"/>
                                     <constraint firstItem="qDd-Wf-dq1" firstAttribute="trailing" secondItem="oUx-kX-lp4" secondAttribute="trailing" type="user" id="k8s-7S-IIZ"/>
+                                    <constraint firstAttribute="bottom" secondItem="Xuu-vM-oep" secondAttribute="bottom" constant="298" id="kpc-i2-4wK"/>
                                     <constraint firstItem="Lh2-47-7mu" firstAttribute="leading" secondItem="oUx-kX-lp4" secondAttribute="leading" type="user" id="m3G-MH-HAk"/>
                                     <constraint firstItem="bpZ-qV-Eth" firstAttribute="leading" secondItem="oUx-kX-lp4" secondAttribute="leading" type="user" id="ppm-M2-Wyt"/>
                                     <constraint firstItem="Lh2-47-7mu" firstAttribute="trailing" secondItem="oUx-kX-lp4" secondAttribute="trailing" type="user" id="sQT-4u-ExG"/>
@@ -168,6 +168,23 @@
                                     <action selector="readerGo:" destination="2" eventType="touchUpInside" id="caH-18-HKd"/>
                                 </connections>
                             </button>
+                            <button opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="uZw-5B-ru9">
+                                <color key="backgroundColor" white="0.0" alpha="0.90000000000000002" colorSpace="custom" customColorSpace="calibratedWhite"/>
+                                <constraints>
+                                    <constraint firstAttribute="height" constant="44" type="user" id="RfU-tW-sAQ"/>
+                                </constraints>
+                                <fontDescription key="fontDescription" name="HelveticaNeue-CondensedBold" family="Helvetica Neue" pointSize="15"/>
+                                <state key="normal" title="TCP_Reader">
+                                    <color key="titleColor" red="1" green="0.47058823529999999" blue="0.0" alpha="1" colorSpace="calibratedRGB"/>
+                                    <color key="titleShadowColor" white="0.5" alpha="1" colorSpace="calibratedWhite"/>
+                                </state>
+                                <state key="highlighted">
+                                    <color key="titleColor" white="1" alpha="1" colorSpace="calibratedWhite"/>
+                                </state>
+                                <connections>
+                                    <action selector="tcpReaderGo:" destination="2" eventType="touchUpInside" id="BiZ-tX-rEZ"/>
+                                </connections>
+                            </button>
                             <button opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="Geo-ER-zvU">
                                 <color key="backgroundColor" white="0.0" alpha="0.90000000000000002" colorSpace="custom" customColorSpace="calibratedWhite"/>
                                 <fontDescription key="fontDescription" name="HelveticaNeue-CondensedBold" family="Helvetica Neue" pointSize="15"/>
@@ -180,6 +197,20 @@
                                 </state>
                                 <connections>
                                     <action selector="senderGo:" destination="2" eventType="touchUpInside" id="LuV-Yu-6JP"/>
+                                </connections>
+                            </button>
+                            <button opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="VoX-l8-Vea">
+                                <color key="backgroundColor" white="0.0" alpha="0.90000000000000002" colorSpace="custom" customColorSpace="calibratedWhite"/>
+                                <fontDescription key="fontDescription" name="HelveticaNeue-CondensedBold" family="Helvetica Neue" pointSize="15"/>
+                                <state key="normal" title="TCP_Sender">
+                                    <color key="titleColor" red="1" green="0.47058823529999999" blue="0.0" alpha="1" colorSpace="calibratedRGB"/>
+                                    <color key="titleShadowColor" white="0.5" alpha="1" colorSpace="calibratedWhite"/>
+                                </state>
+                                <state key="highlighted">
+                                    <color key="titleColor" white="1" alpha="1" colorSpace="calibratedWhite"/>
+                                </state>
+                                <connections>
+                                    <action selector="tcpSenderGo:" destination="2" eventType="touchUpInside" id="CXX-1N-sGI"/>
                                 </connections>
                             </button>
                             <button opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="qSR-fJ-vOB">
@@ -204,6 +235,8 @@
                         <color key="backgroundColor" white="1" alpha="1" colorSpace="custom" customColorSpace="calibratedWhite"/>
                         <constraints>
                             <constraint firstItem="Geo-ER-zvU" firstAttribute="leading" secondItem="kHy-mi-mbG" secondAttribute="trailing" constant="8" symbolic="YES" type="user" id="1He-eW-4vb"/>
+                            <constraint firstItem="VoX-l8-Vea" firstAttribute="leading" secondItem="uZw-5B-ru9" secondAttribute="trailing" constant="8" symbolic="YES" type="user" id="32a-8W-yUc"/>
+                            <constraint firstAttribute="bottom" secondItem="aT7-0a-Ez1" secondAttribute="bottom" constant="20" symbolic="YES" type="user" id="58u-if-0Ai"/>
                             <constraint firstItem="aT7-0a-Ez1" firstAttribute="leading" secondItem="3" secondAttribute="leading" constant="20" symbolic="YES" type="user" id="849-kp-jKZ"/>
                             <constraint firstAttribute="bottom" secondItem="kHy-mi-mbG" secondAttribute="bottom" constant="20" symbolic="YES" type="user" id="8Ok-7W-Z0b"/>
                             <constraint firstItem="oUx-kX-lp4" firstAttribute="top" secondItem="QbL-WF-sPw" secondAttribute="bottom" constant="8" symbolic="YES" type="user" id="8RB-by-iNj"/>
@@ -211,11 +244,13 @@
                             <constraint firstItem="V9c-nY-s7O" firstAttribute="leading" secondItem="3" secondAttribute="leading" constant="20" symbolic="YES" type="user" id="BTN-Ff-sKv"/>
                             <constraint firstAttribute="trailing" secondItem="joH-ER-zl3" secondAttribute="trailing" constant="20" symbolic="YES" type="user" id="D5R-U2-G0n"/>
                             <constraint firstItem="QbL-WF-sPw" firstAttribute="top" secondItem="8QE-K1-Wkr" secondAttribute="bottom" constant="8" symbolic="YES" type="user" id="Gds-qF-zDB"/>
+                            <constraint firstItem="VoX-l8-Vea" firstAttribute="top" secondItem="oUx-kX-lp4" secondAttribute="bottom" constant="8" symbolic="YES" type="user" id="HKp-EM-yiZ"/>
                             <constraint firstAttribute="trailing" secondItem="V9c-nY-s7O" secondAttribute="trailing" constant="20" symbolic="YES" type="user" id="Hyz-3v-RNc"/>
                             <constraint firstAttribute="trailing" secondItem="8QE-K1-Wkr" secondAttribute="trailing" constant="20" symbolic="YES" type="user" id="ItR-Vo-LIR"/>
-                            <constraint firstItem="aT7-0a-Ez1" firstAttribute="top" secondItem="oUx-kX-lp4" secondAttribute="bottom" constant="8" symbolic="YES" type="user" id="QJX-Jd-H5h"/>
+                            <constraint firstAttribute="trailing" secondItem="VoX-l8-Vea" secondAttribute="trailing" constant="20" symbolic="YES" type="user" id="Nch-yK-8Sw"/>
                             <constraint firstItem="V9c-nY-s7O" firstAttribute="top" secondItem="joH-ER-zl3" secondAttribute="bottom" constant="8" symbolic="YES" type="user" id="TDm-0R-olU"/>
-                            <constraint firstAttribute="bottom" secondItem="aT7-0a-Ez1" secondAttribute="bottom" constant="20" symbolic="YES" type="user" id="daV-9J-cMY"/>
+                            <constraint firstItem="VoX-l8-Vea" firstAttribute="height" secondItem="uZw-5B-ru9" secondAttribute="height" type="user" id="dhQ-aQ-GHA"/>
+                            <constraint firstItem="VoX-l8-Vea" firstAttribute="width" secondItem="uZw-5B-ru9" secondAttribute="width" type="user" id="e0i-lR-PQo"/>
                             <constraint firstItem="qSR-fJ-vOB" firstAttribute="trailing" secondItem="3" secondAttribute="trailing" type="user" id="edd-gA-vzT"/>
                             <constraint firstAttribute="trailing" secondItem="Geo-ER-zvU" secondAttribute="trailing" constant="20" symbolic="YES" type="user" id="f1O-QJ-UWG"/>
                             <constraint firstAttribute="trailing" secondItem="QbL-WF-sPw" secondAttribute="trailing" constant="20" symbolic="YES" type="user" id="hVJ-fQ-Pl7"/>
@@ -223,6 +258,9 @@
                             <constraint firstItem="qSR-fJ-vOB" firstAttribute="top" secondItem="3" secondAttribute="top" type="user" id="jeA-OB-Cj7"/>
                             <constraint firstItem="8QE-K1-Wkr" firstAttribute="top" secondItem="V9c-nY-s7O" secondAttribute="bottom" constant="8" symbolic="YES" type="user" id="kgc-Ap-lRj"/>
                             <constraint firstItem="Geo-ER-zvU" firstAttribute="height" secondItem="kHy-mi-mbG" secondAttribute="height" type="user" id="n6y-bQ-uhr"/>
+                            <constraint firstItem="aT7-0a-Ez1" firstAttribute="top" secondItem="VoX-l8-Vea" secondAttribute="bottom" constant="8" symbolic="YES" type="user" id="nXc-Nh-lJj"/>
+                            <constraint firstItem="uZw-5B-ru9" firstAttribute="top" secondItem="oUx-kX-lp4" secondAttribute="bottom" constant="8" symbolic="YES" type="user" id="szR-Zp-hnQ"/>
+                            <constraint firstItem="uZw-5B-ru9" firstAttribute="leading" secondItem="3" secondAttribute="leading" constant="20" symbolic="YES" type="user" id="tt4-aO-8tX"/>
                             <constraint firstItem="Geo-ER-zvU" firstAttribute="width" secondItem="kHy-mi-mbG" secondAttribute="width" type="user" id="u1Z-ti-JWD"/>
                             <constraint firstAttribute="bottom" secondItem="Geo-ER-zvU" secondAttribute="bottom" constant="20" symbolic="YES" type="user" id="utY-7b-6cg"/>
                             <constraint firstItem="joH-ER-zl3" firstAttribute="top" secondItem="3" secondAttribute="top" constant="20" symbolic="YES" type="user" id="v7V-xd-JWX"/>
@@ -247,6 +285,8 @@
                         <outlet property="readerButton" destination="kHy-mi-mbG" id="Zzm-HE-S7z"/>
                         <outlet property="senderButton" destination="Geo-ER-zvU" id="J26-Eq-XE5"/>
                         <outlet property="stopButton" destination="aT7-0a-Ez1" id="lI3-kv-Bhz"/>
+                        <outlet property="tcpReaderButton" destination="uZw-5B-ru9" id="Tcj-ef-3PS"/>
+                        <outlet property="tcpSenderButton" destination="VoX-l8-Vea" id="vzg-Ad-qh8"/>
                     </connections>
                 </viewController>
                 <placeholder placeholderIdentifier="IBFirstResponder" id="4" sceneMemberID="firstResponder"/>
@@ -261,6 +301,8 @@
                 <relationship kind="action" name="readerGo:"/>
                 <relationship kind="action" name="senderGo:"/>
                 <relationship kind="action" name="stop:"/>
+                <relationship kind="action" name="tcpReaderGo:"/>
+                <relationship kind="action" name="tcpSenderGo:"/>
                 <relationship kind="outlet" name="deleteLogsButton" candidateClass="UIButton"/>
                 <relationship kind="outlet" name="deltaTView" candidateClass="CPTGraphHostingView"/>
                 <relationship kind="outlet" name="efficiencyView" candidateClass="CPTGraphHostingView"/>
@@ -273,6 +315,8 @@
                 <relationship kind="outlet" name="readerButton" candidateClass="UIButton"/>
                 <relationship kind="outlet" name="senderButton" candidateClass="UIButton"/>
                 <relationship kind="outlet" name="stopButton" candidateClass="UIButton"/>
+                <relationship kind="outlet" name="tcpReaderButton" candidateClass="UIButton"/>
+                <relationship kind="outlet" name="tcpSenderButton" candidateClass="UIButton"/>
             </relationships>
         </class>
         <class className="CPTGraphHostingView" superclassName="UIView">

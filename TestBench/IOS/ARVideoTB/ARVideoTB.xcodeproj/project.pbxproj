@@ -8,6 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		371815E0178304340030D4FA /* CoreBluetooth.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 371815DF178304340030D4FA /* CoreBluetooth.framework */; };
+		371BD365178D9D0F004D22A3 /* ARVIDEO_TCPReader.c in Sources */ = {isa = PBXBuildFile; fileRef = 371BD363178D9D0F004D22A3 /* ARVIDEO_TCPReader.c */; };
+		371BD36B178D9D1B004D22A3 /* ARVIDEO_TCPSender.c in Sources */ = {isa = PBXBuildFile; fileRef = 371BD369178D9D1B004D22A3 /* ARVIDEO_TCPSender.c */; };
 		372671401779F75000D61680 /* libARNetwork.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3726713C1779F75000D61680 /* libARNetwork.framework */; };
 		372671411779F75000D61680 /* libARNetworkAL.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3726713D1779F75000D61680 /* libARNetworkAL.framework */; };
 		372671421779F75000D61680 /* libARSAL.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3726713E1779F75000D61680 /* libARSAL.framework */; };
@@ -47,6 +49,10 @@
 
 /* Begin PBXFileReference section */
 		371815DF178304340030D4FA /* CoreBluetooth.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreBluetooth.framework; path = System/Library/Frameworks/CoreBluetooth.framework; sourceTree = SDKROOT; };
+		371BD363178D9D0F004D22A3 /* ARVIDEO_TCPReader.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = ARVIDEO_TCPReader.c; path = ../../../Common/TCPReader/ARVIDEO_TCPReader.c; sourceTree = "<group>"; };
+		371BD364178D9D0F004D22A3 /* ARVIDEO_TCPReader.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ARVIDEO_TCPReader.h; path = ../../../Common/TCPReader/ARVIDEO_TCPReader.h; sourceTree = "<group>"; };
+		371BD369178D9D1B004D22A3 /* ARVIDEO_TCPSender.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = ARVIDEO_TCPSender.c; path = ../../../Common/TCPSender/ARVIDEO_TCPSender.c; sourceTree = "<group>"; };
+		371BD36A178D9D1B004D22A3 /* ARVIDEO_TCPSender.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ARVIDEO_TCPSender.h; path = ../../../Common/TCPSender/ARVIDEO_TCPSender.h; sourceTree = "<group>"; };
 		3726713C1779F75000D61680 /* libARNetwork.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = libARNetwork.framework; path = ../../../../IOS_InstallDir/Frameworks/libARNetwork.framework; sourceTree = "<group>"; };
 		3726713D1779F75000D61680 /* libARNetworkAL.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = libARNetworkAL.framework; path = ../../../../IOS_InstallDir/Frameworks/libARNetworkAL.framework; sourceTree = "<group>"; };
 		3726713E1779F75000D61680 /* libARSAL.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = libARSAL.framework; path = ../../../../IOS_InstallDir/Frameworks/libARSAL.framework; sourceTree = "<group>"; };
@@ -141,6 +147,10 @@
 		379378C2176B5A0C00AD5C9D /* ARVideoTB */ = {
 			isa = PBXGroup;
 			children = (
+				371BD369178D9D1B004D22A3 /* ARVIDEO_TCPSender.c */,
+				371BD36A178D9D1B004D22A3 /* ARVIDEO_TCPSender.h */,
+				371BD363178D9D0F004D22A3 /* ARVIDEO_TCPReader.c */,
+				371BD364178D9D0F004D22A3 /* ARVIDEO_TCPReader.h */,
 				379378F6176B5CD300AD5C9D /* ARVIDEO_MP4Sender_TestBench.c */,
 				379378F7176B5CD300AD5C9D /* ARVIDEO_MP4Sender_TestBench.h */,
 				379378F3176B5C3600AD5C9D /* ARVIDEO_Sender_TestBench.c */,
@@ -279,6 +289,8 @@
 				379378F5176B5C3600AD5C9D /* ARVIDEO_Sender_TestBench.c in Sources */,
 				379378F8176B5CD300AD5C9D /* ARVIDEO_MP4Sender_TestBench.c in Sources */,
 				3782C4BD178BFE0200B73166 /* ARVLogger.m in Sources */,
+				371BD365178D9D0F004D22A3 /* ARVIDEO_TCPReader.c in Sources */,
+				371BD36B178D9D1B004D22A3 /* ARVIDEO_TCPSender.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
