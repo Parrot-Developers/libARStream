@@ -79,6 +79,7 @@ struct ARVIDEO_Sender_t {
     int ackBufferID;
     ARVIDEO_Sender_FrameUpdateCallback_t callback;
     uint32_t maxNumberOfNextFrames;
+    void *custom;
 
     /* Current frame storage */
     ARVIDEO_Sender_Frame_t currentFrame;
@@ -168,7 +169,7 @@ static void ARVIDEO_Sender_FlushQueue (ARVIDEO_Sender_t *sender)
     while (sender->numberOfWaitingFrames > 0)
     {
         ARVIDEO_Sender_Frame_t *nextFrame = &(sender->nextFrames [sender->indexGetNextFrame]);
-        sender->callback (ARVIDEO_SENDER_STATUS_FRAME_CANCEL, nextFrame->frameBuffer, nextFrame->frameSize);
+        sender->callback (ARVIDEO_SENDER_STATUS_FRAME_CANCEL, nextFrame->frameBuffer, nextFrame->frameSize, sender->custom);
         sender->indexGetNextFrame++;
         sender->indexGetNextFrame %= sender->maxNumberOfNextFrames;
         sender->numberOfWaitingFrames--;
@@ -345,7 +346,7 @@ void ARVIDEO_Sender_InitVideoAckBuffer (ARNETWORK_IOBufferParam_t *bufferParams,
     ARVIDEO_Buffers_InitVideoAckBuffer (bufferParams, bufferID);
 }
 
-ARVIDEO_Sender_t* ARVIDEO_Sender_New (ARNETWORK_Manager_t *manager, int dataBufferID, int ackBufferID, ARVIDEO_Sender_FrameUpdateCallback_t callback, uint32_t framesBufferSize, eARVIDEO_ERROR *error)
+ARVIDEO_Sender_t* ARVIDEO_Sender_New (ARNETWORK_Manager_t *manager, int dataBufferID, int ackBufferID, ARVIDEO_Sender_FrameUpdateCallback_t callback, uint32_t framesBufferSize, void *custom, eARVIDEO_ERROR *error)
 {
     ARVIDEO_Sender_t *retSender = NULL;
     int packetsToSendMutexWasInit = 0;
@@ -376,6 +377,7 @@ ARVIDEO_Sender_t* ARVIDEO_Sender_New (ARNETWORK_Manager_t *manager, int dataBuff
         retSender->dataBufferID = dataBufferID;
         retSender->ackBufferID = ackBufferID;
         retSender->callback = callback;
+        retSender->custom = custom;
         retSender->maxNumberOfNextFrames = framesBufferSize;
     }
 
@@ -633,7 +635,7 @@ void* ARVIDEO_Sender_RunDataThread (void *ARVIDEO_Sender_t_Param)
 
                 ARNETWORK_Manager_FlushInputBuffer (sender->manager, sender->dataBufferID);
 
-                sender->callback (ARVIDEO_SENDER_STATUS_FRAME_CANCEL, sender->currentFrame.frameBuffer, sender->currentFrame.frameSize);
+                sender->callback (ARVIDEO_SENDER_STATUS_FRAME_CANCEL, sender->currentFrame.frameBuffer, sender->currentFrame.frameSize, sender->custom);
             }
             sender->currentFrameCbWasCalled = 0; // New frame
 
@@ -757,7 +759,7 @@ void* ARVIDEO_Sender_RunAckThread (void *ARVIDEO_Sender_t_Param)
                 if ((sender->currentFrameCbWasCalled == 0) &&
                     (ARVIDEO_NetworkHeaders_AckPacketAllFlagsSet (&(sender->ackPacket), sender->currentFrameNbFragments) == 1))
                 {
-                    sender->callback (ARVIDEO_SENDER_STATUS_FRAME_SENT, sender->currentFrame.frameBuffer, sender->currentFrame.frameSize);
+                    sender->callback (ARVIDEO_SENDER_STATUS_FRAME_SENT, sender->currentFrame.frameBuffer, sender->currentFrame.frameSize, sender->custom);
                     sender->currentFrameCbWasCalled = 1;
                     ARSAL_Mutex_Lock (&(sender->nextFrameMutex));
                     ARSAL_Cond_Signal (&(sender->nextFrameCond));

@@ -43,9 +43,10 @@ typedef enum {
  * @param[in] status Why the call was made
  * @param[in] framePointer Pointer to the frame which was sent/cancelled
  * @param[in] frameSize Size, in bytes, of the frame
+ * @param[in] custom Custom pointer passed during ARVIDEO_Sender_New
  * @see eARVIDEO_SENDER_STATUS
  */
-typedef void (*ARVIDEO_Sender_FrameUpdateCallback_t)(eARVIDEO_SENDER_STATUS status, uint8_t *framePointer, uint32_t frameSize);
+typedef void (*ARVIDEO_Sender_FrameUpdateCallback_t)(eARVIDEO_SENDER_STATUS status, uint8_t *framePointer, uint32_t frameSize, void *custom);
 
 /**
  * @brief An ARVIDEO_Sender_t instance allow sending video frames over a network
@@ -79,6 +80,7 @@ void ARVIDEO_Sender_InitVideoAckBuffer (ARNETWORK_IOBufferParam_t *bufferParams,
  * @param[in] ackBufferID ID of a VideoAckBuffer available within the manager
  * @param[in] callback The status update callback which will be called every time the status of a send-frame is updated
  * @param[in] framesBufferSize Number of frames that the ARVIDEO_Sender_t instance will be able to hold in queue
+ * @param[in] custom Custom pointer which will be passed to callback
  * @param[out] error Optionnal pointer to an eARVIDEO_ERROR to hold any error information
  * @return A pointer to the new ARVIDEO_Sender_t, or NULL if an error occured
  *
@@ -89,7 +91,7 @@ void ARVIDEO_Sender_InitVideoAckBuffer (ARNETWORK_IOBufferParam_t *bufferParams,
  * @see ARVIDEO_Sender_StopSender()
  * @see ARVIDEO_Sender_Delete()
  */
-ARVIDEO_Sender_t* ARVIDEO_Sender_New (ARNETWORK_Manager_t *manager, int dataBufferID, int ackBufferID, ARVIDEO_Sender_FrameUpdateCallback_t callback, uint32_t framesBufferSize, eARVIDEO_ERROR *error);
+ARVIDEO_Sender_t* ARVIDEO_Sender_New (ARNETWORK_Manager_t *manager, int dataBufferID, int ackBufferID, ARVIDEO_Sender_FrameUpdateCallback_t callback, uint32_t framesBufferSize, void *custom, eARVIDEO_ERROR *error);
 
 /**
  * @brief Stops a running ARVIDEO_Sender_t

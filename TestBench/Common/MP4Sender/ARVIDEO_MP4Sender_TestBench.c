@@ -98,7 +98,7 @@ void ARVIDEO_MP4SenderTb_initMultiBuffers (int maxsize);
 /**
  * @see ARVIDEO_Sender.h
  */
-void ARVIDEO_MP4SenderTb_FrameUpdateCallback (eARVIDEO_SENDER_STATUS status, uint8_t *framePointer, uint32_t frameSize);
+void ARVIDEO_MP4SenderTb_FrameUpdateCallback (eARVIDEO_SENDER_STATUS status, uint8_t *framePointer, uint32_t frameSize, void *custom);
 
 /**
  * @brief Gets a free buffer pointer
@@ -177,8 +177,9 @@ void ARVIDEO_MP4SenderTb_initMultiBuffers (int maxsize)
     }
 }
 
-void ARVIDEO_MP4SenderTb_FrameUpdateCallback (eARVIDEO_SENDER_STATUS status, uint8_t *framePointer, uint32_t frameSize)
+void ARVIDEO_MP4SenderTb_FrameUpdateCallback (eARVIDEO_SENDER_STATUS status, uint8_t *framePointer, uint32_t frameSize, void *custom)
 {
+    custom = custom;
     switch (status)
     {
     case ARVIDEO_SENDER_STATUS_FRAME_SENT:
@@ -286,7 +287,7 @@ int ARVIDEO_MP4SenderTb_StartVideoTest (const char *fpath, ARNETWORK_Manager_t *
     eARVIDEO_ERROR err;
     ARVIDEO_Sender_t *sender;
     ARVIDEO_MP4SenderTb_initMultiBuffers (ARVIDEO_MP4SenderTb_OpenVideoFile (fpath));
-    sender = ARVIDEO_Sender_New (manager, DATA_BUFFER_ID, ACK_BUFFER_ID, ARVIDEO_MP4SenderTb_FrameUpdateCallback, NB_BUFFERS, &err);
+    sender = ARVIDEO_Sender_New (manager, DATA_BUFFER_ID, ACK_BUFFER_ID, ARVIDEO_MP4SenderTb_FrameUpdateCallback, NB_BUFFERS, NULL, &err);
     if (sender == NULL)
     {
         ARSAL_PRINT (ARSAL_PRINT_ERROR, __TAG__, "Error during ARVIDEO_Sender_New call : %s", ARVIDEO_Error_ToString(err));

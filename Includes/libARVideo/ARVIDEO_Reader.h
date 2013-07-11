@@ -46,6 +46,7 @@ typedef enum {
  * @param[in] frameSize Used size in framePointer buffer
  * @param[in] numberOfSkippedFrames Number of frames which were skipped between the previous call and this one. (Usually 0)
  * @param[out] newBufferCapacity Capacity of the next buffer to use
+ * @param[in] custom Custom pointer passed during ARVIDEO_Reader_New
  *
  * @return address of a new buffer which will hold the next frame
  *
@@ -55,7 +56,7 @@ typedef enum {
  *
  * @warning If the cause is ARVIDEO_READER_CAUSE_FRAME_TOO_SMALL, returning a buffer shorter than 'frameSize' will cause the library to skip the current frame
  */
-typedef uint8_t* (*ARVIDEO_Reader_FrameCompleteCallback_t) (eARVIDEO_READER_CAUSE cause, uint8_t *framePointer, uint32_t frameSize, int numberOfSkippedFrames, uint32_t *newBufferCapacity);
+typedef uint8_t* (*ARVIDEO_Reader_FrameCompleteCallback_t) (eARVIDEO_READER_CAUSE cause, uint8_t *framePointer, uint32_t frameSize, int numberOfSkippedFrames, uint32_t *newBufferCapacity, void *custom);
 
 /**
  * @brief An ARVIDEO_Reader_t instance allow reading video frames from a network
@@ -90,6 +91,7 @@ void ARVIDEO_Reader_InitVideoAckBuffer (ARNETWORK_IOBufferParam_t *bufferParams,
  * @param[in] callback The callback which will be called every time a new frame is available
  * @param[in] frameBuffer The adress of the first frameBuffer to use
  * @param[in] frameBufferSize The length of the frameBuffer (to avoid overflow)
+ * @param[in] custom Custom pointer which will be passed to callback
  * @param[out] error Optionnal pointer to an eARVIDEO_ERROR to hold any error information
  * @return A pointer to the new ARVIDEO_Reader_t, or NULL if an error occured
  * @see ARVIDEO_Reader_InitVideoDataBuffer()
@@ -97,7 +99,7 @@ void ARVIDEO_Reader_InitVideoAckBuffer (ARNETWORK_IOBufferParam_t *bufferParams,
  * @see ARVIDEO_Reader_StopReader()
  * @see ARVIDEO_Reader_Delete()
  */
-ARVIDEO_Reader_t* ARVIDEO_Reader_New (ARNETWORK_Manager_t *manager, int dataBufferID, int ackBufferID, ARVIDEO_Reader_FrameCompleteCallback_t callback, uint8_t *frameBuffer, uint32_t frameBufferSize, eARVIDEO_ERROR *error);
+ARVIDEO_Reader_t* ARVIDEO_Reader_New (ARNETWORK_Manager_t *manager, int dataBufferID, int ackBufferID, ARVIDEO_Reader_FrameCompleteCallback_t callback, uint8_t *frameBuffer, uint32_t frameBufferSize, void *custom, eARVIDEO_ERROR *error);
 
 /**
  * @brief Stops a running ARVIDEO_Reader_t

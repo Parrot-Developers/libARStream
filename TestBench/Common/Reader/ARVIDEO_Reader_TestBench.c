@@ -103,7 +103,7 @@ void reallocBuffer (int id, int newSize);
 /**
  * @see ARVIDEO_Reader.h
  */
-uint8_t* ARVIDEO_ReaderTb_FrameCompleteCallback (eARVIDEO_READER_CAUSE cause, uint8_t *framePointer, uint32_t frameSize, int numberOfSkippedFrames, uint32_t *newBufferCapacity);
+uint8_t* ARVIDEO_ReaderTb_FrameCompleteCallback (eARVIDEO_READER_CAUSE cause, uint8_t *framePointer, uint32_t frameSize, int numberOfSkippedFrames, uint32_t *newBufferCapacity, void *custom);
 
 /**
  * @brief Gets a free buffer pointer
@@ -153,11 +153,12 @@ void reallocBuffer (int id, int newSize)
     multiBufferSize [id] = newSize;
 }
 
-uint8_t* ARVIDEO_ReaderTb_FrameCompleteCallback (eARVIDEO_READER_CAUSE cause, uint8_t *framePointer, uint32_t frameSize, int numberOfSkippedFrames, uint32_t *newBufferCapacity)
+uint8_t* ARVIDEO_ReaderTb_FrameCompleteCallback (eARVIDEO_READER_CAUSE cause, uint8_t *framePointer, uint32_t frameSize, int numberOfSkippedFrames, uint32_t *newBufferCapacity, void *buffer)
 {
     uint8_t *retVal = NULL;
     struct timeval now;
     int dt;
+    buffer = buffer;
     switch (cause)
     {
     case ARVIDEO_READER_CAUSE_FRAME_COMPLETE:
@@ -265,7 +266,7 @@ int ARVIDEO_ReaderTb_StartVideoTest (ARNETWORK_Manager_t *manager, const char *o
     ARVIDEO_ReaderTb_initMultiBuffers (FRAME_MAX_SIZE);
     ARSAL_Sem_Init (&closeSem, 0, 0);
     firstFrame = ARVIDEO_ReaderTb_GetNextFreeBuffer (&firstFrameSize, 0);
-    g_Reader = ARVIDEO_Reader_New (manager, DATA_BUFFER_ID, ACK_BUFFER_ID, ARVIDEO_ReaderTb_FrameCompleteCallback, firstFrame, firstFrameSize, &err);
+    g_Reader = ARVIDEO_Reader_New (manager, DATA_BUFFER_ID, ACK_BUFFER_ID, ARVIDEO_ReaderTb_FrameCompleteCallback, firstFrame, firstFrameSize, NULL, &err);
     if (g_Reader == NULL)
     {
         ARSAL_PRINT (ARSAL_PRINT_ERROR, __TAG__, "Error during ARVIDEO_Reader_New call : %s", ARVIDEO_Error_ToString(err));

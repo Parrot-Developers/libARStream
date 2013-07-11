@@ -63,6 +63,7 @@ struct ARVIDEO_Reader_t {
     int dataBufferID;
     int ackBufferID;
     ARVIDEO_Reader_FrameCompleteCallback_t callback;
+    void *custom;
 
     /* Current frame storage */
     uint32_t currentFrameBufferSize; // Usable length of the buffer
@@ -131,7 +132,7 @@ void ARVIDEO_Reader_InitVideoAckBuffer (ARNETWORK_IOBufferParam_t *bufferParams,
     ARVIDEO_Buffers_InitVideoAckBuffer (bufferParams, bufferID);
 }
 
-ARVIDEO_Reader_t* ARVIDEO_Reader_New (ARNETWORK_Manager_t *manager, int dataBufferID, int ackBufferID, ARVIDEO_Reader_FrameCompleteCallback_t callback, uint8_t *frameBuffer, uint32_t frameBufferSize, eARVIDEO_ERROR *error)
+ARVIDEO_Reader_t* ARVIDEO_Reader_New (ARNETWORK_Manager_t *manager, int dataBufferID, int ackBufferID, ARVIDEO_Reader_FrameCompleteCallback_t callback, uint8_t *frameBuffer, uint32_t frameBufferSize, void *custom, eARVIDEO_ERROR *error)
 {
     ARVIDEO_Reader_t *retReader = NULL;
     int ackPacketMutexWasInit = 0;
@@ -162,6 +163,7 @@ ARVIDEO_Reader_t* ARVIDEO_Reader_New (ARNETWORK_Manager_t *manager, int dataBuff
         retReader->dataBufferID = dataBufferID;
         retReader->ackBufferID = ackBufferID;
         retReader->callback = callback;
+        retReader->custom = custom;
         retReader->currentFrameBufferSize = frameBufferSize;
         retReader->currentFrameBuffer = frameBuffer;
     }
@@ -361,7 +363,7 @@ void* ARVIDEO_Reader_RunDataThread (void *ARVIDEO_Reader_t_Param)
             {
                 uint32_t nextFrameBufferSize = 0;
                 uint32_t dummy;
-                uint8_t *nextFrameBuffer = reader->callback (ARVIDEO_READER_CAUSE_FRAME_TOO_SMALL, reader->currentFrameBuffer, reader->currentFrameSize, 0, &nextFrameBufferSize);
+                uint8_t *nextFrameBuffer = reader->callback (ARVIDEO_READER_CAUSE_FRAME_TOO_SMALL, reader->currentFrameBuffer, reader->currentFrameSize, 0, &nextFrameBufferSize, reader->custom);
                 if (nextFrameBufferSize >= reader->currentFrameSize)
                 {
                     memcpy (nextFrameBuffer, reader->currentFrameBuffer, reader->currentFrameSize);
@@ -371,7 +373,7 @@ void* ARVIDEO_Reader_RunDataThread (void *ARVIDEO_Reader_t_Param)
                     skipCurrentFrame = 1;
                 }
                 //TODO: Add "SKIP_FRAME"
-                reader->callback (ARVIDEO_READER_CAUSE_COPY_COMPLETE, reader->currentFrameBuffer, reader->currentFrameSize, 0, &dummy);
+                reader->callback (ARVIDEO_READER_CAUSE_COPY_COMPLETE, reader->currentFrameBuffer, reader->currentFrameSize, 0, &dummy, reader->custom);
                 reader->currentFrameBuffer = nextFrameBuffer;
                 reader->currentFrameBufferSize = nextFrameBufferSize;
             }
@@ -401,7 +403,7 @@ void* ARVIDEO_Reader_RunDataThread (void *ARVIDEO_Reader_t_Param)
                             ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARVIDEO_READER_TAG, "Missed %d frames !", nbMissedFrame);
                         }
                         previousFNum = header->frameNumber;
-                        reader->currentFrameBuffer = reader->callback (ARVIDEO_READER_CAUSE_FRAME_COMPLETE, reader->currentFrameBuffer, reader->currentFrameSize, nbMissedFrame, &(reader->currentFrameBufferSize));
+                        reader->currentFrameBuffer = reader->callback (ARVIDEO_READER_CAUSE_FRAME_COMPLETE, reader->currentFrameBuffer, reader->currentFrameSize, nbMissedFrame, &(reader->currentFrameBufferSize), reader->custom);
                     }
                 }
                 ARSAL_Mutex_Unlock (&(reader->ackPacketMutex));
@@ -411,7 +413,7 @@ void* ARVIDEO_Reader_RunDataThread (void *ARVIDEO_Reader_t_Param)
 
     free (recvData);
 
-    reader->callback (ARVIDEO_READER_CAUSE_CANCEL, reader->currentFrameBuffer, reader->currentFrameSize, 0, &(reader->currentFrameBufferSize));
+    reader->callback (ARVIDEO_READER_CAUSE_CANCEL, reader->currentFrameBuffer, reader->currentFrameSize, 0, &(reader->currentFrameBufferSize), reader->custom);
 
     ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARVIDEO_READER_TAG, "Video reader thread ended");
     reader->dataThreadStarted = 0;
