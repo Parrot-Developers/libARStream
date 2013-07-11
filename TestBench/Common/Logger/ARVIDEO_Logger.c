@@ -33,7 +33,7 @@ ARVIDEO_Logger_t* ARVIDEO_Logger_New (const char *basePath, int useDate)
         struct tm *nowtm;
         time_t now = time (NULL);
         nowtm = localtime (&now);
-        snprintf (retLogger->date, ARVIDEO_LOGGER_STRLEN, ARVIDEO_LOGGER_DATE_FORMAT, nowtm->tm_year, nowtm->tm_mon, nowtm->tm_mday, nowtm->tm_hour, nowtm->tm_min, nowtm->tm_sec);
+        snprintf (retLogger->date, ARVIDEO_LOGGER_STRLEN, ARVIDEO_LOGGER_DATE_FORMAT, nowtm->tm_year+1900, nowtm->tm_mon+1, nowtm->tm_mday, nowtm->tm_hour, nowtm->tm_min, nowtm->tm_sec);
     }
     snprintf (retLogger->filename, ARVIDEO_LOGGER_STRLEN, "./%s%s.log", basePath, retLogger->date);
 
