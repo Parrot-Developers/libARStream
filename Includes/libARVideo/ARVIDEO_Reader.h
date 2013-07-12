@@ -44,6 +44,7 @@ typedef enum {
  * @param[in] cause Describes why this callback was called
  * @param[in] framePointer Pointer to the frame buffer which was received
  * @param[in] frameSize Used size in framePointer buffer
+ * @param[in] isFlushFrame Boolean-like (0-1) flag telling if the complete frame was a flush frame (typically an I-Frame) for the sender
  * @param[in] numberOfSkippedFrames Number of frames which were skipped between the previous call and this one. (Usually 0)
  * @param[out] newBufferCapacity Capacity of the next buffer to use
  * @param[in] custom Custom pointer passed during ARVIDEO_Reader_New
@@ -56,7 +57,7 @@ typedef enum {
  *
  * @warning If the cause is ARVIDEO_READER_CAUSE_FRAME_TOO_SMALL, returning a buffer shorter than 'frameSize' will cause the library to skip the current frame
  */
-typedef uint8_t* (*ARVIDEO_Reader_FrameCompleteCallback_t) (eARVIDEO_READER_CAUSE cause, uint8_t *framePointer, uint32_t frameSize, int numberOfSkippedFrames, uint32_t *newBufferCapacity, void *custom);
+typedef uint8_t* (*ARVIDEO_Reader_FrameCompleteCallback_t) (eARVIDEO_READER_CAUSE cause, uint8_t *framePointer, uint32_t frameSize, int isFlushFrame, int numberOfSkippedFrames, uint32_t *newBufferCapacity, void *custom);
 
 /**
  * @brief An ARVIDEO_Reader_t instance allow reading video frames from a network

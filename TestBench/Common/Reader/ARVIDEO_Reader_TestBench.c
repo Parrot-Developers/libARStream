@@ -103,7 +103,7 @@ void reallocBuffer (int id, int newSize);
 /**
  * @see ARVIDEO_Reader.h
  */
-uint8_t* ARVIDEO_ReaderTb_FrameCompleteCallback (eARVIDEO_READER_CAUSE cause, uint8_t *framePointer, uint32_t frameSize, int numberOfSkippedFrames, uint32_t *newBufferCapacity, void *custom);
+uint8_t* ARVIDEO_ReaderTb_FrameCompleteCallback (eARVIDEO_READER_CAUSE cause, uint8_t *framePointer, uint32_t frameSize, int numberOfSkippedFrames, int isFlushFrame, uint32_t *newBufferCapacity, void *custom);
 
 /**
  * @brief Gets a free buffer pointer
@@ -153,7 +153,7 @@ void reallocBuffer (int id, int newSize)
     multiBufferSize [id] = newSize;
 }
 
-uint8_t* ARVIDEO_ReaderTb_FrameCompleteCallback (eARVIDEO_READER_CAUSE cause, uint8_t *framePointer, uint32_t frameSize, int numberOfSkippedFrames, uint32_t *newBufferCapacity, void *buffer)
+uint8_t* ARVIDEO_ReaderTb_FrameCompleteCallback (eARVIDEO_READER_CAUSE cause, uint8_t *framePointer, uint32_t frameSize, int numberOfSkippedFrames, int isFlushFrame, uint32_t *newBufferCapacity, void *buffer)
 {
     uint8_t *retVal = NULL;
     struct timeval now;
@@ -162,7 +162,8 @@ uint8_t* ARVIDEO_ReaderTb_FrameCompleteCallback (eARVIDEO_READER_CAUSE cause, ui
     switch (cause)
     {
     case ARVIDEO_READER_CAUSE_FRAME_COMPLETE:
-        ARSAL_PRINT (ARSAL_PRINT_WARNING, __TAG__, "Got a complete frame of size %d, at address %p", frameSize, framePointer);
+        ARSAL_PRINT (ARSAL_PRINT_WARNING, __TAG__, "Got a complete frame of size %d, at address %p (isFlush : %d)", frameSize, framePointer, isFlushFrame);
+        if (isFlushFrame != 0)
         nbRead++;
         if (numberOfSkippedFrames != 0)
         {

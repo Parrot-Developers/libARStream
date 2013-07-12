@@ -148,7 +148,7 @@ void ARVIDEO_NetworkHeaders_AckPacketDump (const char *prefix, ARVIDEO_NetworkHe
     }
     else
     {
-        ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARVIDEO_NETWORK_HEADERS_TAG, " - Frame number : %d", packet->numFrame);
+        ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARVIDEO_NETWORK_HEADERS_TAG, " - Frame number : %d", packet->frameNumber);
         ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARVIDEO_NETWORK_HEADERS_TAG, " - HI 64 bits : %016llX", packet->highPacketsAck);
         ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARVIDEO_NETWORK_HEADERS_TAG, " - LO 64 bits : %016llX", packet->lowPacketsAck);
     }

@@ -276,6 +276,7 @@ static int ARVIDEO_Sender_PopFromQueue (ARVIDEO_Sender_t *sender, ARVIDEO_Sender
         newFrame->frameNumber = frame->frameNumber;
         newFrame->frameBuffer = frame->frameBuffer;
         newFrame->frameSize   = frame->frameSize;
+        newFrame->isHighPriority = frame->isHighPriority;
     }
     ARSAL_Mutex_Unlock (&(sender->nextFrameMutex));
     return retVal;
@@ -306,7 +307,7 @@ eARNETWORK_MANAGER_CALLBACK_RETURN ARVIDEO_Sender_NetworkCallback (int IoBufferI
     case ARNETWORK_MANAGER_CALLBACK_STATUS_SENT:
         ARSAL_Mutex_Lock (&(sender->packetsToSendMutex));
         // Modify packetsToSend only if it refers to the frame we're sending
-        if (frameNumber == sender->packetsToSend.numFrame)
+        if (frameNumber == sender->packetsToSend.frameNumber)
         {
             ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARVIDEO_SENDER_TAG, "Sent packet %d", packetIndex);
             if (1 == ARVIDEO_NetworkHeaders_AckPacketUnsetFlag (&(sender->packetsToSend), packetIndex))
@@ -316,7 +317,7 @@ eARNETWORK_MANAGER_CALLBACK_RETURN ARVIDEO_Sender_NetworkCallback (int IoBufferI
         }
         else
         {
-            ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARVIDEO_SENDER_TAG, "Sent a packet for an old frame [packet %d, current frame %d]", frameNumber,sender->packetsToSend.numFrame);
+            ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARVIDEO_SENDER_TAG, "Sent a packet for an old frame [packet %d, current frame %d]", frameNumber,sender->packetsToSend.frameNumber);
         }
         ARSAL_Mutex_Unlock (&(sender->packetsToSendMutex));
         /* Free cbParams */
@@ -643,20 +644,23 @@ void* ARVIDEO_Sender_RunDataThread (void *ARVIDEO_Sender_t_Param)
             sender->currentFrame.frameNumber = nextFrame.frameNumber;
             sender->currentFrame.frameBuffer = nextFrame.frameBuffer;
             sender->currentFrame.frameSize   = nextFrame.frameSize;
+            sender->currentFrame.isHighPriority = nextFrame.isHighPriority;
             sendSize = nextFrame.frameSize;
 
             /* Reset ack packet - No packets are ack on the new frame */
-            sender->ackPacket.numFrame = sender->currentFrame.frameNumber;
+            sender->ackPacket.frameNumber = sender->currentFrame.frameNumber;
             ARVIDEO_NetworkHeaders_AckPacketReset (&(sender->ackPacket));
 
             /* Reset packetsToSend - update frame number */
             ARSAL_Mutex_Lock (&(sender->packetsToSendMutex));
-            sender->packetsToSend.numFrame = sender->currentFrame.frameNumber;
+            sender->packetsToSend.frameNumber = sender->currentFrame.frameNumber;
             ARVIDEO_NetworkHeaders_AckPacketReset (&(sender->packetsToSend));
             ARSAL_Mutex_Unlock (&(sender->packetsToSendMutex));
 
             /* Update video data header with the new frame number */
             header->frameNumber = sender->currentFrame.frameNumber;
+            header->frameFlags = 0;
+            header->frameFlags |= (sender->currentFrame.isHighPriority != 0) ? ARVIDEO_NETWORK_HEADERS_FLAG_FLUSH_FRAME : 0;
 
             /* Compute number of fragments / size of the last fragment */
             if (0 < sendSize)
@@ -701,7 +705,7 @@ void* ARVIDEO_Sender_RunDataThread (void *ARVIDEO_Sender_t_Param)
                 ARVIDEO_Sender_NetworkCallbackParam_t *cbParams = malloc (sizeof (ARVIDEO_Sender_NetworkCallbackParam_t));
                 cbParams->sender = sender;
                 cbParams->fragmentIndex = cnt;
-                cbParams->frameNumber = sender->packetsToSend.numFrame;
+                cbParams->frameNumber = sender->packetsToSend.frameNumber;
                 ARSAL_Mutex_Unlock (&(sender->packetsToSendMutex));
                 ARNETWORK_Manager_SendData (sender->manager, sender->dataBufferID, sendFragment, currFragmentSize + sizeof (ARVIDEO_NetworkHeaders_DataHeader_t), (void *)cbParams, ARVIDEO_Sender_NetworkCallback, 1);
                 ARSAL_Mutex_Lock (&(sender->packetsToSendMutex));
@@ -747,13 +751,13 @@ void* ARVIDEO_Sender_RunAckThread (void *ARVIDEO_Sender_t_Param)
         else
         {
             /* Switch recvPacket endianness */
-            recvPacket.numFrame = dtohs (recvPacket.numFrame);
+            recvPacket.frameNumber = dtohs (recvPacket.frameNumber);
             recvPacket.highPacketsAck = dtohll (recvPacket.highPacketsAck);
             recvPacket.lowPacketsAck = dtohll (recvPacket.lowPacketsAck);
 
             /* Apply recvPacket to sender->ackPacket if frame numbers are the same */
             ARSAL_Mutex_Lock (&(sender->ackMutex));
-            if (sender->ackPacket.numFrame == recvPacket.numFrame)
+            if (sender->ackPacket.frameNumber == recvPacket.frameNumber)
             {
                 ARVIDEO_NetworkHeaders_AckPacketSetFlags (&(sender->ackPacket), &recvPacket);
                 if ((sender->currentFrameCbWasCalled == 0) &&
@@ -790,7 +794,7 @@ float ARVIDEO_Sender_GetEstimatedEfficiency (ARVIDEO_Sender_t *sender)
     ARSAL_Mutex_Unlock (&(sender->ackMutex));
     if (sentPackets == 0)
     {
-         retVal = 1.0f; // We didn't send any packet yet, so wa have a 100% success !
+         retVal = 1.0f; // We didn't send any packet yet, so we have a 100% success !
     }
     else if (totalPackets > sentPackets)
     {

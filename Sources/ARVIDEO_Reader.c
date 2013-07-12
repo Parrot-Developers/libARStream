@@ -328,7 +328,7 @@ void* ARVIDEO_Reader_RunDataThread (void *ARVIDEO_Reader_t_Param)
         {
             int cpIndex, cpSize, endIndex;
             ARSAL_Mutex_Lock (&(reader->ackPacketMutex));
-            if (header->frameNumber != reader->ackPacket.numFrame)
+            if (header->frameNumber != reader->ackPacket.frameNumber)
             {
                 reader->efficiency_index ++;
                 reader->efficiency_index %= ARVIDEO_READER_EFFICIENCY_AVERAGE_NB_FRAMES;
@@ -336,7 +336,7 @@ void* ARVIDEO_Reader_RunDataThread (void *ARVIDEO_Reader_t_Param)
                 reader->efficiency_nbUseful [reader->efficiency_index] = 0;
                 skipCurrentFrame = 0;
                 reader->currentFrameSize = 0;
-                reader->ackPacket.numFrame = header->frameNumber;
+                reader->ackPacket.frameNumber = header->frameNumber;
                 ARVIDEO_NetworkHeaders_AckPacketReset (&(reader->ackPacket));
             }
             packetWasAlreadyAck = ARVIDEO_NetworkHeaders_AckPacketFlagIsSet (&(reader->ackPacket), header->fragmentNumber);
@@ -363,7 +363,7 @@ void* ARVIDEO_Reader_RunDataThread (void *ARVIDEO_Reader_t_Param)
             {
                 uint32_t nextFrameBufferSize = 0;
                 uint32_t dummy;
-                uint8_t *nextFrameBuffer = reader->callback (ARVIDEO_READER_CAUSE_FRAME_TOO_SMALL, reader->currentFrameBuffer, reader->currentFrameSize, 0, &nextFrameBufferSize, reader->custom);
+                uint8_t *nextFrameBuffer = reader->callback (ARVIDEO_READER_CAUSE_FRAME_TOO_SMALL, reader->currentFrameBuffer, reader->currentFrameSize, 0, 0, &nextFrameBufferSize, reader->custom);
                 if (nextFrameBufferSize >= reader->currentFrameSize)
                 {
                     memcpy (nextFrameBuffer, reader->currentFrameBuffer, reader->currentFrameSize);
@@ -373,7 +373,7 @@ void* ARVIDEO_Reader_RunDataThread (void *ARVIDEO_Reader_t_Param)
                     skipCurrentFrame = 1;
                 }
                 //TODO: Add "SKIP_FRAME"
-                reader->callback (ARVIDEO_READER_CAUSE_COPY_COMPLETE, reader->currentFrameBuffer, reader->currentFrameSize, 0, &dummy, reader->custom);
+                reader->callback (ARVIDEO_READER_CAUSE_COPY_COMPLETE, reader->currentFrameBuffer, reader->currentFrameSize, 0, 0, &dummy, reader->custom);
                 reader->currentFrameBuffer = nextFrameBuffer;
                 reader->currentFrameBufferSize = nextFrameBufferSize;
             }
@@ -396,6 +396,8 @@ void* ARVIDEO_Reader_RunDataThread (void *ARVIDEO_Reader_t_Param)
                     if (header->frameNumber != previousFNum)
                     {
                         int nbMissedFrame = 0;
+                        ARSAL_PRINT (ARSAL_PRINT_WARNING, ARVIDEO_READER_TAG, "Header flags : 0x%02x", header->frameFlags);
+                        int isFlushFrame = ((header->frameFlags & ARVIDEO_NETWORK_HEADERS_FLAG_FLUSH_FRAME) != 0) ? 1 : 0;
                         ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARVIDEO_READER_TAG, "Ack all in frame %d", header->frameNumber);
                         if (header->frameNumber != previousFNum + 1)
                         {
@@ -403,7 +405,7 @@ void* ARVIDEO_Reader_RunDataThread (void *ARVIDEO_Reader_t_Param)
                             ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARVIDEO_READER_TAG, "Missed %d frames !", nbMissedFrame);
                         }
                         previousFNum = header->frameNumber;
-                        reader->currentFrameBuffer = reader->callback (ARVIDEO_READER_CAUSE_FRAME_COMPLETE, reader->currentFrameBuffer, reader->currentFrameSize, nbMissedFrame, &(reader->currentFrameBufferSize), reader->custom);
+                        reader->currentFrameBuffer = reader->callback (ARVIDEO_READER_CAUSE_FRAME_COMPLETE, reader->currentFrameBuffer, reader->currentFrameSize, nbMissedFrame, isFlushFrame, &(reader->currentFrameBufferSize), reader->custom);
                     }
                 }
                 ARSAL_Mutex_Unlock (&(reader->ackPacketMutex));
@@ -413,7 +415,7 @@ void* ARVIDEO_Reader_RunDataThread (void *ARVIDEO_Reader_t_Param)
 
     free (recvData);
 
-    reader->callback (ARVIDEO_READER_CAUSE_CANCEL, reader->currentFrameBuffer, reader->currentFrameSize, 0, &(reader->currentFrameBufferSize), reader->custom);
+    reader->callback (ARVIDEO_READER_CAUSE_CANCEL, reader->currentFrameBuffer, reader->currentFrameSize, 0, 0, &(reader->currentFrameBufferSize), reader->custom);
 
     ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARVIDEO_READER_TAG, "Video reader thread ended");
     reader->dataThreadStarted = 0;
@@ -434,7 +436,7 @@ void* ARVIDEO_Reader_RunAckThread (void *ARVIDEO_Reader_t_Param)
         ARSAL_Cond_Timedwait (&(reader->ackSendCond), &(reader->ackSendMutex), ARVIDEO_READER_MAX_TIME_BETWEEN_ACK_MS);
         ARSAL_Mutex_Unlock (&(reader->ackSendMutex));
         ARSAL_Mutex_Lock (&(reader->ackPacketMutex));
-        sendPacket.numFrame       = htods  (reader->ackPacket.numFrame);
+        sendPacket.frameNumber = htods  (reader->ackPacket.frameNumber);
         sendPacket.highPacketsAck = htodll (reader->ackPacket.highPacketsAck);
         sendPacket.lowPacketsAck  = htodll (reader->ackPacket.lowPacketsAck);
         ARSAL_Mutex_Unlock (&(reader->ackPacketMutex));

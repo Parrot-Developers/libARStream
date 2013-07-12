@@ -30,6 +30,8 @@
 #define ARVIDEO_NETWORK_HEADERS_FRAGMENT_SIZE (1000)
 #define ARVIDEO_NETWORK_HEADERS_MAX_FRAME_SIZE (ARVIDEO_NETWORK_HEADERS_FRAGMENT_SIZE * ARVIDEO_NETWORK_HEADERS_MAX_FRAGMENTS_PER_FRAME)
 
+#define ARVIDEO_NETWORK_HEADERS_FLAG_FLUSH_FRAME (1)
+
 /*
  * Types
  */
@@ -38,10 +40,23 @@
  * @brief Header for video data frames
  */
 typedef struct {
-    uint16_t frameNumber; /**< Current frame number */
+    uint16_t frameNumber; /**< id of the current frame */
+    uint8_t frameFlags; /**< Infos on the current frame */
     uint8_t fragmentNumber; /**< Index of the current fragment in current frame */
     uint8_t fragmentsPerFrame; /**< Number of fragments un current frame */
 } __attribute__ ((packed)) ARVIDEO_NetworkHeaders_DataHeader_t;
+
+/* frameFlags structure :
+ *  x x x x x x x x
+ *  | | | | | | | \-> FLUSH FRAME
+ *  | | | | | | \-> UNUSED
+ *  | | | | | \-> UNUSED
+ *  | | | | \-> UNUSED
+ *  | | | \-> UNUSED
+ *  | | \-> UNUSED
+ *  | \-> UNUSED
+ *  \-> UNUSED
+ */
 
 /**
  * @brief Content of video ack frames
@@ -54,7 +69,7 @@ typedef struct {
  * In this case, a 1 bit denotes that the packet must be sent
  */
 typedef struct {
-    uint16_t numFrame; /**< Frame number on which the ack packet refers */
+    uint16_t frameNumber; /**< id of the current frame */
     uint64_t highPacketsAck; /**< Upper 64 packets bitfield */
     uint64_t lowPacketsAck; /**< Lower 64 packets bitfield */
 } __attribute__ ((packed)) ARVIDEO_NetworkHeaders_AckPacket_t;
