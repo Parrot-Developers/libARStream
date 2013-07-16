@@ -34,10 +34,10 @@
 #define SENDING_PORT (54321)
 #define READING_PORT (43210)
 
-#define NB_BUFFERS (15)
-#define I_FRAME_EVERY_N (10)
+#define NB_BUFFERS (40)
+#define I_FRAME_EVERY_N (30)
 
-#define TEST_MODE (1)
+#define TEST_MODE (0)
 
 #if TEST_MODE
 # define TIME_BETWEEN_FRAMES_MS (1000)
@@ -142,11 +142,12 @@ int ARVIDEO_MP4SenderTb_OpenVideoFile (const char *path);
  * @brief Get the "next" frame from file
  * @param nextFrame buffer in which to store nextFrame
  * @param nextFrameSize size of the nextFrame buffer
+ * @param isIFrame pointer to an int which will hold this boolean-like flag
  * @return actual data size of the nextFrame
  *
  * @note After reading the last frame from the file, this function goes back to the beginning
  */
-uint32_t ARVIDEO_MP4SenderTb_GetNextFrame (uint8_t *nextFrame, int nextFrameSize);
+uint32_t ARVIDEO_MP4SenderTb_GetNextFrame (uint8_t *nextFrame, int nextFrameSize, int *isIFrame);
 
 /**
  * @brief seeks the global mp4File to the given atom
@@ -246,14 +247,14 @@ void* fileReaderThread (void *ARVIDEO_Sender_t_Param)
     ARSAL_PRINT (ARSAL_PRINT_WARNING, __TAG__, "Encoder thread running");
     while (stillRunning)
     {
+        int flush;
         nextFrameAddr = ARVIDEO_MP4SenderTb_GetNextFreeBuffer (&frameCapacity);
-        frameSize = ARVIDEO_MP4SenderTb_GetNextFrame (nextFrameAddr, frameCapacity);
+        frameSize = ARVIDEO_MP4SenderTb_GetNextFrame (nextFrameAddr, frameCapacity, &flush);
         cnt++;
 
         if (frameSize != 0)
         {
             int nbPrevious = 0;
-            int flush = ((cnt % I_FRAME_EVERY_N) == 1) ? 1 : 0;
             eARVIDEO_ERROR res = ARVIDEO_Sender_SendNewFrame (sender, nextFrameAddr, frameSize, flush, &nbPrevious);
             switch (res)
             {
@@ -419,10 +420,12 @@ int ARVIDEO_MP4SenderTb_OpenVideoFile (const char *path)
     return greatest;
 }
 
-uint32_t ARVIDEO_MP4SenderTb_GetNextFrame (uint8_t *nextFrame, int nextFrameSize)
+uint32_t ARVIDEO_MP4SenderTb_GetNextFrame (uint8_t *nextFrame, int nextFrameSize, int *isIFrame)
 {
     uint32_t nextSize = framesSizeArray [mp4CurrentFrame];
     uint32_t nextOffset = framesOffsetArray [mp4CurrentFrame];
+
+    *isIFrame = 0;
 
     if (nextSize <= nextFrameSize)
     {
@@ -440,6 +443,8 @@ uint32_t ARVIDEO_MP4SenderTb_GetNextFrame (uint8_t *nextFrame, int nextFrameSize
     {
         mp4CurrentFrame = 0;
     }
+
+    *isIFrame = ((mp4CurrentFrame % I_FRAME_EVERY_N) == 0) ? 1 : 0;
 
     return nextSize;
 }
@@ -553,7 +558,7 @@ int ARVIDEO_MP4Sender_TestBenchMain (int argc, char *argv[])
 
     char *ip = __IP;
 
-    if (argc > 3)
+    if (argc >= 3)
     {
         ip = argv[2];
     }
@@ -594,7 +599,7 @@ int ARVIDEO_MP4Sender_TestBenchMain (int argc, char *argv[])
     pthread_t netsend, netread;
     pthread_create (&netsend, NULL, ARNETWORK_Manager_SendingThreadRun, manager);
     pthread_create (&netread, NULL, ARNETWORK_Manager_ReceivingThreadRun, manager);
-    
+
     stillRunning = 1;
 
     retVal = ARVIDEO_MP4SenderTb_StartVideoTest (fpath, manager);
