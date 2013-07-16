@@ -486,6 +486,8 @@
                     [efficiencyData removeObjectAtIndex:0];
                 [efficiencyData addObject:[NSNumber numberWithFloat:0.0]];
                 
+                [logger log:[NSString stringWithFormat:@"%4d", dt]];
+                
                 [self refreshGraphs];
                 break;
             default:
