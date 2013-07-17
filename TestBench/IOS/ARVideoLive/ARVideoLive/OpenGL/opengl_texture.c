@@ -5,6 +5,9 @@
 //  Created by Frédéric D'Haeyer on 10/21/11.
 //  Copyright 2011 Parrot SA. All rights reserved.
 //
+
+#if USE_OPENGL
+
 #include "opengl_texture.h"
 #include <string.h>
 #include <stdio.h>
@@ -64,8 +67,9 @@ void opengl_texture_draw(ARDroneOpenGLTexture* texture, GLuint program)
 {
     static int textureId = 0;
     static int prev_num_picture_decoded = 0;
-    //if(texture->num_picture_decoded > prev_num_picture_decoded)
+    if(texture->num_picture_decoded > prev_num_picture_decoded)
     {
+        texture->nbDisplayed++;
         glActiveTexture(GL_TEXTURE0);
         // Load the texture in the GPUDis
         glTexImage2D(GL_TEXTURE_2D, 0, texture->format, texture->texture_size.width, texture->texture_size.height, 0, texture->format, texture->type, texture->data);
@@ -80,3 +84,5 @@ void opengl_texture_destroy(ARDroneOpenGLTexture *texture)
 {
     
 }
+
+#endif // USE_OPENGL

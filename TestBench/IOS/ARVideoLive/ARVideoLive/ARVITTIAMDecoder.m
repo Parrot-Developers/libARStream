@@ -33,6 +33,8 @@
 @property (nonatomic) int width;
 @property (nonatomic) int height;
 
+@property (nonatomic) int nbDecoded;
+
 @property (nonatomic, strong) ARVFrame *outputFrame;
 @property (nonatomic) uint32_t num_picture_decoded;
 
@@ -61,6 +63,7 @@
         _initialized = NO;
         _width = 1280;
         _height = 720;
+        _nbDecoded = 0;
     }
     return self;
 }
@@ -331,6 +334,7 @@
             if (_h264_video_decode_op.u4_frame_decoded_flag == 1) {
                 
                 _num_picture_decoded++;
+                [self incrementNbDecoded];
                 
                 //Adress of output ittiam pointer
                 _outputFrame.data = (uint8_t*) _h264_get_display_frame_ip.s_out_buffer.pu1_bufs[0];
@@ -344,6 +348,25 @@
         }
     }
     return retFrame;
+}
+
+- (void)incrementNbDecoded
+{
+    @synchronized (self)
+    {
+        _nbDecoded++;
+    }
+}
+
+- (int)getAndResetNbDecoded
+{
+    int ret = 0;
+    @synchronized (self)
+    {
+        ret = _nbDecoded;
+        _nbDecoded = 0;
+    }
+    return ret;
 }
 
 @end

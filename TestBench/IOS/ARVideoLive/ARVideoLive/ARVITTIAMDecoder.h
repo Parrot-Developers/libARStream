@@ -19,6 +19,9 @@
 - (void)initializeWithWidth:(int)w andHeight:(int)h;
 - (void)close;
 
+- (void)incrementNbDecoded;
+- (int)getAndResetNbDecoded;
+
 - (ARVFrame *)decodeFrame:(ARVFrame *)frame;
 
 @end

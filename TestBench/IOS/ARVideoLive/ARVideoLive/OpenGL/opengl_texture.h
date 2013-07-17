@@ -8,6 +8,8 @@
 #ifndef _OPENGL_TEXTURE_H_
 #define _OPENGL_TEXTURE_H_
 
+#if USE_OPENGL
+
 #include <OpenGLES/ES2/gl.h>
 #include <OpenGLES/ES2/glext.h>
 
@@ -30,5 +32,7 @@ void opengl_texture_init(ARDroneOpenGLTexture *texture);
 void opengl_texture_scale_compute(ARDroneOpenGLTexture *texture, ARDroneSize screen_size, ARDroneScaling scaling);
 void opengl_texture_draw(ARDroneOpenGLTexture *texture, GLuint program);
 void opengl_texture_destroy(ARDroneOpenGLTexture *texture);
+
+#endif // USE_OPENGL
 
 #endif // _OPENGL_CONTEXT_H_

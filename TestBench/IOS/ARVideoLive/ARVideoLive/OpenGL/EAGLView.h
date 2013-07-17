@@ -41,4 +41,6 @@
 - (void) changeState:(BOOL)inGame;
 - (void) drawView;
 - (void)setScreenOrientationRight:(BOOL)_screenOrientationRight;
+
+- (int)getAndResetNbDisplayed;
 @end

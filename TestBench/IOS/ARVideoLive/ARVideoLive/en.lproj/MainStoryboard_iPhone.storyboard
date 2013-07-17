@@ -91,8 +91,43 @@
                     <view key="view" contentMode="scaleToFill" id="3" customClass="GLKView">
                         <rect key="frame" x="0.0" y="0.0" width="320" height="568"/>
                         <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                        <subviews>
+                            <label opaque="NO" clipsSubviews="YES" userInteractionEnabled="NO" contentMode="left" text="NetworkFPS : 30.0" textAlignment="right" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="jfM-ye-gAx">
+                                <color key="backgroundColor" white="0.0" alpha="0.29999999999999999" colorSpace="custom" customColorSpace="calibratedWhite"/>
+                                <fontDescription key="fontDescription" name="HelveticaNeue-CondensedBold" family="Helvetica Neue" pointSize="15"/>
+                                <color key="textColor" red="1" green="0.47058823529999999" blue="0.0" alpha="1" colorSpace="calibratedRGB"/>
+                                <nil key="highlightedColor"/>
+                            </label>
+                            <label opaque="NO" clipsSubviews="YES" userInteractionEnabled="NO" contentMode="left" text="DecodeFPS : 30.0" textAlignment="right" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="Jg3-s9-ROd">
+                                <color key="backgroundColor" white="0.0" alpha="0.29999999999999999" colorSpace="custom" customColorSpace="calibratedWhite"/>
+                                <fontDescription key="fontDescription" name="HelveticaNeue-CondensedBold" family="Helvetica Neue" pointSize="15"/>
+                                <color key="textColor" red="1" green="0.47058823529999999" blue="0.0" alpha="1" colorSpace="calibratedRGB"/>
+                                <nil key="highlightedColor"/>
+                            </label>
+                            <label opaque="NO" clipsSubviews="YES" userInteractionEnabled="NO" contentMode="left" text="DisplayFPS : 30.0" textAlignment="right" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="YcB-Kh-dLL">
+                                <color key="backgroundColor" white="0.0" alpha="0.29999999999999999" colorSpace="custom" customColorSpace="calibratedWhite"/>
+                                <fontDescription key="fontDescription" name="HelveticaNeue-CondensedBold" family="Helvetica Neue" pointSize="15"/>
+                                <color key="textColor" red="1" green="0.47058823529999999" blue="0.0" alpha="1" colorSpace="calibratedRGB"/>
+                                <nil key="highlightedColor"/>
+                            </label>
+                        </subviews>
                         <color key="backgroundColor" white="1" alpha="1" colorSpace="custom" customColorSpace="calibratedWhite"/>
+                        <constraints>
+                            <constraint firstItem="YcB-Kh-dLL" firstAttribute="trailing" secondItem="Jg3-s9-ROd" secondAttribute="trailing" type="default" id="4Zy-at-7zU"/>
+                            <constraint firstItem="YcB-Kh-dLL" firstAttribute="top" secondItem="Jg3-s9-ROd" secondAttribute="bottom" constant="8" symbolic="YES" type="default" id="BhG-fy-fIa"/>
+                            <constraint firstItem="Jg3-s9-ROd" firstAttribute="top" secondItem="jfM-ye-gAx" secondAttribute="bottom" constant="8" symbolic="YES" type="default" id="Nsf-DO-fBI"/>
+                            <constraint firstItem="Jg3-s9-ROd" firstAttribute="trailing" secondItem="jfM-ye-gAx" secondAttribute="trailing" type="default" id="cgu-Ms-ng8"/>
+                            <constraint firstItem="YcB-Kh-dLL" firstAttribute="leading" secondItem="3" secondAttribute="leading" constant="20" symbolic="YES" type="default" id="e5a-vq-6fe"/>
+                            <constraint firstItem="jfM-ye-gAx" firstAttribute="leading" secondItem="3" secondAttribute="leading" constant="20" symbolic="YES" type="default" id="iRY-HA-6jQ"/>
+                            <constraint firstItem="Jg3-s9-ROd" firstAttribute="leading" secondItem="3" secondAttribute="leading" constant="20" symbolic="YES" type="default" id="ifk-6x-2El"/>
+                            <constraint firstItem="jfM-ye-gAx" firstAttribute="top" secondItem="3" secondAttribute="top" constant="20" symbolic="YES" type="default" id="qx8-gT-p7E"/>
+                        </constraints>
                     </view>
+                    <connections>
+                        <outlet property="decFps" destination="Jg3-s9-ROd" id="ezK-DC-NXx"/>
+                        <outlet property="disFps" destination="YcB-Kh-dLL" id="KZ9-9O-G4b"/>
+                        <outlet property="netFps" destination="jfM-ye-gAx" id="0LC-WI-oMu"/>
+                    </connections>
                 </viewController>
                 <placeholder placeholderIdentifier="IBFirstResponder" id="4" sceneMemberID="firstResponder"/>
             </objects>
@@ -102,6 +137,11 @@
     <classes>
         <class className="ARVDecoderViewController" superclassName="UIViewController">
             <source key="sourceIdentifier" type="project" relativePath="./Classes/ARVDecoderViewController.h"/>
+            <relationships>
+                <relationship kind="outlet" name="decFps" candidateClass="UILabel"/>
+                <relationship kind="outlet" name="disFps" candidateClass="UILabel"/>
+                <relationship kind="outlet" name="netFps" candidateClass="UILabel"/>
+            </relationships>
         </class>
         <class className="ARVIPSelectorViewController" superclassName="UIViewController">
             <source key="sourceIdentifier" type="project" relativePath="./Classes/ARVIPSelectorViewController.h"/>

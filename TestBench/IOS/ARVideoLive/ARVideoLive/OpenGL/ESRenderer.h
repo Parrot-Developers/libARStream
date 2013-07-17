@@ -5,6 +5,9 @@
 //  Created by Frédéric D'HAEYER on 24/10/11.
 //  Copyright Parrot SA 2009. All rights reserved.
 //
+
+#if USE_OPENGL
+
 #import <QuartzCore/QuartzCore.h>
 #import <OpenGLES/ES2/gl.h>
 #import <OpenGLES/ES2/glext.h>
@@ -30,5 +33,9 @@
 - (void)render;
 - (BOOL)resizeFromLayer:(CAEAGLLayer *)layer;
 - (void)setScreenOrientationRight:(BOOL)_screenOrientationRight;
+
+- (int)getAndResetNbDisplayed;
+
 @end
 
+#endif //USE_OPENGL

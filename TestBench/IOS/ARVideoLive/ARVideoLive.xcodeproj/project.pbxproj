@@ -41,6 +41,7 @@
 		37290EAE178EFDC9006B7B58 /* libh264_dec_lib.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 37290EAA178EFDC9006B7B58 /* libh264_dec_lib.a */; };
 		37290EAF178EFDC9006B7B58 /* libsys_utils.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 37290EAB178EFDC9006B7B58 /* libsys_utils.a */; };
 		37290EB4178EFE74006B7B58 /* ARVITTIAMDecoder.m in Sources */ = {isa = PBXBuildFile; fileRef = 37290EB3178EFE74006B7B58 /* ARVITTIAMDecoder.m */; };
+		37B838371796DCB4008B196F /* ARVDisplayRGB.m in Sources */ = {isa = PBXBuildFile; fileRef = 37B838361796DCB4008B196F /* ARVDisplayRGB.m */; };
 		37F745AA17903CD400184F9C /* Icon-72.png in Resources */ = {isa = PBXBuildFile; fileRef = 37F745A617903CD400184F9C /* Icon-72.png */; };
 		37F745AB17903CD400184F9C /* Icon-72@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = 37F745A717903CD400184F9C /* Icon-72@2x.png */; };
 		37F745AC17903CD400184F9C /* Icon.png in Resources */ = {isa = PBXBuildFile; fileRef = 37F745A817903CD400184F9C /* Icon.png */; };
@@ -113,6 +114,8 @@
 		37290EAB178EFDC9006B7B58 /* libsys_utils.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libsys_utils.a; path = ITTIAM/avc_decoder/libs/libsys_utils.a; sourceTree = "<group>"; };
 		37290EB2178EFE74006B7B58 /* ARVITTIAMDecoder.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ARVITTIAMDecoder.h; sourceTree = "<group>"; };
 		37290EB3178EFE74006B7B58 /* ARVITTIAMDecoder.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = ARVITTIAMDecoder.m; sourceTree = "<group>"; };
+		37B838351796DCB4008B196F /* ARVDisplayRGB.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ARVDisplayRGB.h; sourceTree = "<group>"; };
+		37B838361796DCB4008B196F /* ARVDisplayRGB.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = ARVDisplayRGB.m; sourceTree = "<group>"; };
 		37F745A617903CD400184F9C /* Icon-72.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Icon-72.png"; sourceTree = SOURCE_ROOT; };
 		37F745A717903CD400184F9C /* Icon-72@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Icon-72@2x.png"; sourceTree = SOURCE_ROOT; };
 		37F745A817903CD400184F9C /* Icon.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = Icon.png; sourceTree = SOURCE_ROOT; };
@@ -223,6 +226,8 @@
 				37290E91178EDBBD006B7B58 /* ARVFrameBuffer.m */,
 				37290E93178EE733006B7B58 /* ARVDecoderViewController.h */,
 				37290E94178EE733006B7B58 /* ARVDecoderViewController.m */,
+				37B838351796DCB4008B196F /* ARVDisplayRGB.h */,
+				37B838361796DCB4008B196F /* ARVDisplayRGB.m */,
 			);
 			path = ARVideoLive;
 			sourceTree = "<group>";
@@ -353,6 +358,7 @@
 				3714523817956C12007327BE /* opengl_texture.c in Sources */,
 				3714523917956C12007327BE /* OpenGLSprite.m in Sources */,
 				3714523C17956C51007327BE /* ESRenderer.m in Sources */,
+				37B838371796DCB4008B196F /* ARVDisplayRGB.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -11,6 +11,10 @@
 
 @interface ARVDecoderViewController : UIViewController
 
+@property (nonatomic, strong) IBOutlet UILabel *netFps;
+@property (nonatomic, strong) IBOutlet UILabel *decFps;
+@property (nonatomic, strong) IBOutlet UILabel *disFps;
+
 @property (nonatomic, strong) NSString *ip;
 @property (nonatomic) int videoWidth;
 @property (nonatomic) int videoHeight;

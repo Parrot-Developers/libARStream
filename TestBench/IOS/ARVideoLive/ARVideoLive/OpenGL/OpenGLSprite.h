@@ -6,6 +6,8 @@
  * @date 2009/10/26
  */
 
+#if USE_OPENGL
+
 #include "opengl_texture.h"
 
 @protocol OpenGLSpriteDelegate<NSObject>
@@ -37,4 +39,8 @@
 - (ARDroneScaling)getScaling;
 - (ARDroneOpenGLTexture *)getTexture;
 
+- (int)getAndResetNbDisplayed;
+
 @end
+
+#endif //USE_OPENGL

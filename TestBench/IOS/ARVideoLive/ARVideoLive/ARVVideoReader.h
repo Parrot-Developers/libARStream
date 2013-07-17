@@ -16,4 +16,7 @@
 - (void)start:(NSString *)ip;
 - (void)stop;
 
+- (void)incrementNbReceived;
+- (int)getAndResetNbReceived;
+
 @end

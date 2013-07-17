@@ -5,6 +5,9 @@
  * @author D HAEYER Frederic
  * @date 2009/10/26
  */
+
+#if USE_OPENGL
+
 #import "OpenGLSprite.h"
 
 static CGFloat const matrixOrthoFront[] = {1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, -1.0f, 1.0f};
@@ -118,4 +121,14 @@ static CGFloat const identityMatrix[] = {1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0
 	//free(default_image);
     free(texture);
 }
+
+- (int)getAndResetNbDisplayed
+{
+    int res = texture->nbDisplayed;
+    texture->nbDisplayed = 0;
+    return res;
+}
+
 @end
+
+#endif //USE_OPENGL

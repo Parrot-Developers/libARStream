@@ -5,6 +5,9 @@
 //  Created by Frédéric D'HAEYER on 24/10/11.
 //  Copyright Parrot SA 2009. All rights reserved.
 //
+
+#if USE_OPENGL
+
 #import "ESRenderer.h"
 #include "opengl_shader.h"
 
@@ -279,4 +282,11 @@ GLint uniforms[NUM_UNIFORMS];
     printf("Video index buffer identifier : %d\n", indexBufferId);
 }
 
+- (int)getAndResetNbDisplayed
+{
+    return [video getAndResetNbDisplayed];
+}
+
 @end
+
+#endif //USE_OPENGL

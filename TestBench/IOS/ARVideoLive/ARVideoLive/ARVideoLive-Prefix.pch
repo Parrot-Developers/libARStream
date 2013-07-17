@@ -13,6 +13,14 @@
     #import <Foundation/Foundation.h>
 #endif
 
+/*
+ * 0 --> Use QuartzCore + UIImageView
+ * 1 --> Use OpenGL 2D Texture
+ */
+#define USE_OPENGL (0)
+
+
+#if USE_OPENGL
 /**
  * Define
  */
@@ -39,4 +47,6 @@ typedef struct
 	void* data;
     unsigned int num_picture_decoded;
     int dataSize;
+    int nbDisplayed;
 } ARDroneOpenGLTexture;
+#endif

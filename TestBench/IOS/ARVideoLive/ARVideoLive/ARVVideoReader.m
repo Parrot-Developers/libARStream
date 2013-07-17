@@ -27,6 +27,7 @@ uint8_t* videoCallback (eARVIDEO_READER_CAUSE cause, uint8_t *framePointer, uint
             this.frame.used = frameSize;
             this.frame.isIFrame = (isFlushFrame == 1) ? YES : NO;
             this.frame.missed = numberOfSkippedFrames;
+            [this incrementNbReceived];
             if (numberOfSkippedFrames > 0)
             {
                 NSLog (@"Network skipped %d frame(s)", numberOfSkippedFrames);
@@ -63,6 +64,8 @@ uint8_t* videoCallback (eARVIDEO_READER_CAUSE cause, uint8_t *framePointer, uint
 @property (nonatomic) ARSAL_Thread_t vidDataThread;
 @property (nonatomic) ARSAL_Thread_t vidAckThread;
 
+@property (nonatomic) int nbReceived;
+
 @property (nonatomic) BOOL isStarted;
 
 @end
@@ -77,6 +80,7 @@ uint8_t* videoCallback (eARVIDEO_READER_CAUSE cause, uint8_t *framePointer, uint
     self = [super init];
     if (self)
     {
+        _nbReceived = 0;
         frame = [[ARVFrame alloc] init];
     }
     return self;
@@ -170,6 +174,25 @@ uint8_t* videoCallback (eARVIDEO_READER_CAUSE cause, uint8_t *framePointer, uint
 - (void)dealloc
 {
     [self stop];
+}
+
+- (void)incrementNbReceived
+{
+    @synchronized (self)
+    {
+        _nbReceived++;
+    }
+}
+
+- (int)getAndResetNbReceived
+{
+    int res = 0;
+    @synchronized (self)
+    {
+        res = _nbReceived;
+        _nbReceived = 0;
+    }
+    return res;
 }
 
 @end

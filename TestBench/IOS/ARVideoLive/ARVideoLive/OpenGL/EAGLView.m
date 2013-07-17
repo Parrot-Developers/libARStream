@@ -5,6 +5,9 @@
 //  Created by Frédéric D'HAEYER on 16/10/09.
 //  Copyright Parrot SA 2009. All rights reserved.
 //
+
+#if USE_OPENGL
+
 #import "EAGLView.h"
 #import "ESRenderer.h"
 
@@ -161,4 +164,11 @@
     [self changeState:enabled];
 }
 
+- (int)getAndResetNbDisplayed
+{
+    return [renderer getAndResetNbDisplayed];
+}
+
 @end
+
+#endif //USE_OPENGL
