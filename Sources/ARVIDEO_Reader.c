@@ -396,7 +396,6 @@ void* ARVIDEO_Reader_RunDataThread (void *ARVIDEO_Reader_t_Param)
                     if (header->frameNumber != previousFNum)
                     {
                         int nbMissedFrame = 0;
-                        ARSAL_PRINT (ARSAL_PRINT_WARNING, ARVIDEO_READER_TAG, "Header flags : 0x%02x", header->frameFlags);
                         int isFlushFrame = ((header->frameFlags & ARVIDEO_NETWORK_HEADERS_FLAG_FLUSH_FRAME) != 0) ? 1 : 0;
                         ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARVIDEO_READER_TAG, "Ack all in frame %d", header->frameNumber);
                         if (header->frameNumber != previousFNum + 1)

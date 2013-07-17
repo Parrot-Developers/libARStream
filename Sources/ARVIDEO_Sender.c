@@ -44,7 +44,7 @@
 #define ARVIDEO_SENDER_DEFAULT_ESTIMATED_LATENCY_MS (100)
 
 #define ARVIDEO_SENDER_MINIMUM_TIME_BETWEEN_RETRIES_MS (15)
-#define ARVIDEO_SENDER_MAXIMUM_TIME_BETWEEN_RETRIES_MS (200)
+#define ARVIDEO_SENDER_MAXIMUM_TIME_BETWEEN_RETRIES_MS (50)
 
 #define ARVIDEO_SENDER_EFFICIENCY_AVERAGE_NB_FRAMES (15)
 
@@ -235,8 +235,7 @@ static int ARVIDEO_Sender_PopFromQueue (ARVIDEO_Sender_t *sender, ARVIDEO_Sender
         {
             waitTime = ARVIDEO_SENDER_DEFAULT_ESTIMATED_LATENCY_MS;
         }
-        waitTime += 15; // Add some time to avoid optimistic waitTime, and 0ms waitTime
-        //waitTime *= 5;
+        waitTime += 5; // Add some time to avoid optimistic waitTime, and 0ms waitTime
         if (waitTime > ARVIDEO_SENDER_MAXIMUM_TIME_BETWEEN_RETRIES_MS)
             waitTime = ARVIDEO_SENDER_MAXIMUM_TIME_BETWEEN_RETRIES_MS;
         if (waitTime < ARVIDEO_SENDER_MINIMUM_TIME_BETWEEN_RETRIES_MS)
