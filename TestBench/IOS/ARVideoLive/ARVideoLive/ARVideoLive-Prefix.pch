@@ -1,0 +1,42 @@
+//
+// Prefix header for all source files of the 'ARVideoLive' target in the 'ARVideoLive' project
+//
+
+#import <Availability.h>
+
+#ifndef __IPHONE_5_0
+#warning "This project uses features only available in iOS SDK 5.0 and later."
+#endif
+
+#ifdef __OBJC__
+    #import <UIKit/UIKit.h>
+    #import <Foundation/Foundation.h>
+#endif
+
+/**
+ * Define
+ */
+typedef struct
+{
+    float width;
+    float height;
+} ARDroneSize;
+
+/**
+ * Define
+ */
+typedef struct
+{
+	ARDroneSize image_size;
+	ARDroneSize texture_size;
+	float scaleModelX;
+	float scaleModelY;
+	float scaleTextureX;
+	float scaleTextureY;
+	int bytesPerPixel;
+	int format;
+	int type;
+	void* data;
+    unsigned int num_picture_decoded;
+    int dataSize;
+} ARDroneOpenGLTexture;
