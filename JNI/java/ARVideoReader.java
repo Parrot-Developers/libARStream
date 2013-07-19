@@ -149,7 +149,7 @@ public class ARVideoReader
 
     /**
      * Stops the internal threads of the ARVideoReader.<br>
-     * Calling this function allow the ARVideoReader Runnabled to end
+     * Calling this function allow the ARVideoReader Runnables to end
      */
     public void stop () {
         nativeStop (cReader);
