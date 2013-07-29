@@ -84,7 +84,7 @@ void ARVIDEO_Reader_InitVideoAckBuffer (ARNETWORK_IOBufferParam_t *bufferParams,
 
 /**
  * @brief Creates a new ARVIDEO_Reader_t
- * @Warning This function allocates memory. An ARVIDEO_Reader_t muse be deleted by a call to ARVIDEO_Reader_Delete
+ * @warning This function allocates memory. An ARVIDEO_Reader_t muse be deleted by a call to ARVIDEO_Reader_Delete
  *
  * @param[in] manager Pointer to a valid and connected ARNETWORK_Manager_t, which will be used to send video frames
  * @param[in] dataBufferID ID of a VideoDataBuffer available within the manager
