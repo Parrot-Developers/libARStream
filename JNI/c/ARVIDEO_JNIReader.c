@@ -7,9 +7,8 @@
 static jmethodID g_cbWrapper_id = 0;
 static JavaVM *g_vm = NULL;
 
-uint8_t* internalCallback (eARVIDEO_READER_CAUSE cause, uint8_t *framePointer, uint32_t frameSize, int numberOfSkippedFrames, uint32_t *newBufferCapacity)
+uint8_t* internalCallback (eARVIDEO_READER_CAUSE cause, uint8_t *framePointer, uint32_t frameSize, int isFlushFrame, int numberOfSkippedFrames, uint32_t *newBufferCapacity, void *custom)
 {
-
 }
 
 JNIEXPORT void JNICALL
@@ -39,7 +38,7 @@ JNIEXPORT jlong JNICALL
 Java_com_parrot_arsdk_arvideo_ARVideoReader_nativeConstructor (JNIEnv *env, jobject thizz, jlong cNetManager, jint dataBufferId, jint ackBufferId, jlong frameBuffer, jint frameBufferSize)
 {
     eARVIDEO_ERROR err = ARVIDEO_OK;
-    ARVIDEO_Reader_t *retReader = ARVIDEO_Reader_New ((ARNETWORK_Manager_t *)(intptr_t)cNetManager, dataBufferId, ackBufferId, internalCallback, (uint8_t *)(intptr_t)frameBuffer, frameBufferSize, &err);
+    ARVIDEO_Reader_t *retReader = ARVIDEO_Reader_New ((ARNETWORK_Manager_t *)(intptr_t)cNetManager, dataBufferId, ackBufferId, internalCallback, (uint8_t *)(intptr_t)frameBuffer, frameBufferSize, NULL, &err);
     if (err != ARVIDEO_OK)
     {
         ARSAL_PRINT (ARSAL_PRINT_ERROR, JNI_READER_TAG, "Error while creating reader : %s", ARVIDEO_Error_ToString (err));
