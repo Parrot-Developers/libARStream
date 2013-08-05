@@ -17,7 +17,7 @@
  * 0 --> Use QuartzCore + UIImageView
  * 1 --> Use OpenGL 2D Texture
  */
-#define USE_OPENGL (0)
+#define USE_OPENGL (1)
 
 
 #if USE_OPENGL

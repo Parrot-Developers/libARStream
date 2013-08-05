@@ -219,6 +219,8 @@
 				37290E7C178EAF79006B7B58 /* ARVVideoReader.m */,
 				37290EB2178EFE74006B7B58 /* ARVITTIAMDecoder.h */,
 				37290EB3178EFE74006B7B58 /* ARVITTIAMDecoder.m */,
+				37B838351796DCB4008B196F /* ARVDisplayRGB.h */,
+				37B838361796DCB4008B196F /* ARVDisplayRGB.m */,
 				37290E60178EAF77006B7B58 /* Supporting Files */,
 				37290E83178EB195006B7B58 /* ARVIPSelectorViewController.h */,
 				37290E84178EB195006B7B58 /* ARVIPSelectorViewController.m */,
@@ -226,8 +228,6 @@
 				37290E91178EDBBD006B7B58 /* ARVFrameBuffer.m */,
 				37290E93178EE733006B7B58 /* ARVDecoderViewController.h */,
 				37290E94178EE733006B7B58 /* ARVDecoderViewController.m */,
-				37B838351796DCB4008B196F /* ARVDisplayRGB.h */,
-				37B838361796DCB4008B196F /* ARVDisplayRGB.m */,
 			);
 			path = ARVideoLive;
 			sourceTree = "<group>";
