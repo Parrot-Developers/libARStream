@@ -339,7 +339,7 @@ int ARVIDEO_Reader_TestBenchMain (int argc, char *argv[])
 
     if(specificError == ARNETWORKAL_OK)
     {
-        specificError = ARNETWORKAL_Manager_InitWiFiNetwork(osspecificManagerPtr, ip, SENDING_PORT, READING_PORT, 1000);
+        specificError = ARNETWORKAL_Manager_InitWifiNetwork(osspecificManagerPtr, ip, SENDING_PORT, READING_PORT, 1000);
     }
     else
     {
@@ -375,7 +375,7 @@ int ARVIDEO_Reader_TestBenchMain (int argc, char *argv[])
     pthread_join (netsend, NULL);
 
     ARNETWORK_Manager_Delete (&g_Manager);
-    ARNETWORKAL_Manager_CloseWiFiNetwork(osspecificManagerPtr);
+    ARNETWORKAL_Manager_CloseWifiNetwork(osspecificManagerPtr);
     ARNETWORKAL_Manager_Delete(&osspecificManagerPtr);
 
     return retVal;

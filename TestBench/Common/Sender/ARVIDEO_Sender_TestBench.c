@@ -348,7 +348,7 @@ int ARVIDEO_Sender_TestBenchMain (int argc, char *argv[])
 
     if(specificError == ARNETWORKAL_OK)
     {
-        specificError = ARNETWORKAL_Manager_InitWiFiNetwork(osspecificManagerPtr, ip, SENDING_PORT, READING_PORT, 1000);
+        specificError = ARNETWORKAL_Manager_InitWifiNetwork(osspecificManagerPtr, ip, SENDING_PORT, READING_PORT, 1000);
     }
 
     if(specificError == ARNETWORKAL_OK)
