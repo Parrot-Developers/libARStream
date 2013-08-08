@@ -1,5 +1,5 @@
 /**
- *  @file OpenGLSprite.h
+ * @file OpenGLSprite.h
  *
  * Copyright 2009 Parrot SA. All rights reserved.
  * @author D HAEYER Frederic
