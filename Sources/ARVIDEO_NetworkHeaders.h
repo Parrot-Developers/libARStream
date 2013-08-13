@@ -27,7 +27,7 @@
  */
 
 #define ARVIDEO_NETWORK_HEADERS_MAX_FRAGMENTS_PER_FRAME (128)
-#define ARVIDEO_NETWORK_HEADERS_FRAGMENT_SIZE (1000)
+#define ARVIDEO_NETWORK_HEADERS_FRAGMENT_SIZE (50)
 #define ARVIDEO_NETWORK_HEADERS_MAX_FRAME_SIZE (ARVIDEO_NETWORK_HEADERS_FRAGMENT_SIZE * ARVIDEO_NETWORK_HEADERS_MAX_FRAGMENTS_PER_FRAME)
 
 #define ARVIDEO_NETWORK_HEADERS_FLAG_FLUSH_FRAME (1)
@@ -132,6 +132,23 @@ int ARVIDEO_NetworkHeaders_AckPacketUnsetFlag (ARVIDEO_NetworkHeaders_AckPacket_
  * @return 0 otherwise
  */
 int ARVIDEO_NetworkHeaders_AckPacketUnsetFlags (ARVIDEO_NetworkHeaders_AckPacket_t *dst, ARVIDEO_NetworkHeaders_AckPacket_t *src);
+
+/**
+ * @brief Count the number of flags set in range [0;nb[
+ * @param packet The packet to test
+ * @param nb the number of flags to test
+ * @return The number of flags set (=1) in the packet for the range [0:nb[
+ */
+uint32_t ARVIDEO_NetworkHeaders_AckPacketCountSet (ARVIDEO_NetworkHeaders_AckPacket_t *packet, int nb);
+
+/**
+ * @brief Count the number of flags unset in range [0;nb[
+ * @param packet The packet to test
+ * @param nb the number of flags to test
+ * @return The number of flags unset (=0) in the packet for the range [0:nb[
+ */
+uint32_t ARVIDEO_NetworkHeaders_AckPacketCountNotSet (ARVIDEO_NetworkHeaders_AckPacket_t *packet, int nb);
+
 
 /**
  * @brief Dump an ack packet

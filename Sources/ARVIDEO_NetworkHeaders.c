@@ -34,9 +34,25 @@
  * Internal functions declarations
  */
 
+/**
+ * @brief Computes the Hamming weight of a 32 bit integer
+ * The Hamming weight is the number of '1' bits in the integer binary representation
+ * @param input The integer to test
+ * @return The Hamming weight of the integer
+ */
+uint32_t ARVIDEO_NetworkHeaders_HammingWeight32 (uint32_t input);
+
 /*
  * Internal functions implementation
  */
+
+uint32_t ARVIDEO_NetworkHeaders_HammingWeight32 (uint32_t input)
+{
+    uint32_t tst = input;
+    tst = tst - ((tst >> 1) & 0x55555555);
+    tst = (tst & 0x33333333) + ((tst >> 2) & 0x33333333);
+    return ((tst + (tst >> 4) & 0xF0F0F0F0) * 0x10101010) >> 24;
+}
 
 /*
  * Implementation
@@ -135,6 +151,72 @@ int ARVIDEO_NetworkHeaders_AckPacketUnsetFlags (ARVIDEO_NetworkHeaders_AckPacket
         0ll == dst->highPacketsAck)
     {
         retVal = 1;
+    }
+    return retVal;
+}
+
+uint32_t ARVIDEO_NetworkHeaders_AckPacketCountSet (ARVIDEO_NetworkHeaders_AckPacket_t *packet, int nb)
+{
+    uint32_t retVal = 0;
+
+    // Get subpacket
+    uint32_t tst = (uint32_t)(packet->lowPacketsAck);
+    // Mask if needed
+    tst = (nb < 32) ? tst & ((1 << nb) - 1) : tst;
+    // Add its Hamming weight to the result
+    retVal += ARVIDEO_NetworkHeaders_HammingWeight32 (tst);
+
+    // repeat for other three subpackets (if nb is big enough to reach them)
+    if (nb > 32)
+    {
+        tst = (uint32_t)(packet->lowPacketsAck >> 32);
+        tst = (nb < 64) ? tst & ((1 << (nb-32)) - 1) : tst;
+        retVal += ARVIDEO_NetworkHeaders_HammingWeight32 (tst);
+    }
+    if (nb > 64)
+    {
+        tst = (uint32_t)(packet->highPacketsAck);
+        tst = (nb < 96) ? tst & ((1 << (nb-64)) - 1) : tst;
+        retVal += ARVIDEO_NetworkHeaders_HammingWeight32 (tst);
+    }
+    if (nb > 96)
+    {
+        tst = (uint32_t)(packet->highPacketsAck >> 32);
+        tst = (nb < 128) ? tst & ((1 << (nb-96)) - 1) : tst;
+        retVal += ARVIDEO_NetworkHeaders_HammingWeight32 (tst);
+    }
+    return retVal;
+}
+
+uint32_t ARVIDEO_NetworkHeaders_AckPacketCountNotSet (ARVIDEO_NetworkHeaders_AckPacket_t *packet, int nb)
+{
+    uint32_t retVal = 0;
+
+    // Get subpacket
+    uint32_t tst = (uint32_t)(packet->lowPacketsAck);
+    // Mask if needed
+    tst = (nb < 32) ? tst | (0xFFFFFFFF << nb) : tst;
+    // Add its Hamming weight to the result
+    retVal += (32 - ARVIDEO_NetworkHeaders_HammingWeight32 (tst));
+
+    // repeat for other three subpackets (if nb is big enough to reach them)
+    if (nb > 32)
+    {
+        tst = (uint32_t)(packet->lowPacketsAck >> 32);
+        tst = (nb < 64) ? tst | (0xFFFFFFFF << (nb - 32)) : tst;
+        retVal += (32 - ARVIDEO_NetworkHeaders_HammingWeight32 (tst));
+    }
+    if (nb > 64)
+    {
+        tst = (uint32_t)(packet->highPacketsAck);
+        tst = (nb < 96) ? tst | (0xFFFFFFFF << (nb - 64)) : tst;
+        retVal += (32 - ARVIDEO_NetworkHeaders_HammingWeight32 (tst));
+    }
+    if (nb > 96)
+    {
+        tst = (uint32_t)(packet->highPacketsAck >> 32);
+        tst = (nb < 128) ? tst | (0xFFFFFFFF << (nb - 96)) : tst;
+        retVal += (32 - ARVIDEO_NetworkHeaders_HammingWeight32 (tst));
     }
     return retVal;
 }
