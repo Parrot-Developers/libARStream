@@ -56,6 +56,7 @@ typedef enum {
  * @note If cause is ARVIDEO_READER_CAUSE_CANCEL or ARVIDEO_READER_CAUSE_COPY_COMPLETE, the return value and newBufferCapacity are unused
  *
  * @warning If the cause is ARVIDEO_READER_CAUSE_FRAME_TOO_SMALL, returning a buffer shorter than 'frameSize' will cause the library to skip the current frame
+ * @warning In any case, returning a NULL buffer is not supported.
  */
 typedef uint8_t* (*ARVIDEO_Reader_FrameCompleteCallback_t) (eARVIDEO_READER_CAUSE cause, uint8_t *framePointer, uint32_t frameSize, int isFlushFrame, int numberOfSkippedFrames, uint32_t *newBufferCapacity, void *custom);
 
