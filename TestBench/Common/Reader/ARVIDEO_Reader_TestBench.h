@@ -49,4 +49,10 @@ int ARVIDEO_ReaderTb_GetMissedFrames ();
  */
 float ARVIDEO_ReaderTb_GetEfficiency ();
 
+/**
+ * @brief Gets the estimated paket misses on video stream
+ * @return Estimated data packet loss [0-100]
+ */
+int ARVIDEO_ReaderTb_GetEstimatedLoss ();
+
 #endif /* _ARVIDEO_READER_TESTBENCH_H_ */

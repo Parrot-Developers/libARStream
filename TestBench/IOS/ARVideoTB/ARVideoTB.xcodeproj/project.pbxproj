@@ -10,10 +10,10 @@
 		371815E0178304340030D4FA /* CoreBluetooth.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 371815DF178304340030D4FA /* CoreBluetooth.framework */; };
 		371BD365178D9D0F004D22A3 /* ARVIDEO_TCPReader.c in Sources */ = {isa = PBXBuildFile; fileRef = 371BD363178D9D0F004D22A3 /* ARVIDEO_TCPReader.c */; };
 		371BD36B178D9D1B004D22A3 /* ARVIDEO_TCPSender.c in Sources */ = {isa = PBXBuildFile; fileRef = 371BD369178D9D1B004D22A3 /* ARVIDEO_TCPSender.c */; };
-		372671401779F75000D61680 /* libARNetwork.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3726713C1779F75000D61680 /* libARNetwork.framework */; };
-		372671411779F75000D61680 /* libARNetworkAL.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3726713D1779F75000D61680 /* libARNetworkAL.framework */; };
-		372671421779F75000D61680 /* libARSAL.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3726713E1779F75000D61680 /* libARSAL.framework */; };
-		372671431779F75000D61680 /* libARVideo.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3726713F1779F75000D61680 /* libARVideo.framework */; };
+		375C1FD917BA37A9006E0140 /* libARNetwork.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 375C1FD517BA37A9006E0140 /* libARNetwork.framework */; };
+		375C1FDA17BA37A9006E0140 /* libARNetworkAL.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 375C1FD617BA37A9006E0140 /* libARNetworkAL.framework */; };
+		375C1FDB17BA37A9006E0140 /* libARSAL.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 375C1FD717BA37A9006E0140 /* libARSAL.framework */; };
+		375C1FDC17BA37A9006E0140 /* libARVideo.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 375C1FD817BA37A9006E0140 /* libARVideo.framework */; };
 		3782C4BD178BFE0200B73166 /* ARVLogger.m in Sources */ = {isa = PBXBuildFile; fileRef = 3782C4BC178BFE0200B73166 /* ARVLogger.m */; };
 		379378BD176B5A0C00AD5C9D /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 379378BC176B5A0C00AD5C9D /* UIKit.framework */; };
 		379378BF176B5A0C00AD5C9D /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 379378BE176B5A0C00AD5C9D /* Foundation.framework */; };
@@ -53,10 +53,10 @@
 		371BD364178D9D0F004D22A3 /* ARVIDEO_TCPReader.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ARVIDEO_TCPReader.h; path = ../../../Common/TCPReader/ARVIDEO_TCPReader.h; sourceTree = "<group>"; };
 		371BD369178D9D1B004D22A3 /* ARVIDEO_TCPSender.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = ARVIDEO_TCPSender.c; path = ../../../Common/TCPSender/ARVIDEO_TCPSender.c; sourceTree = "<group>"; };
 		371BD36A178D9D1B004D22A3 /* ARVIDEO_TCPSender.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ARVIDEO_TCPSender.h; path = ../../../Common/TCPSender/ARVIDEO_TCPSender.h; sourceTree = "<group>"; };
-		3726713C1779F75000D61680 /* libARNetwork.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = libARNetwork.framework; path = ../../../../TargetsIOS/Frameworks/libARNetwork.framework; sourceTree = "<group>"; };
-		3726713D1779F75000D61680 /* libARNetworkAL.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = libARNetworkAL.framework; path = ../../../../TargetsIOS/Frameworks/libARNetworkAL.framework; sourceTree = "<group>"; };
-		3726713E1779F75000D61680 /* libARSAL.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = libARSAL.framework; path = ../../../../TargetsIOS/Frameworks/libARSAL.framework; sourceTree = "<group>"; };
-		3726713F1779F75000D61680 /* libARVideo.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = libARVideo.framework; path = ../../../../TargetsIOS/Frameworks/libARVideo.framework; sourceTree = "<group>"; };
+		375C1FD517BA37A9006E0140 /* libARNetwork.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = libARNetwork.framework; path = ../../../../ARBuildUtils/Targets/iOS/Install/Frameworks/libARNetwork.framework; sourceTree = "<group>"; };
+		375C1FD617BA37A9006E0140 /* libARNetworkAL.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = libARNetworkAL.framework; path = ../../../../ARBuildUtils/Targets/iOS/Install/Frameworks/libARNetworkAL.framework; sourceTree = "<group>"; };
+		375C1FD717BA37A9006E0140 /* libARSAL.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = libARSAL.framework; path = ../../../../ARBuildUtils/Targets/iOS/Install/Frameworks/libARSAL.framework; sourceTree = "<group>"; };
+		375C1FD817BA37A9006E0140 /* libARVideo.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = libARVideo.framework; path = ../../../../ARBuildUtils/Targets/iOS/Install/Frameworks/libARVideo.framework; sourceTree = "<group>"; };
 		3782C4BB178BFE0200B73166 /* ARVLogger.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ARVLogger.h; sourceTree = "<group>"; };
 		3782C4BC178BFE0200B73166 /* ARVLogger.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = ARVLogger.m; sourceTree = "<group>"; };
 		379378B9176B5A0C00AD5C9D /* ARVideoTB.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ARVideoTB.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -100,10 +100,10 @@
 				379378BD176B5A0C00AD5C9D /* UIKit.framework in Frameworks */,
 				379378BF176B5A0C00AD5C9D /* Foundation.framework in Frameworks */,
 				379378C1176B5A0C00AD5C9D /* CoreGraphics.framework in Frameworks */,
-				372671401779F75000D61680 /* libARNetwork.framework in Frameworks */,
-				372671411779F75000D61680 /* libARNetworkAL.framework in Frameworks */,
-				372671421779F75000D61680 /* libARSAL.framework in Frameworks */,
-				372671431779F75000D61680 /* libARVideo.framework in Frameworks */,
+				375C1FD917BA37A9006E0140 /* libARNetwork.framework in Frameworks */,
+				375C1FDA17BA37A9006E0140 /* libARNetworkAL.framework in Frameworks */,
+				375C1FDB17BA37A9006E0140 /* libARSAL.framework in Frameworks */,
+				375C1FDC17BA37A9006E0140 /* libARVideo.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -131,10 +131,10 @@
 		379378BB176B5A0C00AD5C9D /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
-				3726713C1779F75000D61680 /* libARNetwork.framework */,
-				3726713D1779F75000D61680 /* libARNetworkAL.framework */,
-				3726713E1779F75000D61680 /* libARSAL.framework */,
-				3726713F1779F75000D61680 /* libARVideo.framework */,
+				375C1FD517BA37A9006E0140 /* libARNetwork.framework */,
+				375C1FD617BA37A9006E0140 /* libARNetworkAL.framework */,
+				375C1FD717BA37A9006E0140 /* libARSAL.framework */,
+				375C1FD817BA37A9006E0140 /* libARVideo.framework */,
 				371815DF178304340030D4FA /* CoreBluetooth.framework */,
 				37F6E396176F113900091546 /* QuartzCore.framework */,
 				379378BC176B5A0C00AD5C9D /* UIKit.framework */,
@@ -379,7 +379,7 @@
 			buildSettings = {
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
-					"\"$(SRCROOT)/../../../../TargetsIOS/Frameworks\"",
+					"\"$(SRCROOT)/../../../../ARBuildUtils/Targets/iOS/Install/Frameworks\"",
 				);
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "ARVideoTB/ARVideoTB-Prefix.pch";
@@ -398,7 +398,7 @@
 			buildSettings = {
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
-					"\"$(SRCROOT)/../../../../TargetsIOS/Frameworks\"",
+					"\"$(SRCROOT)/../../../../ARBuildUtils/Targets/iOS/Install/Frameworks\"",
 				);
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "ARVideoTB/ARVideoTB-Prefix.pch";

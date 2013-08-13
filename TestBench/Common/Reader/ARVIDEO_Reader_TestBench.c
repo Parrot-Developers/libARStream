@@ -428,3 +428,12 @@ float ARVIDEO_ReaderTb_GetEfficiency ()
     }
     return ARVIDEO_Reader_GetEstimatedEfficiency(g_Reader);
 }
+
+int ARVIDEO_ReaderTb_GetEstimatedLoss ()
+{
+    if (g_Manager == NULL)
+    {
+        return 100;
+    }
+    return ARNETWORK_Manager_GetEstimatedMissPercentage(g_Manager, DATA_BUFFER_ID);
+}

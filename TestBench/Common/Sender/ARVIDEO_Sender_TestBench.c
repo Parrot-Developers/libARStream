@@ -430,3 +430,12 @@ float ARVIDEO_SenderTb_GetEfficiency ()
     }
     return ARVIDEO_Sender_GetEstimatedEfficiency (g_Sender);
 }
+
+int ARVIDEO_SenderTb_GetEstimatedLoss ()
+{
+    if (g_Manager == NULL)
+    {
+        return 100;
+    }
+    return ARNETWORK_Manager_GetEstimatedMissPercentage(g_Manager, ACK_BUFFER_ID);
+}

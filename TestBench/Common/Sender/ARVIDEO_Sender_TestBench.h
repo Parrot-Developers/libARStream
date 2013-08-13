@@ -49,4 +49,10 @@ int ARVIDEO_SenderTb_GetMissedFrames ();
  */
 float ARVIDEO_SenderTb_GetEfficiency ();
 
+/**
+ * @brief Gets the estimated paket misses on ack stream
+ * @return Estimated ack packet loss [0-100]
+ */
+int ARVIDEO_SenderTb_GetEstimatedLoss ();
+
 #endif /* _ARVIDEO_SENDER_TESTBENCH_H_ */

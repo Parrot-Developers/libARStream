@@ -375,7 +375,7 @@
         {
             case ARV_Sender:
             {
-                [percentOk setText:[NSString stringWithFormat:@"%f%%", ARVIDEO_Sender_PercentOk]];
+                [percentOk setText:[NSString stringWithFormat:@"%d%%", ARVIDEO_SenderTb_GetEstimatedLoss()]];
                 int estLat = ARVIDEO_SenderTb_GetLatency();
                 if (estLat < 0)
                 {
@@ -413,7 +413,7 @@
                 break;
             case ARV_Reader:
             {
-                [percentOk setText:[NSString stringWithFormat:@"%f%%", ARVIDEO_Reader_PercentOk]];
+                [percentOk setText:[NSString stringWithFormat:@"%d%%", ARVIDEO_ReaderTb_GetEstimatedLoss()]];
                 int estLat = ARVIDEO_ReaderTb_GetLatency();
                 if (estLat < 0)
                 {
