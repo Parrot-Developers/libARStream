@@ -337,6 +337,13 @@ void* ARVIDEO_Reader_RunDataThread (void *ARVIDEO_Reader_t_Param)
                 skipCurrentFrame = 0;
                 reader->currentFrameSize = 0;
                 reader->ackPacket.frameNumber = header->frameNumber;
+#ifdef DEBUG
+                uint32_t nackPackets = ARVIDEO_NetworkHeaders_AckPacketCountNotSet (&(reader->ackPacket), header->fragmentsPerFrame);
+                if (nackPackets != 0)
+                {
+                    ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARVIDEO_READER_TAG, "Dropping a frame (missing %d fragments)", nackPackets);
+                }
+#endif
                 ARVIDEO_NetworkHeaders_AckPacketReset (&(reader->ackPacket));
             }
             packetWasAlreadyAck = ARVIDEO_NetworkHeaders_AckPacketFlagIsSet (&(reader->ackPacket), header->fragmentNumber);

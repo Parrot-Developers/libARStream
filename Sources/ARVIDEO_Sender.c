@@ -631,6 +631,7 @@ void* ARVIDEO_Sender_RunDataThread (void *ARVIDEO_Sender_t_Param)
             {
 #ifdef DEBUG
                 ARVIDEO_NetworkHeaders_AckPacketDump ("Cancel frame:", &(sender->ackPacket));
+                ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARVIDEO_SENDER_TAG, "Receiver acknowledged %d of %d packets", ARVIDEO_NetworkHeaders_AckPacketCountSet (&(sender->ackPacket), nbPackets), nbPackets);
 #endif
 
                 ARNETWORK_Manager_FlushInputBuffer (sender->manager, sender->dataBufferID);

@@ -51,7 +51,7 @@ uint32_t ARVIDEO_NetworkHeaders_HammingWeight32 (uint32_t input)
     uint32_t tst = input;
     tst = tst - ((tst >> 1) & 0x55555555);
     tst = (tst & 0x33333333) + ((tst >> 2) & 0x33333333);
-    return ((tst + (tst >> 4) & 0xF0F0F0F0) * 0x10101010) >> 24;
+    return (((tst + (tst >> 4)) & 0x0F0F0F0F) * 0x01010101) >> 24;
 }
 
 /*

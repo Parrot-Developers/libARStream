@@ -43,7 +43,7 @@ typedef struct {
     uint16_t frameNumber; /**< id of the current frame */
     uint8_t frameFlags; /**< Infos on the current frame */
     uint8_t fragmentNumber; /**< Index of the current fragment in current frame */
-    uint8_t fragmentsPerFrame; /**< Number of fragments un current frame */
+    uint8_t fragmentsPerFrame; /**< Number of fragments in current frame */
 } __attribute__ ((packed)) ARVIDEO_NetworkHeaders_DataHeader_t;
 
 /* frameFlags structure :
