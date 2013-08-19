@@ -36,16 +36,52 @@
  * Macros
  */
 
+/**
+ * Tag for ARSAL_PRINT
+ */
 #define ARVIDEO_SENDER_TAG "ARVIDEO_Sender"
+
+/**
+ * Configuration : Enable retries (0,1)
+ * 0 -> Don't retry sending a frame (count on wifi retries)
+ * 1 -> Retry frame sends after some times if the acknowledge didn't come
+ */
+#define ENABLE_RETRIES (0)
+
+/* Warning */
+#if ENABLE_RETRIES == 0
+#warning Retry is disabled in this build
+#endif
+
+/**
+ * Configuration : Enable acknowledge wait
+ * 0 -> Consider all frames given to network as "sent"
+ * 1 -> Wait for an ARVIDEO_Reader full acknowledge of a frame before trying the next frame
+ */
+#define ENABLE_ACK_WAIT (0)
+
+/* Warning */
+#if ENABLE_ACK_WAIT == 0
+#warning Ack wait is disabled in this build
+#endif
 
 /**
  * Latency used when the network can't give us a valid value
  */
 #define ARVIDEO_SENDER_DEFAULT_ESTIMATED_LATENCY_MS (100)
 
+/**
+ * Minimum time between two retries
+ */
 #define ARVIDEO_SENDER_MINIMUM_TIME_BETWEEN_RETRIES_MS (15)
+/**
+ * Maximum time between two retries
+ */
 #define ARVIDEO_SENDER_MAXIMUM_TIME_BETWEEN_RETRIES_MS (50)
 
+/**
+ * Number of frames for the moving average of efficiency
+ */
 #define ARVIDEO_SENDER_EFFICIENCY_AVERAGE_NB_FRAMES (15)
 
 /**
@@ -160,6 +196,12 @@ static int ARVIDEO_Sender_PopFromQueue (ARVIDEO_Sender_t *sender, ARVIDEO_Sender
  */
 eARNETWORK_MANAGER_CALLBACK_RETURN ARVIDEO_Sender_NetworkCallback (int IoBufferId, uint8_t *dataPtr, void *customData, eARNETWORK_MANAGER_CALLBACK_STATUS status);
 
+/**
+ * @brief Signals that the current frame of the sender was acknowledged
+ * @param sender The sender
+ */
+static void ARVIDEO_Sender_FrameWasAck (ARVIDEO_Sender_t *sender);
+
 /*
  * Internal functions implementation
  */
@@ -218,8 +260,13 @@ static int ARVIDEO_Sender_PopFromQueue (ARVIDEO_Sender_t *sender, ARVIDEO_Sender
     if (sender->numberOfWaitingFrames > 0)
     {
         ARVIDEO_Sender_Frame_t *frame = &(sender->nextFrames [sender->indexGetNextFrame]);
+#if ENABLE_ACK_WAIT == 1
+        // Give the next frame only if :
+        // 1> It's an high priority frame
+        // 2> The previous frame was fully acknowledged
         if ((frame->isHighPriority == 1) ||
             (sender->currentFrameCbWasCalled == 1))
+#endif
         {
             retVal = 1;
             sender->numberOfWaitingFrames--;
@@ -240,6 +287,9 @@ static int ARVIDEO_Sender_PopFromQueue (ARVIDEO_Sender_t *sender, ARVIDEO_Sender
             waitTime = ARVIDEO_SENDER_MAXIMUM_TIME_BETWEEN_RETRIES_MS;
         if (waitTime < ARVIDEO_SENDER_MINIMUM_TIME_BETWEEN_RETRIES_MS)
             waitTime = ARVIDEO_SENDER_MINIMUM_TIME_BETWEEN_RETRIES_MS;
+#if ENABLE_RETRIES == 0
+        waitTime = 100000; // Put an extremely long wait time (100 sec) to simulate a "no retry" case
+#endif
 
         while ((retVal == 0) &&
                (hadTimeout == 0))
@@ -254,10 +304,14 @@ static int ARVIDEO_Sender_PopFromQueue (ARVIDEO_Sender_t *sender, ARVIDEO_Sender
             }
             if (sender->numberOfWaitingFrames > 0)
             {
-                // Accept new frame only if it's high priority, or if we have finished the current one
                 ARVIDEO_Sender_Frame_t *frame = &(sender->nextFrames [sender->indexGetNextFrame]);
+#if ENABLE_ACK_WAIT == 1
+                // Give the next frame only if :
+                // 1> It's an high priority frame
+                // 2> The previous frame was fully acknowledged
                 if ((frame->isHighPriority == 1) ||
                     (sender->currentFrameCbWasCalled == 1))
+#endif
                 {
                     retVal = 1;
                     sender->numberOfWaitingFrames--;
@@ -330,6 +384,16 @@ eARNETWORK_MANAGER_CALLBACK_RETURN ARVIDEO_Sender_NetworkCallback (int IoBufferI
         break;
     }
     return retVal;
+}
+
+
+void ARVIDEO_Sender_FrameWasAck (ARVIDEO_Sender_t *sender)
+{
+    sender->callback (ARVIDEO_SENDER_STATUS_FRAME_SENT, sender->currentFrame.frameBuffer, sender->currentFrame.frameSize, sender->custom);
+    sender->currentFrameCbWasCalled = 1;
+    ARSAL_Mutex_Lock (&(sender->nextFrameMutex));
+    ARSAL_Cond_Signal (&(sender->nextFrameCond));
+    ARSAL_Mutex_Unlock (&(sender->nextFrameMutex));
 }
 
 /*
@@ -763,11 +827,7 @@ void* ARVIDEO_Sender_RunAckThread (void *ARVIDEO_Sender_t_Param)
                 if ((sender->currentFrameCbWasCalled == 0) &&
                     (ARVIDEO_NetworkHeaders_AckPacketAllFlagsSet (&(sender->ackPacket), sender->currentFrameNbFragments) == 1))
                 {
-                    sender->callback (ARVIDEO_SENDER_STATUS_FRAME_SENT, sender->currentFrame.frameBuffer, sender->currentFrame.frameSize, sender->custom);
-                    sender->currentFrameCbWasCalled = 1;
-                    ARSAL_Mutex_Lock (&(sender->nextFrameMutex));
-                    ARSAL_Cond_Signal (&(sender->nextFrameCond));
-                    ARSAL_Mutex_Unlock (&(sender->nextFrameMutex));
+                    ARVIDEO_Sender_FrameWasAck (sender);
                 }
             }
             ARSAL_Mutex_Unlock (&(sender->ackMutex));
@@ -794,7 +854,7 @@ float ARVIDEO_Sender_GetEstimatedEfficiency (ARVIDEO_Sender_t *sender)
     ARSAL_Mutex_Unlock (&(sender->ackMutex));
     if (sentPackets == 0)
     {
-         retVal = 1.0f; // We didn't send any packet yet, so we have a 100% success !
+        retVal = 1.0f; // We didn't send any packet yet, so we have a 100% success !
     }
     else if (totalPackets > sentPackets)
     {
