@@ -46,7 +46,7 @@
  * 0 -> Don't retry sending a frame (count on wifi retries)
  * 1 -> Retry frame sends after some times if the acknowledge didn't come
  */
-#define ENABLE_RETRIES (0)
+#define ENABLE_RETRIES (1)
 
 /* Warning */
 #if ENABLE_RETRIES == 0
@@ -58,7 +58,7 @@
  * 0 -> Consider all frames given to network as "sent"
  * 1 -> Wait for an ARVIDEO_Reader full acknowledge of a frame before trying the next frame
  */
-#define ENABLE_ACK_WAIT (0)
+#define ENABLE_ACK_WAIT (1)
 
 /* Warning */
 #if ENABLE_ACK_WAIT == 0
@@ -259,8 +259,8 @@ static int ARVIDEO_Sender_PopFromQueue (ARVIDEO_Sender_t *sender, ARVIDEO_Sender
     // Check if a frame is ready and of good priority
     if (sender->numberOfWaitingFrames > 0)
     {
-        ARVIDEO_Sender_Frame_t *frame = &(sender->nextFrames [sender->indexGetNextFrame]);
 #if ENABLE_ACK_WAIT == 1
+        ARVIDEO_Sender_Frame_t *frame = &(sender->nextFrames [sender->indexGetNextFrame]);
         // Give the next frame only if :
         // 1> It's an high priority frame
         // 2> The previous frame was fully acknowledged
@@ -304,8 +304,8 @@ static int ARVIDEO_Sender_PopFromQueue (ARVIDEO_Sender_t *sender, ARVIDEO_Sender
             }
             if (sender->numberOfWaitingFrames > 0)
             {
-                ARVIDEO_Sender_Frame_t *frame = &(sender->nextFrames [sender->indexGetNextFrame]);
 #if ENABLE_ACK_WAIT == 1
+                ARVIDEO_Sender_Frame_t *frame = &(sender->nextFrames [sender->indexGetNextFrame]);
                 // Give the next frame only if :
                 // 1> It's an high priority frame
                 // 2> The previous frame was fully acknowledged
