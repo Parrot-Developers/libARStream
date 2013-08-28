@@ -205,33 +205,46 @@ public class ARVideoReader
     /**
      * Callback wrapper for the listener
      */
-    private ARNativeData callbackWrapper (int icause, long ndPointer, int ndSize, int nbSkip) {
+    private long[] callbackWrapper (int icause, long ndPointer, int ndSize, boolean isFlush, int nbSkip) {
         ARVIDEO_READER_CAUSE_ENUM cause = ARVIDEO_READER_CAUSE_ENUM.getFromValue (icause);
         if (cause == null) {
+            ARSALPrint.e (TAG, "Bad cause : " + icause);
+            return null;
+        }
+
+        if (ndPointer != currentFrameBuffer.getData()) {
+            ARSALPrint.e (TAG, "Bad frame buffer");
             return null;
         }
 
         switch (cause) {
         case ARVIDEO_READER_CAUSE_FRAME_COMPLETE:
-            currentFrameBuffer = eventListener.didUpdateFrameStatus (cause, currentFrameBuffer, nbSkip);
+            currentFrameBuffer.setUsedSize(ndSize);
+            currentFrameBuffer = eventListener.didUpdateFrameStatus (cause, currentFrameBuffer, isFlush, nbSkip);
             break;
         case ARVIDEO_READER_CAUSE_FRAME_TOO_SMALL:
             previousFrameBuffer = currentFrameBuffer;
-            currentFrameBuffer = eventListener.didUpdateFrameStatus (cause, currentFrameBuffer, nbSkip);
+            currentFrameBuffer = eventListener.didUpdateFrameStatus (cause, currentFrameBuffer, isFlush, nbSkip);
             break;
         case ARVIDEO_READER_CAUSE_COPY_COMPLETE:
-            eventListener.didUpdateFrameStatus (cause, previousFrameBuffer, nbSkip);
+            eventListener.didUpdateFrameStatus (cause, previousFrameBuffer, isFlush, nbSkip);
             previousFrameBuffer = null;
             break;
         case ARVIDEO_READER_CAUSE_CANCEL:
-            eventListener.didUpdateFrameStatus (cause, currentFrameBuffer, nbSkip);
+            eventListener.didUpdateFrameStatus (cause, currentFrameBuffer, isFlush, nbSkip);
             currentFrameBuffer = null;
             break;
         default:
             ARSALPrint.e (TAG, "Unknown cause :" + cause);
             break;
         }
-        return currentFrameBuffer;
+        if (currentFrameBuffer != null) {
+            long retVal[] = { currentFrameBuffer.getData(), currentFrameBuffer.getCapacity() };
+            return retVal;
+        } else {
+            long retVal[] = { 0, 0 };
+            return retVal;
+        }
     }
 
     /* **************** */

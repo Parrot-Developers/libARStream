@@ -371,7 +371,7 @@ void* ARVIDEO_Reader_RunDataThread (void *ARVIDEO_Reader_t_Param)
                 uint32_t nextFrameBufferSize = 0;
                 uint32_t dummy;
                 uint8_t *nextFrameBuffer = reader->callback (ARVIDEO_READER_CAUSE_FRAME_TOO_SMALL, reader->currentFrameBuffer, reader->currentFrameSize, 0, 0, &nextFrameBufferSize, reader->custom);
-                if (nextFrameBufferSize >= reader->currentFrameSize)
+                if (nextFrameBufferSize >= reader->currentFrameSize && nextFrameBufferSize > 0)
                 {
                     memcpy (nextFrameBuffer, reader->currentFrameBuffer, reader->currentFrameSize);
                 }
