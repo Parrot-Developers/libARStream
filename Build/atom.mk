@@ -6,11 +6,11 @@ ifneq ("$(TARGET_LIBC)","bionic")
 include $(CLEAR_VARS)
 
 LOCAL_CATEGORY_PATH := mykonos3/libs
-LOCAL_MODULE := libARVideo
-LOCAL_DESCRIPTION := ARSDK Video library
+LOCAL_MODULE := libARStreaming
+LOCAL_DESCRIPTION := ARSDK Streaming library
 
 LOCAL_LIBRARIES := libARSAL libARNetworkAL libARNetwork
-LOCAL_EXPORT_LDLIBS := -larvideo
+LOCAL_EXPORT_LDLIBS := -larstreaming
 
 #Autotools variables
 LOCAL_AUTOTOOLS_CONFIGURE_ARGS := --with-libARSALInstallDir="" --with-libARNetworkALInstallDir="" --with-libARNetworkInstallDir=""

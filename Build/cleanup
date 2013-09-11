@@ -16,8 +16,8 @@ rm -f \
     config.status \
     configure \
     libtool \
-    libarvideo_dbg.la \
-    libarvideo.la \
+    libarstreaming_dbg.la \
+    libarstreaming.la \
     stamp-h1
 
 find .. -name '*~' -delete
