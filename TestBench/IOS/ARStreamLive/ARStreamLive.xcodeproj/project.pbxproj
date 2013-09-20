@@ -1,0 +1,511 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 46;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		3714523617956C12007327BE /* EAGLView.m in Sources */ = {isa = PBXBuildFile; fileRef = 3714522F17956C12007327BE /* EAGLView.m */; };
+		3714523717956C12007327BE /* opengl_shader.c in Sources */ = {isa = PBXBuildFile; fileRef = 3714523017956C12007327BE /* opengl_shader.c */; };
+		3714523817956C12007327BE /* opengl_texture.c in Sources */ = {isa = PBXBuildFile; fileRef = 3714523217956C12007327BE /* opengl_texture.c */; };
+		3714523917956C12007327BE /* OpenGLSprite.m in Sources */ = {isa = PBXBuildFile; fileRef = 3714523517956C12007327BE /* OpenGLSprite.m */; };
+		3714523C17956C51007327BE /* ESRenderer.m in Sources */ = {isa = PBXBuildFile; fileRef = 3714523B17956C51007327BE /* ESRenderer.m */; };
+		3714523E17956DB3007327BE /* QuartzCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3714523D17956DB2007327BE /* QuartzCore.framework */; };
+		3714524317956FBE007327BE /* Shader.fsh in Resources */ = {isa = PBXBuildFile; fileRef = 3714523F17956FA0007327BE /* Shader.fsh */; };
+		3714524417956FBE007327BE /* Shader.vsh in Resources */ = {isa = PBXBuildFile; fileRef = 3714524017956FA0007327BE /* Shader.vsh */; };
+		37290E56178EAF77006B7B58 /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 37290E55178EAF77006B7B58 /* UIKit.framework */; };
+		37290E58178EAF77006B7B58 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 37290E57178EAF77006B7B58 /* Foundation.framework */; };
+		37290E5A178EAF77006B7B58 /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 37290E59178EAF77006B7B58 /* CoreGraphics.framework */; };
+		37290E5C178EAF77006B7B58 /* GLKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 37290E5B178EAF77006B7B58 /* GLKit.framework */; };
+		37290E5E178EAF77006B7B58 /* OpenGLES.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 37290E5D178EAF77006B7B58 /* OpenGLES.framework */; };
+		37290E64178EAF77006B7B58 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = 37290E62178EAF77006B7B58 /* InfoPlist.strings */; };
+		37290E66178EAF77006B7B58 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 37290E65178EAF77006B7B58 /* main.m */; };
+		37290E6A178EAF77006B7B58 /* ARSAppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = 37290E69178EAF77006B7B58 /* ARSAppDelegate.m */; };
+		37290E6C178EAF78006B7B58 /* Default.png in Resources */ = {isa = PBXBuildFile; fileRef = 37290E6B178EAF78006B7B58 /* Default.png */; };
+		37290E6E178EAF78006B7B58 /* Default@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = 37290E6D178EAF78006B7B58 /* Default@2x.png */; };
+		37290E70178EAF78006B7B58 /* Default-568h@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = 37290E6F178EAF78006B7B58 /* Default-568h@2x.png */; };
+		37290E73178EAF78006B7B58 /* MainStoryboard_iPhone.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 37290E71178EAF78006B7B58 /* MainStoryboard_iPhone.storyboard */; };
+		37290E7D178EAF79006B7B58 /* ARSStreamReader.m in Sources */ = {isa = PBXBuildFile; fileRef = 37290E7C178EAF79006B7B58 /* ARSStreamReader.m */; };
+		37290E85178EB195006B7B58 /* ARSIPSelectorViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 37290E84178EB195006B7B58 /* ARSIPSelectorViewController.m */; };
+		37290E8A178EB4C3006B7B58 /* libARNetwork.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 37290E86178EB4C3006B7B58 /* libARNetwork.framework */; };
+		37290E8B178EB4C3006B7B58 /* libARNetworkAL.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 37290E87178EB4C3006B7B58 /* libARNetworkAL.framework */; };
+		37290E8C178EB4C3006B7B58 /* libARSAL.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 37290E88178EB4C3006B7B58 /* libARSAL.framework */; };
+		37290E8D178EB4C3006B7B58 /* libARStream.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 37290E89178EB4C3006B7B58 /* libARStream.framework */; };
+		37290E8F178EDB77006B7B58 /* CoreBluetooth.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 37290E8E178EDB77006B7B58 /* CoreBluetooth.framework */; };
+		37290E92178EDBBD006B7B58 /* ARSFrameBuffer.m in Sources */ = {isa = PBXBuildFile; fileRef = 37290E91178EDBBD006B7B58 /* ARSFrameBuffer.m */; };
+		37290E95178EE733006B7B58 /* ARSDecoderViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 37290E94178EE733006B7B58 /* ARSDecoderViewController.m */; };
+		37290EAC178EFDC9006B7B58 /* libbuf_api_lib.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 37290EA8178EFDC9006B7B58 /* libbuf_api_lib.a */; };
+		37290EAD178EFDC9006B7B58 /* libcncl.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 37290EA9178EFDC9006B7B58 /* libcncl.a */; };
+		37290EAE178EFDC9006B7B58 /* libh264_dec_lib.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 37290EAA178EFDC9006B7B58 /* libh264_dec_lib.a */; };
+		37290EAF178EFDC9006B7B58 /* libsys_utils.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 37290EAB178EFDC9006B7B58 /* libsys_utils.a */; };
+		37290EB4178EFE74006B7B58 /* ARSITTIAMDecoder.m in Sources */ = {isa = PBXBuildFile; fileRef = 37290EB3178EFE74006B7B58 /* ARSITTIAMDecoder.m */; };
+		37B838371796DCB4008B196F /* ARSDisplayRGB.m in Sources */ = {isa = PBXBuildFile; fileRef = 37B838361796DCB4008B196F /* ARSDisplayRGB.m */; };
+		37F745AA17903CD400184F9C /* Icon-72.png in Resources */ = {isa = PBXBuildFile; fileRef = 37F745A617903CD400184F9C /* Icon-72.png */; };
+		37F745AB17903CD400184F9C /* Icon-72@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = 37F745A717903CD400184F9C /* Icon-72@2x.png */; };
+		37F745AC17903CD400184F9C /* Icon.png in Resources */ = {isa = PBXBuildFile; fileRef = 37F745A817903CD400184F9C /* Icon.png */; };
+		37F745AD17903CD400184F9C /* Icon@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = 37F745A917903CD400184F9C /* Icon@2x.png */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		3714522E17956C12007327BE /* EAGLView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = EAGLView.h; path = OpenGL/EAGLView.h; sourceTree = "<group>"; };
+		3714522F17956C12007327BE /* EAGLView.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = EAGLView.m; path = OpenGL/EAGLView.m; sourceTree = "<group>"; };
+		3714523017956C12007327BE /* opengl_shader.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = opengl_shader.c; path = OpenGL/opengl_shader.c; sourceTree = "<group>"; };
+		3714523117956C12007327BE /* opengl_shader.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = opengl_shader.h; path = OpenGL/opengl_shader.h; sourceTree = "<group>"; };
+		3714523217956C12007327BE /* opengl_texture.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = opengl_texture.c; path = OpenGL/opengl_texture.c; sourceTree = "<group>"; };
+		3714523317956C12007327BE /* opengl_texture.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = opengl_texture.h; path = OpenGL/opengl_texture.h; sourceTree = "<group>"; };
+		3714523417956C12007327BE /* OpenGLSprite.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = OpenGLSprite.h; path = OpenGL/OpenGLSprite.h; sourceTree = "<group>"; };
+		3714523517956C12007327BE /* OpenGLSprite.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = OpenGLSprite.m; path = OpenGL/OpenGLSprite.m; sourceTree = "<group>"; };
+		3714523A17956C51007327BE /* ESRenderer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ESRenderer.h; path = OpenGL/ESRenderer.h; sourceTree = "<group>"; };
+		3714523B17956C51007327BE /* ESRenderer.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = ESRenderer.m; path = OpenGL/ESRenderer.m; sourceTree = "<group>"; };
+		3714523D17956DB2007327BE /* QuartzCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuartzCore.framework; path = System/Library/Frameworks/QuartzCore.framework; sourceTree = SDKROOT; };
+		3714523F17956FA0007327BE /* Shader.fsh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.glsl; name = Shader.fsh; path = Shaders/Shader.fsh; sourceTree = "<group>"; };
+		3714524017956FA0007327BE /* Shader.vsh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.glsl; name = Shader.vsh; path = Shaders/Shader.vsh; sourceTree = "<group>"; };
+		37290E52178EAF77006B7B58 /* ARStreamLive.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ARStreamLive.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		37290E55178EAF77006B7B58 /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = System/Library/Frameworks/UIKit.framework; sourceTree = SDKROOT; };
+		37290E57178EAF77006B7B58 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
+		37290E59178EAF77006B7B58 /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
+		37290E5B178EAF77006B7B58 /* GLKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = GLKit.framework; path = System/Library/Frameworks/GLKit.framework; sourceTree = SDKROOT; };
+		37290E5D178EAF77006B7B58 /* OpenGLES.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = OpenGLES.framework; path = System/Library/Frameworks/OpenGLES.framework; sourceTree = SDKROOT; };
+		37290E61178EAF77006B7B58 /* ARStreamLive-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "ARStreamLive-Info.plist"; sourceTree = "<group>"; };
+		37290E63178EAF77006B7B58 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		37290E65178EAF77006B7B58 /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
+		37290E67178EAF77006B7B58 /* ARStreamLive-Prefix.pch */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "ARStreamLive-Prefix.pch"; sourceTree = "<group>"; };
+		37290E68178EAF77006B7B58 /* ARSAppDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ARSAppDelegate.h; sourceTree = "<group>"; };
+		37290E69178EAF77006B7B58 /* ARSAppDelegate.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ARSAppDelegate.m; sourceTree = "<group>"; };
+		37290E6B178EAF78006B7B58 /* Default.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = Default.png; sourceTree = "<group>"; };
+		37290E6D178EAF78006B7B58 /* Default@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Default@2x.png"; sourceTree = "<group>"; };
+		37290E6F178EAF78006B7B58 /* Default-568h@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Default-568h@2x.png"; sourceTree = "<group>"; };
+		37290E72178EAF78006B7B58 /* en */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = en; path = en.lproj/MainStoryboard_iPhone.storyboard; sourceTree = "<group>"; };
+		37290E7B178EAF79006B7B58 /* ARSStreamReader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ARSStreamReader.h; sourceTree = "<group>"; };
+		37290E7C178EAF79006B7B58 /* ARSStreamReader.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ARSStreamReader.m; sourceTree = "<group>"; };
+		37290E83178EB195006B7B58 /* ARSIPSelectorViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ARSIPSelectorViewController.h; sourceTree = "<group>"; };
+		37290E84178EB195006B7B58 /* ARSIPSelectorViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = ARSIPSelectorViewController.m; sourceTree = "<group>"; };
+		37290E86178EB4C3006B7B58 /* libARNetwork.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = libARNetwork.framework; path = ../../../../TargetsIOS/Frameworks/libARNetwork.framework; sourceTree = "<group>"; };
+		37290E87178EB4C3006B7B58 /* libARNetworkAL.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = libARNetworkAL.framework; path = ../../../../TargetsIOS/Frameworks/libARNetworkAL.framework; sourceTree = "<group>"; };
+		37290E88178EB4C3006B7B58 /* libARSAL.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = libARSAL.framework; path = ../../../../TargetsIOS/Frameworks/libARSAL.framework; sourceTree = "<group>"; };
+		37290E89178EB4C3006B7B58 /* libARStream.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = libARStream.framework; path = ../../../../TargetsIOS/Frameworks/libARStream.framework; sourceTree = "<group>"; };
+		37290E8E178EDB77006B7B58 /* CoreBluetooth.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreBluetooth.framework; path = System/Library/Frameworks/CoreBluetooth.framework; sourceTree = SDKROOT; };
+		37290E90178EDBBD006B7B58 /* ARSFrameBuffer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ARSFrameBuffer.h; sourceTree = "<group>"; };
+		37290E91178EDBBD006B7B58 /* ARSFrameBuffer.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = ARSFrameBuffer.m; sourceTree = "<group>"; };
+		37290E93178EE733006B7B58 /* ARSDecoderViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ARSDecoderViewController.h; sourceTree = "<group>"; };
+		37290E94178EE733006B7B58 /* ARSDecoderViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = ARSDecoderViewController.m; sourceTree = "<group>"; };
+		37290E97178EFDBE006B7B58 /* app_video_decode.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = app_video_decode.h; path = ITTIAM/avc_decoder/includes/app_video_decode.h; sourceTree = "<group>"; };
+		37290E98178EFDBE006B7B58 /* appl_error_handler.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = appl_error_handler.h; path = ITTIAM/avc_decoder/includes/appl_error_handler.h; sourceTree = "<group>"; };
+		37290E99178EFDBE006B7B58 /* datatypedef.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = datatypedef.h; path = ITTIAM/avc_decoder/includes/datatypedef.h; sourceTree = "<group>"; };
+		37290E9A178EFDBE006B7B58 /* dvevmStMD5.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = dvevmStMD5.h; path = ITTIAM/avc_decoder/includes/dvevmStMD5.h; sourceTree = "<group>"; };
+		37290E9B178EFDBE006B7B58 /* dvevmStMD5Global.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = dvevmStMD5Global.h; path = ITTIAM/avc_decoder/includes/dvevmStMD5Global.h; sourceTree = "<group>"; };
+		37290E9C178EFDBE006B7B58 /* ih264d_cxa8.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ih264d_cxa8.h; path = ITTIAM/avc_decoder/includes/ih264d_cxa8.h; sourceTree = "<group>"; };
+		37290E9D178EFDBE006B7B58 /* it_file_ansi.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = it_file_ansi.h; path = ITTIAM/avc_decoder/includes/it_file_ansi.h; sourceTree = "<group>"; };
+		37290E9E178EFDBE006B7B58 /* it_file.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = it_file.h; path = ITTIAM/avc_decoder/includes/it_file.h; sourceTree = "<group>"; };
+		37290E9F178EFDBE006B7B58 /* it_mem.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = it_mem.h; path = ITTIAM/avc_decoder/includes/it_mem.h; sourceTree = "<group>"; };
+		37290EA0178EFDBE006B7B58 /* it_memory.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = it_memory.h; path = ITTIAM/avc_decoder/includes/it_memory.h; sourceTree = "<group>"; };
+		37290EA1178EFDBE006B7B58 /* it_result_types.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = it_result_types.h; path = ITTIAM/avc_decoder/includes/it_result_types.h; sourceTree = "<group>"; };
+		37290EA2178EFDBE006B7B58 /* itt_vid_dec_sys_api.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = itt_vid_dec_sys_api.h; path = ITTIAM/avc_decoder/includes/itt_vid_dec_sys_api.h; sourceTree = "<group>"; };
+		37290EA3178EFDBE006B7B58 /* itt_viddec_api_typedefs.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = itt_viddec_api_typedefs.h; path = ITTIAM/avc_decoder/includes/itt_viddec_api_typedefs.h; sourceTree = "<group>"; };
+		37290EA4178EFDBE006B7B58 /* iv.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = iv.h; path = ITTIAM/avc_decoder/includes/iv.h; sourceTree = "<group>"; };
+		37290EA5178EFDBE006B7B58 /* ivd.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ivd.h; path = ITTIAM/avc_decoder/includes/ivd.h; sourceTree = "<group>"; };
+		37290EA6178EFDBE006B7B58 /* mpeg4aspdec_profile.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = mpeg4aspdec_profile.h; path = ITTIAM/avc_decoder/includes/mpeg4aspdec_profile.h; sourceTree = "<group>"; };
+		37290EA7178EFDBE006B7B58 /* vid_dec_interface.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = vid_dec_interface.h; path = ITTIAM/avc_decoder/includes/vid_dec_interface.h; sourceTree = "<group>"; };
+		37290EA8178EFDC9006B7B58 /* libbuf_api_lib.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libbuf_api_lib.a; path = ITTIAM/avc_decoder/libs/libbuf_api_lib.a; sourceTree = "<group>"; };
+		37290EA9178EFDC9006B7B58 /* libcncl.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libcncl.a; path = ITTIAM/avc_decoder/libs/libcncl.a; sourceTree = "<group>"; };
+		37290EAA178EFDC9006B7B58 /* libh264_dec_lib.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libh264_dec_lib.a; path = ITTIAM/avc_decoder/libs/libh264_dec_lib.a; sourceTree = "<group>"; };
+		37290EAB178EFDC9006B7B58 /* libsys_utils.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libsys_utils.a; path = ITTIAM/avc_decoder/libs/libsys_utils.a; sourceTree = "<group>"; };
+		37290EB2178EFE74006B7B58 /* ARSITTIAMDecoder.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ARSITTIAMDecoder.h; sourceTree = "<group>"; };
+		37290EB3178EFE74006B7B58 /* ARSITTIAMDecoder.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = ARSITTIAMDecoder.m; sourceTree = "<group>"; };
+		37B838351796DCB4008B196F /* ARSDisplayRGB.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ARSDisplayRGB.h; sourceTree = "<group>"; };
+		37B838361796DCB4008B196F /* ARSDisplayRGB.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = ARSDisplayRGB.m; sourceTree = "<group>"; };
+		37F745A617903CD400184F9C /* Icon-72.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Icon-72.png"; sourceTree = SOURCE_ROOT; };
+		37F745A717903CD400184F9C /* Icon-72@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Icon-72@2x.png"; sourceTree = SOURCE_ROOT; };
+		37F745A817903CD400184F9C /* Icon.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = Icon.png; sourceTree = SOURCE_ROOT; };
+		37F745A917903CD400184F9C /* Icon@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Icon@2x.png"; sourceTree = SOURCE_ROOT; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		37290E4F178EAF77006B7B58 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				3714523E17956DB3007327BE /* QuartzCore.framework in Frameworks */,
+				37290E8F178EDB77006B7B58 /* CoreBluetooth.framework in Frameworks */,
+				37290E56178EAF77006B7B58 /* UIKit.framework in Frameworks */,
+				37290E58178EAF77006B7B58 /* Foundation.framework in Frameworks */,
+				37290E5A178EAF77006B7B58 /* CoreGraphics.framework in Frameworks */,
+				37290E5C178EAF77006B7B58 /* GLKit.framework in Frameworks */,
+				37290E5E178EAF77006B7B58 /* OpenGLES.framework in Frameworks */,
+				37290E8A178EB4C3006B7B58 /* libARNetwork.framework in Frameworks */,
+				37290E8B178EB4C3006B7B58 /* libARNetworkAL.framework in Frameworks */,
+				37290E8C178EB4C3006B7B58 /* libARSAL.framework in Frameworks */,
+				37290E8D178EB4C3006B7B58 /* libARStream.framework in Frameworks */,
+				37290EAC178EFDC9006B7B58 /* libbuf_api_lib.a in Frameworks */,
+				37290EAD178EFDC9006B7B58 /* libcncl.a in Frameworks */,
+				37290EAE178EFDC9006B7B58 /* libh264_dec_lib.a in Frameworks */,
+				37290EAF178EFDC9006B7B58 /* libsys_utils.a in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		3714522D17956BFE007327BE /* OpenGL */ = {
+			isa = PBXGroup;
+			children = (
+				3714523F17956FA0007327BE /* Shader.fsh */,
+				3714524017956FA0007327BE /* Shader.vsh */,
+				3714523A17956C51007327BE /* ESRenderer.h */,
+				3714523B17956C51007327BE /* ESRenderer.m */,
+				3714522E17956C12007327BE /* EAGLView.h */,
+				3714522F17956C12007327BE /* EAGLView.m */,
+				3714523017956C12007327BE /* opengl_shader.c */,
+				3714523117956C12007327BE /* opengl_shader.h */,
+				3714523217956C12007327BE /* opengl_texture.c */,
+				3714523317956C12007327BE /* opengl_texture.h */,
+				3714523417956C12007327BE /* OpenGLSprite.h */,
+				3714523517956C12007327BE /* OpenGLSprite.m */,
+			);
+			name = OpenGL;
+			sourceTree = "<group>";
+		};
+		37290E49178EAF76006B7B58 = {
+			isa = PBXGroup;
+			children = (
+				37290E5F178EAF77006B7B58 /* ARStreamLive */,
+				37290E54178EAF77006B7B58 /* Frameworks */,
+				37290E53178EAF77006B7B58 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		37290E53178EAF77006B7B58 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				37290E52178EAF77006B7B58 /* ARStreamLive.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		37290E54178EAF77006B7B58 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				37290E86178EB4C3006B7B58 /* libARNetwork.framework */,
+				37290E87178EB4C3006B7B58 /* libARNetworkAL.framework */,
+				37290E88178EB4C3006B7B58 /* libARSAL.framework */,
+				37290E89178EB4C3006B7B58 /* libARStream.framework */,
+				3714523D17956DB2007327BE /* QuartzCore.framework */,
+				37290E8E178EDB77006B7B58 /* CoreBluetooth.framework */,
+				37290E55178EAF77006B7B58 /* UIKit.framework */,
+				37290E57178EAF77006B7B58 /* Foundation.framework */,
+				37290E59178EAF77006B7B58 /* CoreGraphics.framework */,
+				37290E5B178EAF77006B7B58 /* GLKit.framework */,
+				37290E5D178EAF77006B7B58 /* OpenGLES.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		37290E5F178EAF77006B7B58 /* ARStreamLive */ = {
+			isa = PBXGroup;
+			children = (
+				3714522D17956BFE007327BE /* OpenGL */,
+				37F745A617903CD400184F9C /* Icon-72.png */,
+				37F745A717903CD400184F9C /* Icon-72@2x.png */,
+				37F745A817903CD400184F9C /* Icon.png */,
+				37F745A917903CD400184F9C /* Icon@2x.png */,
+				37290E96178EFDAF006B7B58 /* ITTIAM */,
+				37290E68178EAF77006B7B58 /* ARSAppDelegate.h */,
+				37290E69178EAF77006B7B58 /* ARSAppDelegate.m */,
+				37290E71178EAF78006B7B58 /* MainStoryboard_iPhone.storyboard */,
+				37290E62178EAF77006B7B58 /* InfoPlist.strings */,
+				37290E7B178EAF79006B7B58 /* ARSStreamReader.h */,
+				37290E7C178EAF79006B7B58 /* ARSStreamReader.m */,
+				37290EB2178EFE74006B7B58 /* ARSITTIAMDecoder.h */,
+				37290EB3178EFE74006B7B58 /* ARSITTIAMDecoder.m */,
+				37B838351796DCB4008B196F /* ARSDisplayRGB.h */,
+				37B838361796DCB4008B196F /* ARSDisplayRGB.m */,
+				37290E60178EAF77006B7B58 /* Supporting Files */,
+				37290E83178EB195006B7B58 /* ARSIPSelectorViewController.h */,
+				37290E84178EB195006B7B58 /* ARSIPSelectorViewController.m */,
+				37290E90178EDBBD006B7B58 /* ARSFrameBuffer.h */,
+				37290E91178EDBBD006B7B58 /* ARSFrameBuffer.m */,
+				37290E93178EE733006B7B58 /* ARSDecoderViewController.h */,
+				37290E94178EE733006B7B58 /* ARSDecoderViewController.m */,
+			);
+			path = ARStreamLive;
+			sourceTree = "<group>";
+		};
+		37290E60178EAF77006B7B58 /* Supporting Files */ = {
+			isa = PBXGroup;
+			children = (
+				37290E61178EAF77006B7B58 /* ARStreamLive-Info.plist */,
+				37290E65178EAF77006B7B58 /* main.m */,
+				37290E67178EAF77006B7B58 /* ARStreamLive-Prefix.pch */,
+				37290E6B178EAF78006B7B58 /* Default.png */,
+				37290E6D178EAF78006B7B58 /* Default@2x.png */,
+				37290E6F178EAF78006B7B58 /* Default-568h@2x.png */,
+			);
+			name = "Supporting Files";
+			sourceTree = "<group>";
+		};
+		37290E96178EFDAF006B7B58 /* ITTIAM */ = {
+			isa = PBXGroup;
+			children = (
+				37290EA8178EFDC9006B7B58 /* libbuf_api_lib.a */,
+				37290EA9178EFDC9006B7B58 /* libcncl.a */,
+				37290EAA178EFDC9006B7B58 /* libh264_dec_lib.a */,
+				37290EAB178EFDC9006B7B58 /* libsys_utils.a */,
+				37290E97178EFDBE006B7B58 /* app_video_decode.h */,
+				37290E98178EFDBE006B7B58 /* appl_error_handler.h */,
+				37290E99178EFDBE006B7B58 /* datatypedef.h */,
+				37290E9A178EFDBE006B7B58 /* dvevmStMD5.h */,
+				37290E9B178EFDBE006B7B58 /* dvevmStMD5Global.h */,
+				37290E9C178EFDBE006B7B58 /* ih264d_cxa8.h */,
+				37290E9D178EFDBE006B7B58 /* it_file_ansi.h */,
+				37290E9E178EFDBE006B7B58 /* it_file.h */,
+				37290E9F178EFDBE006B7B58 /* it_mem.h */,
+				37290EA0178EFDBE006B7B58 /* it_memory.h */,
+				37290EA1178EFDBE006B7B58 /* it_result_types.h */,
+				37290EA2178EFDBE006B7B58 /* itt_vid_dec_sys_api.h */,
+				37290EA3178EFDBE006B7B58 /* itt_viddec_api_typedefs.h */,
+				37290EA4178EFDBE006B7B58 /* iv.h */,
+				37290EA5178EFDBE006B7B58 /* ivd.h */,
+				37290EA6178EFDBE006B7B58 /* mpeg4aspdec_profile.h */,
+				37290EA7178EFDBE006B7B58 /* vid_dec_interface.h */,
+			);
+			name = ITTIAM;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		37290E51178EAF77006B7B58 /* ARStreamLive */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 37290E80178EAF79006B7B58 /* Build configuration list for PBXNativeTarget "ARStreamLive" */;
+			buildPhases = (
+				37290E4E178EAF77006B7B58 /* Sources */,
+				37290E4F178EAF77006B7B58 /* Frameworks */,
+				37290E50178EAF77006B7B58 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = ARStreamLive;
+			productName = ARStreamLive;
+			productReference = 37290E52178EAF77006B7B58 /* ARStreamLive.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		37290E4A178EAF77006B7B58 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				CLASSPREFIX = ARS;
+				LastUpgradeCheck = 0460;
+				ORGANIZATIONNAME = parrot;
+			};
+			buildConfigurationList = 37290E4D178EAF77006B7B58 /* Build configuration list for PBXProject "ARStreamLive" */;
+			compatibilityVersion = "Xcode 3.2";
+			developmentRegion = English;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+			);
+			mainGroup = 37290E49178EAF76006B7B58;
+			productRefGroup = 37290E53178EAF77006B7B58 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				37290E51178EAF77006B7B58 /* ARStreamLive */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		37290E50178EAF77006B7B58 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				3714524317956FBE007327BE /* Shader.fsh in Resources */,
+				3714524417956FBE007327BE /* Shader.vsh in Resources */,
+				37290E64178EAF77006B7B58 /* InfoPlist.strings in Resources */,
+				37290E6C178EAF78006B7B58 /* Default.png in Resources */,
+				37290E6E178EAF78006B7B58 /* Default@2x.png in Resources */,
+				37290E70178EAF78006B7B58 /* Default-568h@2x.png in Resources */,
+				37290E73178EAF78006B7B58 /* MainStoryboard_iPhone.storyboard in Resources */,
+				37F745AA17903CD400184F9C /* Icon-72.png in Resources */,
+				37F745AB17903CD400184F9C /* Icon-72@2x.png in Resources */,
+				37F745AC17903CD400184F9C /* Icon.png in Resources */,
+				37F745AD17903CD400184F9C /* Icon@2x.png in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		37290E4E178EAF77006B7B58 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				37290E66178EAF77006B7B58 /* main.m in Sources */,
+				37290E6A178EAF77006B7B58 /* ARSAppDelegate.m in Sources */,
+				37290E7D178EAF79006B7B58 /* ARSStreamReader.m in Sources */,
+				37290E85178EB195006B7B58 /* ARSIPSelectorViewController.m in Sources */,
+				37290E92178EDBBD006B7B58 /* ARSFrameBuffer.m in Sources */,
+				37290E95178EE733006B7B58 /* ARSDecoderViewController.m in Sources */,
+				37290EB4178EFE74006B7B58 /* ARSITTIAMDecoder.m in Sources */,
+				3714523617956C12007327BE /* EAGLView.m in Sources */,
+				3714523717956C12007327BE /* opengl_shader.c in Sources */,
+				3714523817956C12007327BE /* opengl_texture.c in Sources */,
+				3714523917956C12007327BE /* OpenGLSprite.m in Sources */,
+				3714523C17956C51007327BE /* ESRenderer.m in Sources */,
+				37B838371796DCB4008B196F /* ARSDisplayRGB.m in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXVariantGroup section */
+		37290E62178EAF77006B7B58 /* InfoPlist.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				37290E63178EAF77006B7B58 /* en */,
+			);
+			name = InfoPlist.strings;
+			sourceTree = "<group>";
+		};
+		37290E71178EAF78006B7B58 /* MainStoryboard_iPhone.storyboard */ = {
+			isa = PBXVariantGroup;
+			children = (
+				37290E72178EAF78006B7B58 /* en */,
+			);
+			name = MainStoryboard_iPhone.storyboard;
+			sourceTree = "<group>";
+		};
+/* End PBXVariantGroup section */
+
+/* Begin XCBuildConfiguration section */
+		37290E7E178EAF79006B7B58 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++0x";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
+				COPY_PHASE_STRIP = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 6.1;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		37290E7F178EAF79006B7B58 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++0x";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
+				COPY_PHASE_STRIP = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 6.1;
+				OTHER_CFLAGS = "-DNS_BLOCK_ASSERTIONS=1";
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		37290E81178EAF79006B7B58 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"\"$(SRCROOT)/../../../../TargetsIOS/Frameworks\"",
+				);
+				GCC_PRECOMPILE_PREFIX_HEADER = YES;
+				GCC_PREFIX_HEADER = "ARStreamLive/ARStreamLive-Prefix.pch";
+				INFOPLIST_FILE = "ARStreamLive/ARStreamLive-Info.plist";
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"\"$(SRCROOT)/ARStreamLive/ITTIAM/avc_decoder/libs\"",
+				);
+				ONLY_ACTIVE_ARCH = NO;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				VALID_ARCHS = armv7;
+				WRAPPER_EXTENSION = app;
+			};
+			name = Debug;
+		};
+		37290E82178EAF79006B7B58 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"\"$(SRCROOT)/../../../../TargetsIOS/Frameworks\"",
+				);
+				GCC_PRECOMPILE_PREFIX_HEADER = YES;
+				GCC_PREFIX_HEADER = "ARStreamLive/ARStreamLive-Prefix.pch";
+				INFOPLIST_FILE = "ARStreamLive/ARStreamLive-Info.plist";
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"\"$(SRCROOT)/ARStreamLive/ITTIAM/avc_decoder/libs\"",
+				);
+				ONLY_ACTIVE_ARCH = NO;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				VALID_ARCHS = armv7;
+				WRAPPER_EXTENSION = app;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		37290E4D178EAF77006B7B58 /* Build configuration list for PBXProject "ARStreamLive" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				37290E7E178EAF79006B7B58 /* Debug */,
+				37290E7F178EAF79006B7B58 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		37290E80178EAF79006B7B58 /* Build configuration list for PBXNativeTarget "ARStreamLive" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				37290E81178EAF79006B7B58 /* Debug */,
+				37290E82178EAF79006B7B58 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 37290E4A178EAF77006B7B58 /* Project object */;
+}

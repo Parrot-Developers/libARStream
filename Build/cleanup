@@ -16,8 +16,8 @@ rm -f \
     config.status \
     configure \
     libtool \
-    libarstreaming_dbg.la \
-    libarstreaming.la \
+    libarstream_dbg.la \
+    libarstream.la \
     stamp-h1
 
 find .. -name '*~' -delete
