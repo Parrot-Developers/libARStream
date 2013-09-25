@@ -444,7 +444,7 @@ uint32_t ARSTREAM_MP4SenderTb_GetNextFrame (uint8_t *nextFrame, int nextFrameSiz
         mp4CurrentFrame = 0;
     }
 
-    *isIFrame = ((mp4CurrentFrame % I_FRAME_EVERY_N) == 0) ? 1 : 0;
+    *isIFrame = ((mp4CurrentFrame % I_FRAME_EVERY_N) == 1) ? 1 : 0;
 
     return nextSize;
 }

@@ -223,6 +223,10 @@ static int ARSTREAM_Sender_AddToQueue (ARSTREAM_Sender_t *sender, uint32_t size,
     int retVal;
     ARSAL_Mutex_Lock (&(sender->nextFrameMutex));
     retVal = sender->numberOfWaitingFrames;
+    if (sender->currentFrameCbWasCalled == 0)
+    {
+        retVal++;
+    }
     if (wasFlushFrame == 1)
     {
         ARSTREAM_Sender_FlushQueue (sender);

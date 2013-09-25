@@ -61,7 +61,7 @@ typedef enum {
 typedef uint8_t* (*ARSTREAM_Reader_FrameCompleteCallback_t) (eARSTREAM_READER_CAUSE cause, uint8_t *framePointer, uint32_t frameSize, int isFlushFrame, int numberOfSkippedFrames, uint32_t *newBufferCapacity, void *custom);
 
 /**
- * @brief An ARSTREAM_Reader_t instance allow reading stream frames from a network
+ * @brief An ARSTREAM_Reader_t instance allow reading streamed frames from a network
  */
 typedef struct ARSTREAM_Reader_t ARSTREAM_Reader_t;
 

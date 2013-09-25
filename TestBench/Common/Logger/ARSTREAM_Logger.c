@@ -9,6 +9,8 @@
 #define ARSTREAM_LOGGER_DATE_FORMAT  "_%04d%02d%02d_%02d%02d%02d"
 #define ARSTREAM_LOGGER_STRLEN (1024)
 
+#define ENABLE_LOGGER (1)
+
 struct ARSTREAM_Logger {
     char filename [ARSTREAM_LOGGER_STRLEN];
     char date[ARSTREAM_LOGGER_STRLEN];
@@ -22,6 +24,7 @@ ARSTREAM_Logger_t* ARSTREAM_Logger_NewWithDefaultName ()
 
 ARSTREAM_Logger_t* ARSTREAM_Logger_New (const char *basePath, int useDate)
 {
+#if ENABLE_LOGGER
     ARSTREAM_Logger_t *retLogger = calloc (1, sizeof (ARSTREAM_Logger_t));
     if (retLogger == NULL)
     {
@@ -45,6 +48,9 @@ ARSTREAM_Logger_t* ARSTREAM_Logger_New (const char *basePath, int useDate)
     }
 
     return retLogger;
+#else
+    return NULL;
+#endif
 }
 
 void ARSTREAM_Logger_Delete (ARSTREAM_Logger_t **logger)

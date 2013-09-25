@@ -49,7 +49,7 @@ typedef enum {
 typedef void (*ARSTREAM_Sender_FrameUpdateCallback_t)(eARSTREAM_SENDER_STATUS status, uint8_t *framePointer, uint32_t frameSize, void *custom);
 
 /**
- * @brief An ARSTREAM_Sender_t instance allow stream frames over a network
+ * @brief An ARSTREAM_Sender_t instance allow streaming frames over a network
  */
 typedef struct ARSTREAM_Sender_t ARSTREAM_Sender_t;
 

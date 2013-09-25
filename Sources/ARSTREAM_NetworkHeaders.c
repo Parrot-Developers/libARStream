@@ -71,7 +71,7 @@ int ARSTREAM_NetworkHeaders_AckPacketAllFlagsSet (ARSTREAM_NetworkHeaders_AckPac
     {
         // We need to check for the second packet also
         uint64_t lo_mask = UINT64_MAX;
-        uint32_t hi_mask = (1ll << (maxFlag-32)) - 1ll;
+        uint64_t hi_mask = (1ll << (maxFlag-64)) - 1ll;
         int hi_res = ((packet->highPacketsAck & hi_mask) == hi_mask) ? 1 : 0;
         int lo_res = ((packet->lowPacketsAck & lo_mask) == lo_mask) ? 1 : 0;
         res = (hi_res == 1 && lo_res == 1) ? 1 : 0;
@@ -221,17 +221,22 @@ uint32_t ARSTREAM_NetworkHeaders_AckPacketCountNotSet (ARSTREAM_NetworkHeaders_A
     return retVal;
 }
 
-void ARSTREAM_NetworkHeaders_AckPacketDump (const char *prefix, ARSTREAM_NetworkHeaders_AckPacket_t *packet)
+void ARSTREAM_NetworkHeaders_InternalAckPacketDump (const char *prefix, ARSTREAM_NetworkHeaders_AckPacket_t *packet, eARSAL_PRINT_LEVEL level)
 {
-    ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARSTREAM_NETWORK_HEADERS_TAG, "Packet dump: %s", prefix);
+    ARSAL_PRINT (level, ARSTREAM_NETWORK_HEADERS_TAG, "Packet dump: %s", prefix);
     if (packet == NULL)
     {
-        ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARSTREAM_NETWORK_HEADERS_TAG, "Packet is NULL");
+        ARSAL_PRINT (level, ARSTREAM_NETWORK_HEADERS_TAG, "Packet is NULL");
     }
     else
     {
-        ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARSTREAM_NETWORK_HEADERS_TAG, " - Frame number : %d", packet->frameNumber);
-        ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARSTREAM_NETWORK_HEADERS_TAG, " - HI 64 bits : %016llX", packet->highPacketsAck);
-        ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARSTREAM_NETWORK_HEADERS_TAG, " - LO 64 bits : %016llX", packet->lowPacketsAck);
+        ARSAL_PRINT (level, ARSTREAM_NETWORK_HEADERS_TAG, " - Frame number : %d", packet->frameNumber);
+        ARSAL_PRINT (level, ARSTREAM_NETWORK_HEADERS_TAG, " - HI 64 bits : %016llX", packet->highPacketsAck);
+        ARSAL_PRINT (level, ARSTREAM_NETWORK_HEADERS_TAG, " - LO 64 bits : %016llX", packet->lowPacketsAck);
     }
+}
+
+void ARSTREAM_NetworkHeaders_AckPacketDump (const char *prefix, ARSTREAM_NetworkHeaders_AckPacket_t *packet)
+{
+    ARSTREAM_NetworkHeaders_InternalAckPacketDump (prefix, packet, ARSAL_PRINT_DEBUG);
 }
