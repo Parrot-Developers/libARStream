@@ -100,7 +100,7 @@ uint8_t* streamCallback (eARSTREAM_READER_CAUSE cause, uint8_t *framePointer, ui
             {
                 NSLog (@"Error while creating ARNetworkAL : %s", ARNETWORKAL_Error_ToString(alerr));
             }
-            alerr = ARNETWORKAL_Manager_InitWiFiNetwork(_alm, [ip UTF8String], CD_PORT, DC_PORT, NET_TO);
+            alerr = ARNETWORKAL_Manager_InitWifiNetwork(_alm, [ip UTF8String], CD_PORT, DC_PORT, NET_TO);
             if (alerr != ARNETWORKAL_OK)
             {
                 NSLog (@"Error while Initializing wifi network : %s", ARNETWORKAL_Error_ToString(alerr));
