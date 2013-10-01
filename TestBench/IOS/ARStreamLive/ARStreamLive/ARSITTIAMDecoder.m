@@ -81,7 +81,7 @@
     /****************************************************************************/
     /* H264 ====== Initialize the memory records
      *****************************************************************************/
-    NSLog (@"ITTIAM INIT");
+    NSLog (@"ITTIAM INIT (%3d x %3d)", _width, _height);
     
     iv_num_mem_rec_ip_t h264_num_mem_rec_ip;
     iv_num_mem_rec_op_t h264_num_mem_rec_op;
@@ -305,9 +305,8 @@
     if (frame.missed != 0) {
         waitForIFrame = YES;
     }
-    
+
     if (!waitForIFrame || frame.isIFrame) {
-        
         /****************************************************************************/
         /* Decode the in buffer EXEC PART
          *****************************************************************************/
@@ -316,12 +315,10 @@
         _h264_video_decode_ip.pv_stream_buffer = ((unsigned char*) frame.data);
         _h264_video_decode_ip.u4_num_Bytes = frame.used;
         
-        //NSLog (@"In size = %d", frame.used);
-        
         if (ih264d_cxa8_api_function(_H264_DECHDL, (void *) &_h264_video_decode_ip, (void *) &_h264_video_decode_op) == IV_SUCCESS) {
             //NSLog (@"IVD_CMD_VIDEO_DECODE   [ OK ]");
         } else {
-            //NSLog (@"IVD_CMD_VIDEO_DECODE   [ NOK ]");
+            NSLog (@"IVD_CMD_VIDEO_DECODE   [ NOK ]");
         }
         
         /****************************************************************************/
@@ -344,7 +341,7 @@
                 retFrame = _outputFrame;
             }
         } else {
-            //NSLog (@"IVD_CMD_GET_DISPLAY_FRAME   [ NOK ]");
+            NSLog (@"IVD_CMD_GET_DISPLAY_FRAME   [ NOK ]");
         }
     }
     return retFrame;

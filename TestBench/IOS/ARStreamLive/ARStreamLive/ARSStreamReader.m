@@ -8,12 +8,14 @@
 
 #import "ARSStreamReader.h"
 
+#import <libARCommands/ARCOMMANDS_Decoder.h>
 #import <libARStream/ARSTREAM_Reader.h>
 #import <libARSAL/ARSAL_Thread.h>
 
 #define CD_PORT     (43210)
 #define DC_PORT     (54321)
 #define NET_TO          (3)
+#define EVENT_ID      (126)
 #define DATA_BUF_ID   (125)
 #define ACK_BUF_ID     (13)
 
@@ -53,8 +55,13 @@ uint8_t* streamCallback (eARSTREAM_READER_CAUSE cause, uint8_t *framePointer, ui
     return this.frame.data;
 }
 
-@interface ARSStreamReader () {
+void resolutionUpdate(uint16_t width, uint16_t height, void *custom)
+{
+    ARSStreamReader *this = (__bridge ARSStreamReader *)custom;
+    [this updateResolutionWithWidth:(int)width andHeight:(int)height];
 }
+
+@interface ARSStreamReader ()
 @property (nonatomic) ARNETWORKAL_Manager_t *alm;
 @property (nonatomic) ARNETWORK_Manager_t *netManager;
 @property (nonatomic) ARSTREAM_Reader_t *streamReader;
@@ -64,9 +71,12 @@ uint8_t* streamCallback (eARSTREAM_READER_CAUSE cause, uint8_t *framePointer, ui
 @property (nonatomic) ARSAL_Thread_t vidDataThread;
 @property (nonatomic) ARSAL_Thread_t vidAckThread;
 
+@property (nonatomic, strong) dispatch_group_t myGroup;
+
 @property (nonatomic) int nbReceived;
 
 @property (nonatomic) BOOL isStarted;
+@property (nonatomic) BOOL dispatchMustRun;
 
 @end
 
@@ -74,6 +84,7 @@ uint8_t* streamCallback (eARSTREAM_READER_CAUSE cause, uint8_t *framePointer, ui
 
 @synthesize buffer;
 @synthesize frame;
+@synthesize delegate;
 
 - (id)init
 {
@@ -93,6 +104,7 @@ uint8_t* streamCallback (eARSTREAM_READER_CAUSE cause, uint8_t *framePointer, ui
         if (! _isStarted)
         {
             buffer = [[ARSFrameBuffer alloc] initWithCapacity:30];
+            _myGroup = dispatch_group_create();
             
             eARNETWORKAL_ERROR alerr = ARNETWORKAL_OK;
             _alm = ARNETWORKAL_Manager_New(&alerr);
@@ -107,12 +119,17 @@ uint8_t* streamCallback (eARSTREAM_READER_CAUSE cause, uint8_t *framePointer, ui
             }
             
             ARNETWORK_IOBufferParam_t inParam;
-            ARNETWORK_IOBufferParam_t outParam;
-            ARSTREAM_Reader_InitStreamDataBuffer(&outParam, DATA_BUF_ID);
+            ARNETWORK_IOBufferParam_t outParam [2];
+            ARSTREAM_Reader_InitStreamDataBuffer(&outParam[0], DATA_BUF_ID);
+            outParam[1].ID = EVENT_ID;
+            outParam[1].dataType = ARNETWORKAL_FRAME_TYPE_DATA_WITH_ACK;
+            outParam[1].numberOfCell = 20;
+            outParam[1].dataCopyMaxSize = 128;
+            outParam[1].isOverwriting = 0;
             ARSTREAM_Reader_InitStreamAckBuffer(&inParam, ACK_BUF_ID);
             
             eARNETWORK_ERROR neterr = ARNETWORK_OK;
-            _netManager = ARNETWORK_Manager_New(_alm, 1, &inParam, 1, &outParam, 0, &neterr);
+            _netManager = ARNETWORK_Manager_New(_alm, 1, &inParam, 2, outParam, 0, &neterr);
             if (neterr != ARNETWORK_OK)
             {
                 NSLog (@"Error while creating ARNetwork : %s", ARNETWORK_Error_ToString(neterr));
@@ -129,6 +146,11 @@ uint8_t* streamCallback (eARSTREAM_READER_CAUSE cause, uint8_t *framePointer, ui
             }
             ARSAL_Thread_Create(&_vidDataThread, ARSTREAM_Reader_RunDataThread, _streamReader);
             ARSAL_Thread_Create(&_vidAckThread, ARSTREAM_Reader_RunAckThread, _streamReader);
+
+            _dispatchMustRun = YES;
+            dispatch_group_async(_myGroup, dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+                [self ackDataReaderLoop];
+            });
             
             _isStarted = YES;
             
@@ -144,6 +166,12 @@ uint8_t* streamCallback (eARSTREAM_READER_CAUSE cause, uint8_t *framePointer, ui
         if (_isStarted)
         {
             buffer = nil;
+
+            _dispatchMustRun = NO;
+            ARNETWORKAL_Manager_SignalWifiNetwork(_alm);
+            dispatch_group_wait(_myGroup, DISPATCH_TIME_FOREVER);
+            _myGroup = nil;
+
             ARSTREAM_Reader_StopReader(_streamReader);
             
             ARSAL_Thread_Join(_vidDataThread, NULL);
@@ -155,6 +183,7 @@ uint8_t* streamCallback (eARSTREAM_READER_CAUSE cause, uint8_t *framePointer, ui
             ARSTREAM_Reader_Delete(&_streamReader);
             
             ARNETWORK_Manager_Stop(_netManager);
+            ARNETWORKAL_Manager_SignalWifiNetwork(_alm);
             
             ARSAL_Thread_Join(_netRecvThread, NULL);
             ARSAL_Thread_Join(_netSendThread, NULL);
@@ -169,6 +198,34 @@ uint8_t* streamCallback (eARSTREAM_READER_CAUSE cause, uint8_t *framePointer, ui
             _isStarted = NO;
         }
     }
+}
+
+- (void)ackDataReaderLoop
+{
+    ARCOMMANDS_Decoder_SetCommonDebugVideoSetResolutionCallback(resolutionUpdate, (__bridge void *)self);
+    eARNETWORK_ERROR net_err = ARNETWORK_OK;
+    uint8_t *data = malloc (256);
+    int dataSize = 0;
+    if (NULL == data)
+    {
+        return;
+    }
+    while (_dispatchMustRun)
+    {
+
+        net_err = ARNETWORK_Manager_ReadDataWithTimeout(_netManager, EVENT_ID, data, 256, &dataSize, 3);
+        if (net_err == ARNETWORK_OK)
+        {
+            ARCOMMANDS_Decoder_DecodeBuffer(data, dataSize);
+        }
+    }
+    free (data);
+    ARCOMMANDS_Decoder_SetCommonDebugVideoSetResolutionCallback(NULL, NULL);
+}
+
+- (void)updateResolutionWithWidth:(int)w andHeight:(int)h
+{
+    [delegate newResolutionWidth:w Height:h];
 }
 
 - (void)dealloc

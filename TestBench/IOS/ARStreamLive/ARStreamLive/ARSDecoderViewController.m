@@ -55,6 +55,13 @@
 
 - (void)viewDidLoad
 {
+    _reader.delegate = self;
+    [self addDisplay];
+    [super viewDidLoad];
+}
+
+- (void)addDisplay
+{
     CGRect frame = [[UIScreen mainScreen] bounds];
     CGFloat tmp = frame.size.width;
     frame.size.width = frame.size.height;
@@ -67,6 +74,7 @@
     [_glview setScreenOrientationRight:NO];
     [self.view addSubview:_glview];
     [self.view sendSubviewToBack:_glview];
+
 #else
     CGSize resolution = { streamWidth, streamHeight };
     _display = [[ARSDisplayRGB alloc] initWithFrame:frame andResolution:resolution];
@@ -74,7 +82,21 @@
     [self.view addSubview:iw];
     [self.view sendSubviewToBack:iw];
 #endif
-    [super viewDidLoad];
+    
+}
+
+- (void)removeDisplay
+{
+#if USE_OPENGL
+    [_glview removeFromSuperview];
+    [_glview changeState:NO];
+    [_glview setRenderer:nil];
+    _glview = nil;
+#else
+    [[_display getView] removeFromSuperview];
+    _display = nil;
+#endif
+    
 }
 
 - (BOOL)shouldAutorotate
@@ -106,11 +128,21 @@
     prevNbDis = nbDis;
 }
 
+- (void)createDecoder
+{
+    [_decoder initializeWithWidth:streamWidth andHeight:streamHeight];
+}
+
+- (void)closeDecoder
+{
+    [_decoder close];
+}
+
 - (void)viewDidAppear:(BOOL)animated
 {
     [super viewDidAppear:animated];
     [_reader start:ip];
-    [_decoder initializeWithWidth:streamWidth andHeight:streamHeight];
+    [self createDecoder];
     _decodeThread = [[NSThread alloc] initWithTarget:self selector:@selector(decodeLoop) object:nil];
     [_decodeThread start];
     _fpsTimer = [NSTimer scheduledTimerWithTimeInterval:0.5 target:self selector:@selector(fpsTimerTick) userInfo:nil repeats:YES];
@@ -123,6 +155,7 @@
     dispatch_semaphore_wait(_threadEnded, DISPATCH_TIME_FOREVER);
     [_decoder close];
     [_reader stop];
+    [self removeDisplay];
     [super viewWillDisappear:animated];
 }
 
@@ -162,6 +195,18 @@
 {
     [super didReceiveMemoryWarning];
     // Dispose of any resources that can be recreated.
+}
+
+- (void)newResolutionWidth:(int)w Height:(int)h
+{
+    streamHeight = h;
+    streamWidth = w;
+#if ! USE_OPENGL
+    [self performSelectorOnMainThread:@selector(removeDisplay) withObject:nil waitUntilDone:YES];
+    [self performSelectorOnMainThread:@selector(addDisplay) withObject:nil waitUntilDone:YES];
+#endif
+    [self closeDecoder];
+    [self createDecoder];
 }
 
 @end

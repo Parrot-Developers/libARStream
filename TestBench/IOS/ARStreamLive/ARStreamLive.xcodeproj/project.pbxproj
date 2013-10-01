@@ -46,6 +46,7 @@
 		37F745AB17903CD400184F9C /* Icon-72@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = 37F745A717903CD400184F9C /* Icon-72@2x.png */; };
 		37F745AC17903CD400184F9C /* Icon.png in Resources */ = {isa = PBXBuildFile; fileRef = 37F745A817903CD400184F9C /* Icon.png */; };
 		37F745AD17903CD400184F9C /* Icon@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = 37F745A917903CD400184F9C /* Icon@2x.png */; };
+		37F8BF0317FB053C0023E47B /* libARCommands.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 37F8BF0217FB053C0023E47B /* libARCommands.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -120,6 +121,7 @@
 		37F745A717903CD400184F9C /* Icon-72@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Icon-72@2x.png"; sourceTree = SOURCE_ROOT; };
 		37F745A817903CD400184F9C /* Icon.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = Icon.png; sourceTree = SOURCE_ROOT; };
 		37F745A917903CD400184F9C /* Icon@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Icon@2x.png"; sourceTree = SOURCE_ROOT; };
+		37F8BF0217FB053C0023E47B /* libARCommands.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = libARCommands.framework; path = ../../../../ARBuildUtils/Targets/iOS/Install/Frameworks/libARCommands.framework; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -142,6 +144,7 @@
 				37F0257C17F4504600F3E382 /* libARNetworkAL.framework in Frameworks */,
 				37F0257D17F4504600F3E382 /* libARSAL.framework in Frameworks */,
 				37F0257E17F4504600F3E382 /* libARStream.framework in Frameworks */,
+				37F8BF0317FB053C0023E47B /* libARCommands.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -187,6 +190,7 @@
 		37290E54178EAF77006B7B58 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				37F8BF0217FB053C0023E47B /* libARCommands.framework */,
 				37F0257717F4504600F3E382 /* libARNetwork.framework */,
 				37F0257817F4504600F3E382 /* libARNetworkAL.framework */,
 				37F0257917F4504600F3E382 /* libARSAL.framework */,
@@ -447,8 +451,9 @@
 			buildSettings = {
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
-					"\"$(SRCROOT)/../../../../TargetsIOS/Frameworks\"",
-					"\"$(SRCROOT)/../../../../ARBuildUtils/Targets/iOS/Install/Frameworks\"",
+					"\\\"$(SRCROOT)/../../../../TargetsIOS/Frameworks\\\"",
+					"\\\"$(SRCROOT)/../../../../ARBuildUtils/Targets/iOS/Install/Frameworks\\\"",
+					/Users/nicolas/workspace/git/ARBuildUtils/Targets/iOS/Install/Frameworks,
 				);
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "ARStreamLive/ARStreamLive-Prefix.pch";
@@ -469,8 +474,9 @@
 			buildSettings = {
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
-					"\"$(SRCROOT)/../../../../TargetsIOS/Frameworks\"",
-					"\"$(SRCROOT)/../../../../ARBuildUtils/Targets/iOS/Install/Frameworks\"",
+					"\\\"$(SRCROOT)/../../../../TargetsIOS/Frameworks\\\"",
+					"\\\"$(SRCROOT)/../../../../ARBuildUtils/Targets/iOS/Install/Frameworks\\\"",
+					/Users/nicolas/workspace/git/ARBuildUtils/Targets/iOS/Install/Frameworks,
 				);
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "ARStreamLive/ARStreamLive-Prefix.pch";

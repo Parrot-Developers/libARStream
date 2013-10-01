@@ -8,8 +8,9 @@
 
 #import <UIKit/UIKit.h>
 #import <GLKit/GLKit.h>
+#import "ARSStreamReader.h"
 
-@interface ARSDecoderViewController : UIViewController
+@interface ARSDecoderViewController : UIViewController <ARSStreamReaderDelegate>
 
 @property (nonatomic, strong) IBOutlet UILabel *netFps;
 @property (nonatomic, strong) IBOutlet UILabel *decFps;
