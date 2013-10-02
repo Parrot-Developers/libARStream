@@ -300,6 +300,9 @@
 
 - (ARSFrame *)decodeFrame:(ARSFrame *)frame
 {
+    if (!_initialized) {
+        return nil;
+    }
     ARSFrame *retFrame = nil;
     BOOL waitForIFrame = NO;
     if (frame.missed != 0) {
