@@ -356,8 +356,8 @@ eARNETWORK_MANAGER_CALLBACK_RETURN ARSTREAM_Sender_NetworkCallback (int IoBuffer
     uint32_t frameNumber = cbParams->frameNumber;
 
     /* Remove "unused parameter" warnings */
-    IoBufferId = IoBufferId;
-    dataPtr = dataPtr;
+    (void)IoBufferId;
+    (void)dataPtr;
 
     switch (status)
     {

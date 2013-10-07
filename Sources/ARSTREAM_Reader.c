@@ -109,10 +109,10 @@ eARNETWORK_MANAGER_CALLBACK_RETURN ARSTREAM_Reader_NetworkCallback (int IoBuffer
 eARNETWORK_MANAGER_CALLBACK_RETURN ARSTREAM_Reader_NetworkCallback (int IoBufferId, uint8_t *dataPtr, void *customData, eARNETWORK_MANAGER_CALLBACK_STATUS status)
 {
     /* Avoid "unused parameters" warnings */
-    IoBufferId = IoBufferId;
-    dataPtr = dataPtr;
-    customData = customData;
-    status = status;
+    (void)IoBufferId;
+    (void)dataPtr;
+    (void)customData;
+    (void)status;
 
     /* Dummy return value */
     return ARNETWORK_MANAGER_CALLBACK_RETURN_DEFAULT;

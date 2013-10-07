@@ -451,9 +451,7 @@
 			buildSettings = {
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
-					"\\\"$(SRCROOT)/../../../../TargetsIOS/Frameworks\\\"",
-					"\\\"$(SRCROOT)/../../../../ARBuildUtils/Targets/iOS/Install/Frameworks\\\"",
-					/Users/nicolas/workspace/git/ARBuildUtils/Targets/iOS/Install/Frameworks,
+					"$(SRCROOT)/../../../../ARBuildUtils/Targets/iOS/Install/Frameworks",
 				);
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "ARStreamLive/ARStreamLive-Prefix.pch";
@@ -474,9 +472,7 @@
 			buildSettings = {
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
-					"\\\"$(SRCROOT)/../../../../TargetsIOS/Frameworks\\\"",
-					"\\\"$(SRCROOT)/../../../../ARBuildUtils/Targets/iOS/Install/Frameworks\\\"",
-					/Users/nicolas/workspace/git/ARBuildUtils/Targets/iOS/Install/Frameworks,
+					"$(SRCROOT)/../../../../ARBuildUtils/Targets/iOS/Install/Frameworks",
 				);
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "ARStreamLive/ARStreamLive-Prefix.pch";
