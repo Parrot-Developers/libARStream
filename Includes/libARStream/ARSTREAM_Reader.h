@@ -46,14 +46,15 @@ typedef enum {
  * @param[in] frameSize Used size in framePointer buffer
  * @param[in] isFlushFrame Boolean-like (0-1) flag telling if the complete frame was a flush frame (typically an I-Frame) for the sender
  * @param[in] numberOfSkippedFrames Number of frames which were skipped between the previous call and this one. (Usually 0)
- * @param[out] newBufferCapacity Capacity of the next buffer to use
+ * @param[inout] newBufferCapacity Capacity of the next buffer to use
  * @param[in] custom Custom pointer passed during ARSTREAM_Reader_New
  *
  * @return address of a new buffer which will hold the next frame
  *
  * @note If cause is ARSTREAM_READER_CAUSE_FRAME_COMPLETE, framePointer contains a valid frame.
- * @note If cause is ARSTREAM_READER_CAUSE_FRAME_TOO_SMALL, datas will be copied into the new frame. Old frame buffer will still be in use until the callback is called again with ARSTREAM_READER_CAUSE_COPY_COMPLETE cause. If the new frame is still too small, the callback will be called again, until a suitable buffer is provided
- * @note If cause is ARSTREAM_READER_CAUSE_CANCEL or ARSTREAM_READER_CAUSE_COPY_COMPLETE, the return value and newBufferCapacity are unused
+ * @note If cause is ARSTREAM_READER_CAUSE_FRAME_TOO_SMALL, datas will be copied into the new frame. Old frame buffer will still be in use until the callback is called again with ARSTREAM_READER_CAUSE_COPY_COMPLETE cause. If the new frame is still too small, the callback will be called again, until a suitable buffer is provided. newBufferCapacity holds a suitable capacity for the new buffer, but still has to be updated by the application.
+ * @note If cause is ARSTREAM_READER_CAUSE_COPY_COMPLETE, the return value and newBufferCapacity are unused. If numberOfSkippedFrames is non-zero, then the current frame will be skipped (usually because the buffer returned after the ARSTREAM_READER_CAUSE_FRAME_TOO_SMALL was smaller than the previous buffer).
+ * @note If cause is ARSTREAM_READER_CAUSE_CANCEL, the return value and newBufferCapacity are unused
  *
  * @warning If the cause is ARSTREAM_READER_CAUSE_FRAME_TOO_SMALL, returning a buffer shorter than 'frameSize' will cause the library to skip the current frame
  * @warning In any case, returning a NULL buffer is not supported.

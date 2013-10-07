@@ -368,7 +368,7 @@ void* ARSTREAM_Reader_RunDataThread (void *ARSTREAM_Reader_t_Param)
             while ((endIndex > reader->currentFrameBufferSize) &&
                    (skipCurrentFrame == 0))
             {
-                uint32_t nextFrameBufferSize = 0;
+                uint32_t nextFrameBufferSize = ARSTREAM_NETWORK_HEADERS_FRAGMENT_SIZE * header->fragmentsPerFrame;
                 uint32_t dummy;
                 uint8_t *nextFrameBuffer = reader->callback (ARSTREAM_READER_CAUSE_FRAME_TOO_SMALL, reader->currentFrameBuffer, reader->currentFrameSize, 0, 0, &nextFrameBufferSize, reader->custom);
                 if (nextFrameBufferSize >= reader->currentFrameSize && nextFrameBufferSize > 0)
@@ -380,7 +380,7 @@ void* ARSTREAM_Reader_RunDataThread (void *ARSTREAM_Reader_t_Param)
                     skipCurrentFrame = 1;
                 }
                 //TODO: Add "SKIP_FRAME"
-                reader->callback (ARSTREAM_READER_CAUSE_COPY_COMPLETE, reader->currentFrameBuffer, reader->currentFrameSize, 0, 0, &dummy, reader->custom);
+                reader->callback (ARSTREAM_READER_CAUSE_COPY_COMPLETE, reader->currentFrameBuffer, reader->currentFrameSize, 0, skipCurrentFrame, &dummy, reader->custom);
                 reader->currentFrameBuffer = nextFrameBuffer;
                 reader->currentFrameBufferSize = nextFrameBufferSize;
             }
