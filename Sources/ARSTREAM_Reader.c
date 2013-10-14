@@ -366,7 +366,8 @@ void* ARSTREAM_Reader_RunDataThread (void *ARSTREAM_Reader_t_Param)
             cpSize = recvSize - sizeof (ARSTREAM_NetworkHeaders_DataHeader_t);
             endIndex = cpIndex + cpSize;
             while ((endIndex > reader->currentFrameBufferSize) &&
-                   (skipCurrentFrame == 0))
+                   (skipCurrentFrame == 0) &&
+                   (packetWasAlreadyAck == 0))
             {
                 uint32_t nextFrameBufferSize = ARSTREAM_NETWORK_HEADERS_FRAGMENT_SIZE * header->fragmentsPerFrame;
                 uint32_t dummy;
@@ -404,13 +405,14 @@ void* ARSTREAM_Reader_RunDataThread (void *ARSTREAM_Reader_t_Param)
                     {
                         int nbMissedFrame = 0;
                         int isFlushFrame = ((header->frameFlags & ARSTREAM_NETWORK_HEADERS_FLAG_FLUSH_FRAME) != 0) ? 1 : 0;
-                        ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARSTREAM_READER_TAG, "Ack all in frame %d", header->frameNumber);
+                        ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARSTREAM_READER_TAG, "Ack all in frame %d (isFlush : %d)", header->frameNumber, isFlushFrame);
                         if (header->frameNumber != previousFNum + 1)
                         {
                             nbMissedFrame = header->frameNumber - previousFNum - 1;
                             ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARSTREAM_READER_TAG, "Missed %d frames !", nbMissedFrame);
                         }
                         previousFNum = header->frameNumber;
+                        skipCurrentFrame = 1;
                         reader->currentFrameBuffer = reader->callback (ARSTREAM_READER_CAUSE_FRAME_COMPLETE, reader->currentFrameBuffer, reader->currentFrameSize, nbMissedFrame, isFlushFrame, &(reader->currentFrameBufferSize), reader->custom);
                     }
                 }
