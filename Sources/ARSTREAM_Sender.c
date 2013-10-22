@@ -656,6 +656,7 @@ void* ARSTREAM_Sender_RunDataThread (void *ARSTREAM_Sender_t_Param)
     int lastFragmentSize = 0;
     ARSTREAM_NetworkHeaders_DataHeader_t *header = NULL;
     ARSTREAM_Sender_Frame_t nextFrame = {0};
+    int firstFrame = 1;
 
     /* Parameters check */
     if (sender == NULL)
@@ -695,7 +696,9 @@ void* ARSTREAM_Sender_RunDataThread (void *ARSTREAM_Sender_t_Param)
             sender->efficiency_nbFragments [sender->efficiency_index] = 0;
 
             /* Cancel current frame if it was not already sent */
-            if (sender->currentFrameCbWasCalled == 0)
+            /* Do not do it for the first "NULL" frame that is in the
+             * ARStream Sender before any call to SendNewFrame */
+            if (sender->currentFrameCbWasCalled == 0 && firstFrame == 0)
             {
 #ifdef DEBUG
                 ARSTREAM_NetworkHeaders_AckPacketDump ("Cancel frame:", &(sender->ackPacket));
@@ -707,6 +710,7 @@ void* ARSTREAM_Sender_RunDataThread (void *ARSTREAM_Sender_t_Param)
                 sender->callback (ARSTREAM_SENDER_STATUS_FRAME_CANCEL, sender->currentFrame.frameBuffer, sender->currentFrame.frameSize, sender->custom);
             }
             sender->currentFrameCbWasCalled = 0; // New frame
+            firstFrame = 0;
 
             /* Save next frame data into current frame data */
             sender->currentFrame.frameNumber = nextFrame.frameNumber;
