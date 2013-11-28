@@ -8,31 +8,25 @@
 
 #import "ARSDecoderViewController.h"
 #import "ARSStreamReader.h"
-#import "ARSITTIAMDecoder.h"
+#import <libARCodecs/libARCodecs.h>
 
-#if USE_OPENGL
-#import "EAGLView.h"
-#else
-#import "ARSDisplayRGB.h"
-#endif
+#import "GLView.h"
 
 @interface ARSDecoderViewController ()
 
 @property (nonatomic, strong) ARSStreamReader *reader;
 @property (nonatomic, strong) NSThread *decodeThread;
 @property (nonatomic) dispatch_semaphore_t threadEnded;
-@property (nonatomic, strong) ARSITTIAMDecoder *decoder;
+@property (nonatomic)ARCODECS_Manager_t *decoder;
 @property (nonatomic, weak) ARSFrame *decodedFrame;
 
 @property (nonatomic, strong) NSTimer *fpsTimer;
 
-#if USE_OPENGL
-@property (nonatomic) ARDroneOpenGLTexture texture;
-@property (nonatomic, strong) EAGLView *glview;
-#else
-@property (nonatomic, strong) ARSDisplayRGB *display;
-#endif
+@property (nonatomic) AROpenGLTexture texture;
+@property (nonatomic, strong) GLView *glview;
 
+@property (nonatomic, strong) NSString *filePath;
+@property (nonatomic, strong) NSMutableString *printString;
 @end
 
 @implementation ARSDecoderViewController
@@ -41,6 +35,23 @@
 @synthesize streamHeight;
 @synthesize streamWidth;
 
+static ARSFrame *_frame = NULL;
+int ARDecoder_GetNextDataCallback(uint8_t **dataPtrAddr)
+{
+    int readBytes = 0;
+    if(dataPtrAddr != NULL)
+    {
+        readBytes = _frame.used;
+        *dataPtrAddr = _frame.data;
+    }
+    else
+    {
+        readBytes = 0;
+    }
+    
+    return readBytes;
+}
+
 - (id)initWithCoder:(NSCoder *)aDecoder
 {
     self = [super initWithCoder:aDecoder];
@@ -48,7 +59,17 @@
     {
         _reader = [[ARSStreamReader alloc] init];
         _threadEnded = dispatch_semaphore_create(0);
-        _decoder = [[ARSITTIAMDecoder alloc] init];
+        
+        //CREATE LOG FILE
+        NSDate *date = [[NSDate alloc] init];
+        NSDateFormatter *dateFormatter = [[NSDateFormatter alloc] init];
+        [dateFormatter setDateFormat:@"yyyy-MM-dd-hh:mm:ss"];
+        NSString *dateString = [dateFormatter stringFromDate:date];
+        
+        _filePath = [[NSHomeDirectory()stringByAppendingPathComponent:@"Documents"] stringByAppendingPathComponent:[NSString stringWithFormat:@"Log_%@.txt",dateString]];
+        
+        _printString = [NSMutableString stringWithString:@"Timestamp;DecodeFPS;\n"];
+        [_printString writeToFile:_filePath atomically:YES encoding:NSUTF8StringEncoding error:nil];
     }
     return self;
 }
@@ -56,47 +77,26 @@
 - (void)viewDidLoad
 {
     _reader.delegate = self;
-    [self addDisplay];
     [super viewDidLoad];
+}
+
+- (void)viewWillAppear:(BOOL)animated
+{
+    [super viewWillAppear:animated];
+    [self addDisplay];
 }
 
 - (void)addDisplay
 {
-    CGRect frame = [[UIScreen mainScreen] bounds];
-    CGFloat tmp = frame.size.width;
-    frame.size.width = frame.size.height;
-    frame.size.height = tmp;
-#if USE_OPENGL
-    _glview = [[EAGLView alloc] initWithFrame:frame];
-    ESRenderer *renderer = [[ESRenderer alloc] initWithFrame:frame withData:&_texture];
-    [_glview setRenderer:renderer];
-    [_glview changeState:YES];
-    [_glview setScreenOrientationRight:NO];
+    _glview = [[GLView alloc] initWithFrame:self.view.frame rendererClass:[GLRenderer_YUV class]];
     [self.view addSubview:_glview];
     [self.view sendSubviewToBack:_glview];
-
-#else
-    CGSize resolution = { streamWidth, streamHeight };
-    _display = [[ARSDisplayRGB alloc] initWithFrame:frame andResolution:resolution];
-    UIImageView *iw = [_display getView];
-    [self.view addSubview:iw];
-    [self.view sendSubviewToBack:iw];
-#endif
-    
 }
 
 - (void)removeDisplay
 {
-#if USE_OPENGL
     [_glview removeFromSuperview];
-    [_glview changeState:NO];
-    [_glview setRenderer:nil];
     _glview = nil;
-#else
-    [[_display getView] removeFromSuperview];
-    _display = nil;
-#endif
-    
 }
 
 - (BOOL)shouldAutorotate
@@ -113,29 +113,49 @@
     int nbNet = [_reader getAndResetNbReceived];
     [_netFps setText:[NSString stringWithFormat:@"NetworkFPS : %d", nbNet + prevNbNet]];
     
-    int nbDec = [_decoder getAndResetNbDecoded];
+    int nbDec = [self getAndResetNbDecoded];
     [_decFps setText:[NSString stringWithFormat:@"DecodeFPS : %d", nbDec + prevNbDec]];
     
-#if USE_OPENGL
-    int nbDis = [_glview getAndResetNbDisplayed];
-#else
-    int nbDis = [_display getAndResetNbDisplayed];
-#endif
+    int nbDis = [self getAndResetNbDisplayed];
     [_disFps setText:[NSString stringWithFormat:@"DisplayFPS : %d", nbDis + prevNbDis]];
     
     prevNbNet = nbNet;
     prevNbDec = nbDec;
     prevNbDis = nbDis;
+   
+    long long timeStamp = (long long)([[NSDate date] timeIntervalSince1970] * 1000.0);
+    
+    [_printString appendString:[NSString stringWithFormat:@"%lld;%d;\n",timeStamp, nbDec + prevNbDec]];
+    [_printString  writeToFile:_filePath atomically:YES encoding:NSUTF8StringEncoding error:nil];
+}
+
+- (int)getAndResetNbDecoded
+{
+    int res = _texture.num_picture_decoded;
+    _texture.num_picture_decoded = 0;
+    return res;
+}
+
+- (int)getAndResetNbDisplayed
+{
+    int res = _texture.nbDisplayed;
+    _texture.nbDisplayed = 0;
+    return res;
 }
 
 - (void)createDecoder
 {
-    [_decoder initializeWithWidth:streamWidth andHeight:streamHeight];
+    eARCODECS_ERROR error = ARCODECS_OK;
+    _decoder = ARCODECS_Manager_New(ARCODECS_TYPE_VIDEO_H264_PARROT,ARDecoder_GetNextDataCallback, &error);
+    if(_decoder == nil)
+    {
+        NSLog(@"%s", ARCODECS_Error_ToString(error));
+    }
 }
 
 - (void)closeDecoder
 {
-    [_decoder close];
+    ARCODECS_Manager_Delete(&(_decoder));
 }
 
 - (void)viewDidAppear:(BOOL)animated
@@ -153,7 +173,7 @@
     [_fpsTimer invalidate];
     [_decodeThread cancel];
     dispatch_semaphore_wait(_threadEnded, DISPATCH_TIME_FOREVER);
-    [_decoder close];
+    ARCODECS_Manager_Delete(&(_decoder));
     [_reader stop];
     [self removeDisplay];
     [super viewWillDisappear:animated];
@@ -166,25 +186,26 @@
         ARSFrame *frame = [_reader.buffer getElement];
         if (frame)
         {
-            _decodedFrame = [_decoder decodeFrame:frame];
-            if (_decodedFrame)
+            _frame = frame;
+            eARCODECS_ERROR error = ARCODECS_OK;
+            ARCODECS_Manager_Frame_t *arcodecsOutputFrame = ARCODECS_Manager_Decode(_decoder,&error);
+            if (arcodecsOutputFrame != NULL)
             {
-#if USE_OPENGL
-                int newSize = [_decodedFrame used];
+                _texture.num_picture_decoded++;
                 _texture.image_size.height = streamHeight;
                 _texture.image_size.width  = streamWidth;
                 _texture.texture_size.height = streamHeight;
                 _texture.texture_size.width  = streamWidth;
-                if (newSize > _texture.dataSize)
-                {
-                    _texture.data = realloc(_texture.data, newSize);
-                }
-                _texture.dataSize = newSize;
-                memcpy(_texture.data, [_decodedFrame data], newSize);
-                _texture.num_picture_decoded++;
-#else
-                [_display performSelectorOnMainThread:@selector(displayFrame:) withObject:_decodedFrame waitUntilDone:NO];
-#endif
+                _texture.dataSize = arcodecsOutputFrame->size;
+                _texture.data = arcodecsOutputFrame->data;
+
+                dispatch_sync(dispatch_get_main_queue(), ^{
+                    [_glview render:&_texture];
+                });
+            }
+            else
+            {
+                NSLog(@"Decoding error %s", ARCODECS_Error_ToString(error));
             }
         }
     }
@@ -201,10 +222,6 @@
 {
     streamHeight = h;
     streamWidth = w;
-#if ! USE_OPENGL
-    [self performSelectorOnMainThread:@selector(removeDisplay) withObject:nil waitUntilDone:YES];
-    [self performSelectorOnMainThread:@selector(addDisplay) withObject:nil waitUntilDone:YES];
-#endif
     [self closeDecoder];
     [self createDecoder];
 }
