@@ -6,7 +6,8 @@ ACLOCAL_AMFLAGS                                             =   -I m4
 # The list of header files that belong to the library (to be installed later)
 HEADER_FILES                                                =   ../Includes/libARStream/ARSTREAM_Sender.h \
                                                                 ../Includes/libARStream/ARSTREAM_Reader.h \
-                                                                ../Includes/libARStream/ARSTREAM_Error.h
+                                                                ../Includes/libARStream/ARSTREAM_Error.h  \
+                                                                ../Includes/libARStream/ARStream.h
 
 # The sources to add to the library and to add to the source distribution
 SOURCE_FILES                                                =   $(HEADER_FILES)                          \
