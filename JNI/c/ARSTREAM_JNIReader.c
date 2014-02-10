@@ -31,7 +31,7 @@ uint8_t* internalCallback (eARSTREAM_READER_CAUSE cause, uint8_t *framePointer, 
     }
 
     jboolean isFlush = (isFlushFrame == 1) ? JNI_TRUE : JNI_FALSE;
-    jlongArray *newNativeDataInfos = (*env)->CallObjectMethod(env, (jobject)thizz, g_cbWrapper_id, (jint)cause, (jlong)(intptr_t)framePointer, (jint)frameSize, isFlush, (jint)numberOfSkippedFrames);
+    jlongArray *newNativeDataInfos = (*env)->CallObjectMethod(env, (jobject)thizz, g_cbWrapper_id, (jint)cause, (jlong)(intptr_t)framePointer, (jint)frameSize, isFlush, (jint)numberOfSkippedFrames, (jint)*newBufferCapacity);
 
     uint8_t *retVal = NULL;
     *newBufferCapacity = 0;
@@ -59,7 +59,7 @@ Java_com_parrot_arsdk_arstream_ARStreamReader_nativeInitClass (JNIEnv *env, jcla
     {
         ARSAL_PRINT (ARSAL_PRINT_ERROR, JNI_READER_TAG, "Unable to get JavaVM pointer");
     }
-    g_cbWrapper_id = (*env)->GetMethodID (env, clazz, "callbackWrapper", "(IJIZI)[J");
+    g_cbWrapper_id = (*env)->GetMethodID (env, clazz, "callbackWrapper", "(IJIZII)[J");
 }
 
 JNIEXPORT void JNICALL

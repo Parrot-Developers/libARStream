@@ -205,7 +205,7 @@ public class ARStreamReader
     /**
      * Callback wrapper for the listener
      */
-    private long[] callbackWrapper (int icause, long ndPointer, int ndSize, boolean isFlush, int nbSkip) {
+    private long[] callbackWrapper (int icause, long ndPointer, int ndSize, boolean isFlush, int nbSkip, int newBufferCapacity) {
         ARSTREAM_READER_CAUSE_ENUM cause = ARSTREAM_READER_CAUSE_ENUM.getFromValue (icause);
         if (cause == null) {
             ARSALPrint.e (TAG, "Bad cause : " + icause);
@@ -220,18 +220,18 @@ public class ARStreamReader
         switch (cause) {
         case ARSTREAM_READER_CAUSE_FRAME_COMPLETE:
             currentFrameBuffer.setUsedSize(ndSize);
-            currentFrameBuffer = eventListener.didUpdateFrameStatus (cause, currentFrameBuffer, isFlush, nbSkip);
+            currentFrameBuffer = eventListener.didUpdateFrameStatus (cause, currentFrameBuffer, isFlush, nbSkip, newBufferCapacity);
             break;
         case ARSTREAM_READER_CAUSE_FRAME_TOO_SMALL:
             previousFrameBuffer = currentFrameBuffer;
-            currentFrameBuffer = eventListener.didUpdateFrameStatus (cause, currentFrameBuffer, isFlush, nbSkip);
+            currentFrameBuffer = eventListener.didUpdateFrameStatus (cause, currentFrameBuffer, isFlush, nbSkip, newBufferCapacity);
             break;
         case ARSTREAM_READER_CAUSE_COPY_COMPLETE:
-            eventListener.didUpdateFrameStatus (cause, previousFrameBuffer, isFlush, nbSkip);
+            eventListener.didUpdateFrameStatus (cause, previousFrameBuffer, isFlush, nbSkip, newBufferCapacity);
             previousFrameBuffer = null;
             break;
         case ARSTREAM_READER_CAUSE_CANCEL:
-            eventListener.didUpdateFrameStatus (cause, currentFrameBuffer, isFlush, nbSkip);
+            eventListener.didUpdateFrameStatus (cause, currentFrameBuffer, isFlush, nbSkip, newBufferCapacity);
             currentFrameBuffer = null;
             break;
         default:
