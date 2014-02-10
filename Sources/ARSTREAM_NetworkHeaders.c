@@ -61,13 +61,13 @@ uint32_t ARSTREAM_NetworkHeaders_HammingWeight32 (uint32_t input)
 int ARSTREAM_NetworkHeaders_AckPacketAllFlagsSet (ARSTREAM_NetworkHeaders_AckPacket_t *packet, int maxFlag)
 {
     int res = 1;
-    if (0 <= maxFlag && maxFlag < 64)
+    if (0 < maxFlag && maxFlag <= 64)
     {
         // Check only in first packet
         uint64_t lo_mask = (1ll << maxFlag) - 1ll;
         res = ((packet->lowPacketsAck & lo_mask) == lo_mask) ? 1 : 0;
     }
-    else if (64 <= maxFlag && maxFlag < 128)
+    else if (64 < maxFlag && maxFlag <= 128)
     {
         // We need to check for the second packet also
         uint64_t lo_mask = UINT64_MAX;
