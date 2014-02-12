@@ -212,7 +212,8 @@ public class ARStreamReader
             return null;
         }
 
-        if (ndPointer != currentFrameBuffer.getData()) {
+        if (ndPointer != currentFrameBuffer.getData() &&
+            (previousFrameBuffer == null || ndPointer != previousFrameBuffer.getData())) {
             ARSALPrint.e (TAG, "Bad frame buffer");
             return null;
         }

@@ -29,9 +29,9 @@ uint8_t* internalCallback (eARSTREAM_READER_CAUSE cause, uint8_t *framePointer, 
         *newBufferCapacity = 0;
         return NULL;
     }
-
+    
     jboolean isFlush = (isFlushFrame == 1) ? JNI_TRUE : JNI_FALSE;
-    jlongArray *newNativeDataInfos = (*env)->CallObjectMethod(env, (jobject)thizz, g_cbWrapper_id, (jint)cause, (jlong)(intptr_t)framePointer, (jint)frameSize, isFlush, (jint)numberOfSkippedFrames, (jint)*newBufferCapacity);
+    jlongArray newNativeDataInfos = (*env)->CallObjectMethod(env, (jobject)thizz, g_cbWrapper_id, (jint)cause, (jlong)(intptr_t)framePointer, (jint)frameSize, isFlush, (jint)numberOfSkippedFrames, (jint)*newBufferCapacity);
 
     uint8_t *retVal = NULL;
     *newBufferCapacity = 0;
@@ -41,6 +41,8 @@ uint8_t* internalCallback (eARSTREAM_READER_CAUSE cause, uint8_t *framePointer, 
         retVal = (uint8_t *)(intptr_t)array[0];
         *newBufferCapacity = (int)array[1];
         (*env)->ReleaseLongArrayElements(env, newNativeDataInfos, array, 0);
+        
+        (*env)->DeleteLocalRef (env, newNativeDataInfos);
     }
 
     if (wasAlreadyAttached == 0)
@@ -119,6 +121,7 @@ Java_com_parrot_arsdk_arstream_ARStreamReader_nativeDispose (JNIEnv *env, jobjec
     if (retVal == JNI_TRUE)
     {
         (*env)->DeleteGlobalRef(env, g_thizz);
+        g_thizz = 0;
     }
     return retVal;
 }
