@@ -15,7 +15,6 @@
 #include <string.h>
 
 #include <errno.h>
-#include <assert.h>
 
 /*
  * Private Headers
