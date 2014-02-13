@@ -15,6 +15,7 @@
 #include <string.h>
 
 #include <errno.h>
+#include <assert.h>
 
 /*
  * Private Headers
@@ -115,6 +116,7 @@ struct ARSTREAM_Sender_t {
     int ackBufferID;
     ARSTREAM_Sender_FrameUpdateCallback_t callback;
     uint32_t maxNumberOfNextFrames;
+    uint32_t maxFragmentSize;
     void *custom;
 
     /* Current frame storage */
@@ -414,7 +416,7 @@ void ARSTREAM_Sender_InitStreamAckBuffer (ARNETWORK_IOBufferParam_t *bufferParam
     ARSTREAM_Buffers_InitStreamAckBuffer (bufferParams, bufferID);
 }
 
-ARSTREAM_Sender_t* ARSTREAM_Sender_New (ARNETWORK_Manager_t *manager, int dataBufferID, int ackBufferID, ARSTREAM_Sender_FrameUpdateCallback_t callback, uint32_t framesBufferSize, void *custom, eARSTREAM_ERROR *error)
+ARSTREAM_Sender_t* ARSTREAM_Sender_New (ARNETWORK_Manager_t *manager, int dataBufferID, int ackBufferID, ARSTREAM_Sender_FrameUpdateCallback_t callback, uint32_t framesBufferSize, uint32_t maxFragmentSize, void *custom, eARSTREAM_ERROR *error)
 {
     ARSTREAM_Sender_t *retSender = NULL;
     int packetsToSendMutexWasInit = 0;
@@ -425,7 +427,8 @@ ARSTREAM_Sender_t* ARSTREAM_Sender_New (ARNETWORK_Manager_t *manager, int dataBu
     eARSTREAM_ERROR internalError = ARSTREAM_OK;
     /* ARGS Check */
     if ((manager == NULL) ||
-        (callback == NULL))
+        (callback == NULL) ||
+        (maxFragmentSize == 0))
     {
         SET_WITH_CHECK (error, ARSTREAM_ERROR_BAD_PARAMETERS);
         return retSender;
@@ -447,6 +450,7 @@ ARSTREAM_Sender_t* ARSTREAM_Sender_New (ARNETWORK_Manager_t *manager, int dataBu
         retSender->callback = callback;
         retSender->custom = custom;
         retSender->maxNumberOfNextFrames = framesBufferSize;
+        retSender->maxFragmentSize = maxFragmentSize;
     }
 
     /* Setup internal mutexes/sems */
@@ -666,7 +670,7 @@ void* ARSTREAM_Sender_RunDataThread (void *ARSTREAM_Sender_t_Param)
     }
 
     /* Alloc and check */
-    sendFragment = malloc (ARSTREAM_NETWORK_HEADERS_FRAGMENT_SIZE + sizeof (ARSTREAM_NetworkHeaders_DataHeader_t));
+    sendFragment = malloc (sender->maxFragmentSize + sizeof (ARSTREAM_NetworkHeaders_DataHeader_t));
     if (sendFragment == NULL)
     {
         ARSAL_PRINT (ARSAL_PRINT_ERROR, ARSTREAM_SENDER_TAG, "Error while starting %s, can not alloc memory", __FUNCTION__);
@@ -737,12 +741,13 @@ void* ARSTREAM_Sender_RunDataThread (void *ARSTREAM_Sender_t_Param)
             /* Compute number of fragments / size of the last fragment */
             if (0 < sendSize)
             {
-                lastFragmentSize = ARSTREAM_NETWORK_HEADERS_FRAGMENT_SIZE;
-                nbPackets = sendSize / ARSTREAM_NETWORK_HEADERS_FRAGMENT_SIZE;
-                if (sendSize % ARSTREAM_NETWORK_HEADERS_FRAGMENT_SIZE)
+                uint32_t maxFragSize = sender->maxFragmentSize;
+                lastFragmentSize = maxFragSize;
+                nbPackets = sendSize / maxFragSize;
+                if (sendSize % maxFragSize)
                 {
                     nbPackets++;
-                    lastFragmentSize = sendSize % ARSTREAM_NETWORK_HEADERS_FRAGMENT_SIZE;
+                    lastFragmentSize = sendSize % maxFragSize;
                 }
             }
             sender->currentFrameNbFragments = nbPackets;
@@ -769,11 +774,12 @@ void* ARSTREAM_Sender_RunDataThread (void *ARSTREAM_Sender_t_Param)
         {
             if (ARSTREAM_NetworkHeaders_AckPacketFlagIsSet (&(sender->packetsToSend), cnt))
             {
+                uint32_t maxFragSize = sender->maxFragmentSize;
                 numbersOfFragmentsSentForCurrentFrame ++;
-                int currFragmentSize = (cnt == nbPackets-1) ? lastFragmentSize : ARSTREAM_NETWORK_HEADERS_FRAGMENT_SIZE;
+                int currFragmentSize = (cnt == nbPackets-1) ? lastFragmentSize : maxFragSize;
                 header->fragmentNumber = cnt;
                 header->fragmentsPerFrame = nbPackets;
-                memcpy (&sendFragment[sizeof (ARSTREAM_NetworkHeaders_DataHeader_t)], &(sender->currentFrame.frameBuffer)[ARSTREAM_NETWORK_HEADERS_FRAGMENT_SIZE*cnt], currFragmentSize);
+                memcpy (&sendFragment[sizeof (ARSTREAM_NetworkHeaders_DataHeader_t)], &(sender->currentFrame.frameBuffer)[maxFragSize*cnt], currFragmentSize);
                 ARSTREAM_Sender_NetworkCallbackParam_t *cbParams = malloc (sizeof (ARSTREAM_Sender_NetworkCallbackParam_t));
                 cbParams->sender = sender;
                 cbParams->fragmentIndex = cnt;

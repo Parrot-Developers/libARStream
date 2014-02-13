@@ -62,6 +62,7 @@ struct ARSTREAM_Reader_t {
     ARNETWORK_Manager_t *manager;
     int dataBufferID;
     int ackBufferID;
+    uint32_t maxFragmentSize;
     ARSTREAM_Reader_FrameCompleteCallback_t callback;
     void *custom;
 
@@ -132,7 +133,7 @@ void ARSTREAM_Reader_InitStreamAckBuffer (ARNETWORK_IOBufferParam_t *bufferParam
     ARSTREAM_Buffers_InitStreamAckBuffer (bufferParams, bufferID);
 }
 
-ARSTREAM_Reader_t* ARSTREAM_Reader_New (ARNETWORK_Manager_t *manager, int dataBufferID, int ackBufferID, ARSTREAM_Reader_FrameCompleteCallback_t callback, uint8_t *frameBuffer, uint32_t frameBufferSize, void *custom, eARSTREAM_ERROR *error)
+ARSTREAM_Reader_t* ARSTREAM_Reader_New (ARNETWORK_Manager_t *manager, int dataBufferID, int ackBufferID, ARSTREAM_Reader_FrameCompleteCallback_t callback, uint8_t *frameBuffer, uint32_t frameBufferSize, uint32_t maxFragmentSize, void *custom, eARSTREAM_ERROR *error)
 {
     ARSTREAM_Reader_t *retReader = NULL;
     int ackPacketMutexWasInit = 0;
@@ -143,7 +144,8 @@ ARSTREAM_Reader_t* ARSTREAM_Reader_New (ARNETWORK_Manager_t *manager, int dataBu
     if ((manager == NULL) ||
         (callback == NULL) ||
         (frameBuffer == NULL) ||
-        (frameBufferSize == 0))
+        (frameBufferSize == 0) ||
+        (maxFragmentSize == 0))
     {
         SET_WITH_CHECK (error, ARSTREAM_ERROR_BAD_PARAMETERS);
         return retReader;
@@ -162,6 +164,7 @@ ARSTREAM_Reader_t* ARSTREAM_Reader_New (ARNETWORK_Manager_t *manager, int dataBu
         retReader->manager = manager;
         retReader->dataBufferID = dataBufferID;
         retReader->ackBufferID = ackBufferID;
+        retReader->maxFragmentSize = maxFragmentSize;
         retReader->callback = callback;
         retReader->custom = custom;
         retReader->currentFrameBufferSize = frameBufferSize;
@@ -286,7 +289,6 @@ eARSTREAM_ERROR ARSTREAM_Reader_Delete (ARSTREAM_Reader_t **reader)
 
 void* ARSTREAM_Reader_RunDataThread (void *ARSTREAM_Reader_t_Param)
 {
-    int recvDataLen = ARSTREAM_NETWORK_HEADERS_FRAGMENT_SIZE + sizeof (ARSTREAM_NetworkHeaders_DataHeader_t);
     uint8_t *recvData = NULL;
     int recvSize;
     uint16_t previousFNum = UINT16_MAX;
@@ -294,6 +296,7 @@ void* ARSTREAM_Reader_RunDataThread (void *ARSTREAM_Reader_t_Param)
     int packetWasAlreadyAck = 0;
     ARSTREAM_Reader_t *reader = (ARSTREAM_Reader_t *)ARSTREAM_Reader_t_Param;
     ARSTREAM_NetworkHeaders_DataHeader_t *header = NULL;
+    int recvDataLen = reader->maxFragmentSize + sizeof (ARSTREAM_NetworkHeaders_DataHeader_t);
 
     /* Parameters check */
     if (reader == NULL)
@@ -362,14 +365,14 @@ void* ARSTREAM_Reader_RunDataThread (void *ARSTREAM_Reader_t_Param)
             ARSAL_Mutex_Unlock (&(reader->ackSendMutex));
 
 
-            cpIndex = ARSTREAM_NETWORK_HEADERS_FRAGMENT_SIZE*header->fragmentNumber;
+            cpIndex = reader->maxFragmentSize * header->fragmentNumber;
             cpSize = recvSize - sizeof (ARSTREAM_NetworkHeaders_DataHeader_t);
             endIndex = cpIndex + cpSize;
             while ((endIndex > reader->currentFrameBufferSize) &&
                    (skipCurrentFrame == 0) &&
                    (packetWasAlreadyAck == 0))
             {
-                uint32_t nextFrameBufferSize = ARSTREAM_NETWORK_HEADERS_FRAGMENT_SIZE * header->fragmentsPerFrame;
+                uint32_t nextFrameBufferSize = reader->maxFragmentSize * header->fragmentsPerFrame;
                 uint32_t dummy;
                 uint8_t *nextFrameBuffer = reader->callback (ARSTREAM_READER_CAUSE_FRAME_TOO_SMALL, reader->currentFrameBuffer, reader->currentFrameSize, 0, 0, &nextFrameBufferSize, reader->custom);
                 if (nextFrameBufferSize >= reader->currentFrameSize && nextFrameBufferSize > 0)

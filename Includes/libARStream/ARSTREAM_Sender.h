@@ -80,6 +80,7 @@ void ARSTREAM_Sender_InitStreamAckBuffer (ARNETWORK_IOBufferParam_t *bufferParam
  * @param[in] ackBufferID ID of a StreamAckBuffer available within the manager
  * @param[in] callback The status update callback which will be called every time the status of a send-frame is updated
  * @param[in] framesBufferSize Number of frames that the ARSTREAM_Sender_t instance will be able to hold in queue
+ * @param[in] maxFragmentSize Maximum allowed size for a video data fragment. Video frames larger that will be fragmented.
  * @param[in] custom Custom pointer which will be passed to callback
  * @param[out] error Optionnal pointer to an eARSTREAM_ERROR to hold any error information
  * @return A pointer to the new ARSTREAM_Sender_t, or NULL if an error occured
@@ -91,7 +92,7 @@ void ARSTREAM_Sender_InitStreamAckBuffer (ARNETWORK_IOBufferParam_t *bufferParam
  * @see ARSTREAM_Sender_StopSender()
  * @see ARSTREAM_Sender_Delete()
  */
-ARSTREAM_Sender_t* ARSTREAM_Sender_New (ARNETWORK_Manager_t *manager, int dataBufferID, int ackBufferID, ARSTREAM_Sender_FrameUpdateCallback_t callback, uint32_t framesBufferSize, void *custom, eARSTREAM_ERROR *error);
+ARSTREAM_Sender_t* ARSTREAM_Sender_New (ARNETWORK_Manager_t *manager, int dataBufferID, int ackBufferID, ARSTREAM_Sender_FrameUpdateCallback_t callback, uint32_t framesBufferSize, uint32_t maxFragmentSize, void *custom, eARSTREAM_ERROR *error);
 
 /**
  * @brief Stops a running ARSTREAM_Sender_t

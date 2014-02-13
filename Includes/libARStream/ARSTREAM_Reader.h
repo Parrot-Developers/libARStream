@@ -94,6 +94,7 @@ void ARSTREAM_Reader_InitStreamAckBuffer (ARNETWORK_IOBufferParam_t *bufferParam
  * @param[in] callback The callback which will be called every time a new frame is available
  * @param[in] frameBuffer The adress of the first frameBuffer to use
  * @param[in] frameBufferSize The length of the frameBuffer (to avoid overflow)
+ * @param[in] maxFragmentSize Maximum allowed size for a video data fragment. Video frames larger that will be fragmented.
  * @param[in] custom Custom pointer which will be passed to callback
  * @param[out] error Optionnal pointer to an eARSTREAM_ERROR to hold any error information
  * @return A pointer to the new ARSTREAM_Reader_t, or NULL if an error occured
@@ -102,7 +103,7 @@ void ARSTREAM_Reader_InitStreamAckBuffer (ARNETWORK_IOBufferParam_t *bufferParam
  * @see ARSTREAM_Reader_StopReader()
  * @see ARSTREAM_Reader_Delete()
  */
-ARSTREAM_Reader_t* ARSTREAM_Reader_New (ARNETWORK_Manager_t *manager, int dataBufferID, int ackBufferID, ARSTREAM_Reader_FrameCompleteCallback_t callback, uint8_t *frameBuffer, uint32_t frameBufferSize, void *custom, eARSTREAM_ERROR *error);
+ARSTREAM_Reader_t* ARSTREAM_Reader_New (ARNETWORK_Manager_t *manager, int dataBufferID, int ackBufferID, ARSTREAM_Reader_FrameCompleteCallback_t callback, uint8_t *frameBuffer, uint32_t frameBufferSize, uint32_t maxFragmentSize, void *custom, eARSTREAM_ERROR *error);
 
 /**
  * @brief Stops a running ARSTREAM_Reader_t
