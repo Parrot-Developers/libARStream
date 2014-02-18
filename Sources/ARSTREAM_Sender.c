@@ -626,7 +626,7 @@ eARSTREAM_ERROR ARSTREAM_Sender_SendNewFrame (ARSTREAM_Sender_t *sender, uint8_t
         retVal = ARSTREAM_ERROR_BAD_PARAMETERS;
     }
     if ((retVal == ARSTREAM_OK) &&
-        (frameSize > ARSTREAM_NETWORK_HEADERS_MAX_FRAME_SIZE))
+        (frameSize > (sender->maxFragmentSize * ARSTREAM_NETWORK_HEADERS_MAX_FRAGMENTS_PER_FRAME)))
     {
         retVal = ARSTREAM_ERROR_FRAME_TOO_LARGE;
     }
