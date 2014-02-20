@@ -77,11 +77,12 @@ Java_com_parrot_arsdk_arstream_ARStreamReader_nativeSetAckBufferParams (JNIEnv *
 }
 
 JNIEXPORT jlong JNICALL
-Java_com_parrot_arsdk_arstream_ARStreamReader_nativeConstructor (JNIEnv *env, jobject thizz, jlong cNetManager, jint dataBufferId, jint ackBufferId, jlong frameBuffer, jint frameBufferSize)
+Java_com_parrot_arsdk_arstream_ARStreamReader_nativeConstructor (JNIEnv *env, jobject thizz, jlong cNetManager, jint dataBufferId, jint ackBufferId, jlong frameBuffer, jint frameBufferSize, jint maxFragmentSize)
 {
     eARSTREAM_ERROR err = ARSTREAM_OK;
     g_thizz = (*env)->NewGlobalRef(env, thizz);
-    ARSTREAM_Reader_t *retReader = ARSTREAM_Reader_New ((ARNETWORK_Manager_t *)(intptr_t)cNetManager, dataBufferId, ackBufferId, internalCallback, (uint8_t *)(intptr_t)frameBuffer, frameBufferSize, (void *)g_thizz, &err);
+    ARSTREAM_Reader_t *retReader = ARSTREAM_Reader_New ((ARNETWORK_Manager_t *)(intptr_t)cNetManager, dataBufferId, ackBufferId, internalCallback, (uint8_t *)(intptr_t)frameBuffer, frameBufferSize, maxFragmentSize, (void *)g_thizz, &err);
+    
     if (err != ARSTREAM_OK)
     {
         ARSAL_PRINT (ARSAL_PRINT_ERROR, JNI_READER_TAG, "Error while creating reader : %s", ARSTREAM_Error_ToString (err));

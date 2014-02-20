@@ -97,9 +97,10 @@ public class ARStreamReader
      * @param ackBufferId The id to use for ack transferts on network (must be a valid buffer id in <code>netManager</code>
      * @param initialFrameBuffer The first frame buffer to use
      * @param theEventListener The event listener to use for this instance
+     * @param maxFragmentSize Maximum allowed size for a video data fragment. Video frames larger that will be fragmented.
      */
-    public ARStreamReader (ARNetworkManager netManager, int dataBufferId, int ackBufferId, ARNativeData initialFrameBuffer, ARStreamReaderListener theEventListener) {
-        this.cReader = nativeConstructor (netManager.getManager (), dataBufferId, ackBufferId, initialFrameBuffer.getData (), initialFrameBuffer.getCapacity ());
+    public ARStreamReader (ARNetworkManager netManager, int dataBufferId, int ackBufferId, ARNativeData initialFrameBuffer, ARStreamReaderListener theEventListener, int maxFragmentSize) {
+        this.cReader = nativeConstructor (netManager.getManager (), dataBufferId, ackBufferId, initialFrameBuffer.getData (), initialFrameBuffer.getCapacity (), maxFragmentSize);
         if (this.cReader != 0) {
             this.valid = true;
             this.eventListener = theEventListener;
@@ -278,7 +279,7 @@ public class ARStreamReader
      * @param frameBufferSize size of the initial frame buffer
      * @return C-Pointer to the ARSTREAM_Reader object (or null if any error occured)
      */
-    private native long nativeConstructor (long cNetManager, int dataBufferId, int ackBufferId, long frameBuffer, int frameBufferSize);
+    private native long nativeConstructor (long cNetManager, int dataBufferId, int ackBufferId, long frameBuffer, int frameBufferSize, int maxFragmentSize);
 
     /**
      * Entry point for the data thread<br>
