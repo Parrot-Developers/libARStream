@@ -8,7 +8,7 @@ static jmethodID g_cbWrapper_id = 0;
 static JavaVM *g_vm = NULL;
 static jobject g_thizz = NULL;
 
-uint8_t* internalCallback (eARSTREAM_READER_CAUSE cause, uint8_t *framePointer, uint32_t frameSize, int isFlushFrame, int numberOfSkippedFrames, uint32_t *newBufferCapacity, void *thizz)
+uint8_t* internalCallback (eARSTREAM_READER_CAUSE cause, uint8_t *framePointer, uint32_t frameSize, int numberOfSkippedFrames, int isFlushFrame, uint32_t *newBufferCapacity, void *thizz)
 {
     JNIEnv *env = NULL;
     int wasAlreadyAttached = 1;
