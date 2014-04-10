@@ -116,6 +116,7 @@ struct ARSTREAM_Sender_t {
     ARSTREAM_Sender_FrameUpdateCallback_t callback;
     uint32_t maxNumberOfNextFrames;
     uint32_t maxFragmentSize;
+    uint32_t maxNumberOfFragment;
     void *custom;
 
     /* Current frame storage */
@@ -405,9 +406,9 @@ void ARSTREAM_Sender_FrameWasAck (ARSTREAM_Sender_t *sender)
  * Implementation
  */
 
-void ARSTREAM_Sender_InitStreamDataBuffer (ARNETWORK_IOBufferParam_t *bufferParams, int bufferID)
+void ARSTREAM_Sender_InitStreamDataBuffer (ARNETWORK_IOBufferParam_t *bufferParams, int bufferID, int maxFragmentSize, uint32_t maxFragmentPerFrame)
 {
-    ARSTREAM_Buffers_InitStreamDataBuffer (bufferParams, bufferID);
+    ARSTREAM_Buffers_InitStreamDataBuffer (bufferParams, bufferID, maxFragmentSize, maxFragmentPerFrame);
 }
 
 void ARSTREAM_Sender_InitStreamAckBuffer (ARNETWORK_IOBufferParam_t *bufferParams, int bufferID)
@@ -415,7 +416,7 @@ void ARSTREAM_Sender_InitStreamAckBuffer (ARNETWORK_IOBufferParam_t *bufferParam
     ARSTREAM_Buffers_InitStreamAckBuffer (bufferParams, bufferID);
 }
 
-ARSTREAM_Sender_t* ARSTREAM_Sender_New (ARNETWORK_Manager_t *manager, int dataBufferID, int ackBufferID, ARSTREAM_Sender_FrameUpdateCallback_t callback, uint32_t framesBufferSize, uint32_t maxFragmentSize, void *custom, eARSTREAM_ERROR *error)
+ARSTREAM_Sender_t* ARSTREAM_Sender_New (ARNETWORK_Manager_t *manager, int dataBufferID, int ackBufferID, ARSTREAM_Sender_FrameUpdateCallback_t callback, uint32_t framesBufferSize, uint32_t maxFragmentSize, uint32_t maxNumberOfFragment,  void *custom, eARSTREAM_ERROR *error)
 {
     ARSTREAM_Sender_t *retSender = NULL;
     int packetsToSendMutexWasInit = 0;
@@ -427,7 +428,8 @@ ARSTREAM_Sender_t* ARSTREAM_Sender_New (ARNETWORK_Manager_t *manager, int dataBu
     /* ARGS Check */
     if ((manager == NULL) ||
         (callback == NULL) ||
-        (maxFragmentSize == 0))
+        (maxFragmentSize == 0) ||
+        (maxNumberOfFragment > ARSTREAM_NETWORK_HEADERS_MAX_FRAGMENTS_PER_FRAME))
     {
         SET_WITH_CHECK (error, ARSTREAM_ERROR_BAD_PARAMETERS);
         return retSender;
@@ -448,6 +450,7 @@ ARSTREAM_Sender_t* ARSTREAM_Sender_New (ARNETWORK_Manager_t *manager, int dataBu
         retSender->ackBufferID = ackBufferID;
         retSender->callback = callback;
         retSender->custom = custom;
+        retSender->maxNumberOfFragment = maxNumberOfFragment;
         retSender->maxNumberOfNextFrames = framesBufferSize;
         retSender->maxFragmentSize = maxFragmentSize;
     }
@@ -595,6 +598,7 @@ eARSTREAM_ERROR ARSTREAM_Sender_Delete (ARSTREAM_Sender_t **sender)
 
         if (canDelete == 1)
         {
+            ARSTREAM_Sender_FlushQueue (*sender);
             ARSAL_Mutex_Destroy (&((*sender)->packetsToSendMutex));
             ARSAL_Mutex_Destroy (&((*sender)->ackMutex));
             ARSAL_Mutex_Destroy (&((*sender)->nextFrameMutex));
@@ -626,7 +630,7 @@ eARSTREAM_ERROR ARSTREAM_Sender_SendNewFrame (ARSTREAM_Sender_t *sender, uint8_t
         retVal = ARSTREAM_ERROR_BAD_PARAMETERS;
     }
     if ((retVal == ARSTREAM_OK) &&
-        (frameSize > (sender->maxFragmentSize * ARSTREAM_NETWORK_HEADERS_MAX_FRAGMENTS_PER_FRAME)))
+        (frameSize > (sender->maxFragmentSize * sender->maxNumberOfFragment)))
     {
         retVal = ARSTREAM_ERROR_FRAME_TOO_LARGE;
     }
@@ -773,6 +777,7 @@ void* ARSTREAM_Sender_RunDataThread (void *ARSTREAM_Sender_t_Param)
         {
             if (ARSTREAM_NetworkHeaders_AckPacketFlagIsSet (&(sender->packetsToSend), cnt))
             {
+                eARNETWORK_ERROR netError = ARNETWORK_OK;
                 uint32_t maxFragSize = sender->maxFragmentSize;
                 numbersOfFragmentsSentForCurrentFrame ++;
                 int currFragmentSize = (cnt == nbPackets-1) ? lastFragmentSize : maxFragSize;
@@ -784,7 +789,12 @@ void* ARSTREAM_Sender_RunDataThread (void *ARSTREAM_Sender_t_Param)
                 cbParams->fragmentIndex = cnt;
                 cbParams->frameNumber = sender->packetsToSend.frameNumber;
                 ARSAL_Mutex_Unlock (&(sender->packetsToSendMutex));
-                ARNETWORK_Manager_SendData (sender->manager, sender->dataBufferID, sendFragment, currFragmentSize + sizeof (ARSTREAM_NetworkHeaders_DataHeader_t), (void *)cbParams, ARSTREAM_Sender_NetworkCallback, 1);
+                netError = ARNETWORK_Manager_SendData (sender->manager, sender->dataBufferID, sendFragment, currFragmentSize + sizeof (ARSTREAM_NetworkHeaders_DataHeader_t), (void *)cbParams, ARSTREAM_Sender_NetworkCallback, 1);
+                if (netError != ARNETWORK_OK)
+                {
+                    ARSAL_PRINT (ARSAL_PRINT_ERROR, ARSTREAM_SENDER_TAG, "Error occurred during sending of the fragment ; error: %d : %s", netError, ARNETWORK_Error_ToString(netError));
+                }
+                
                 ARSAL_Mutex_Lock (&(sender->packetsToSendMutex));
             }
         }
@@ -792,6 +802,15 @@ void* ARSTREAM_Sender_RunDataThread (void *ARSTREAM_Sender_t_Param)
         ARSAL_Mutex_Unlock (&(sender->packetsToSendMutex));
     }
     /* END OF PROCESS LOOP */
+    
+    if (sender->currentFrameCbWasCalled == 0 && firstFrame == 0)
+    {
+#ifdef DEBUG
+        ARSTREAM_NetworkHeaders_AckPacketDump ("Cancel frame:", &(sender->ackPacket));
+        ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARSTREAM_SENDER_TAG, "Receiver acknowledged %d of %d packets", ARSTREAM_NetworkHeaders_AckPacketCountSet (&(sender->ackPacket), nbPackets), nbPackets);
+#endif
+        sender->callback (ARSTREAM_SENDER_STATUS_FRAME_CANCEL, sender->currentFrame.frameBuffer, sender->currentFrame.frameSize, sender->custom);
+    }
 
     ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARSTREAM_SENDER_TAG, "Sender thread ended");
     sender->dataThreadStarted = 0;

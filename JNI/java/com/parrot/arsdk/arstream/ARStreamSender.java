@@ -63,11 +63,13 @@ public class ARStreamSender
     /**
      * Static builder for ARNetworkIOBufferParam of data buffers
      * @param bufferId Id of the new buffer
+     * @param  maxFragmentSize Maximum size of the fragment to send
+     * @param  maxNumberOfFragment Maximum number of the fragment to send
      * @return A new buffer, configured to be an ARStream data buffer
      */
-    public static ARNetworkIOBufferParam newDataARNetworkIOBufferParam (int bufferId) {
+    public static ARNetworkIOBufferParam newDataARNetworkIOBufferParam (int bufferId, int maxFragmentSize, int maxNumberOfFragment) {
         ARNetworkIOBufferParam retParam = new ARNetworkIOBufferParamBuilder (bufferId).build ();
-        nativeSetDataBufferParams (retParam.getNativePointer (), bufferId);
+        nativeSetDataBufferParams (retParam.getNativePointer (), bufferId, maxFragmentSize, maxNumberOfFragment);
         return retParam;
     }
 
@@ -95,9 +97,12 @@ public class ARStreamSender
      * @param ackBufferId The id to use for ack transferts on network (must be a valid buffer id in <code>netManager</code>
      * @param theEventListener The event listener to use for this instance
      * @param frameBufferSize Capacity of the internal frameBuffer
+     * @param maxFragmentSize Maximum size of the fragment to send
+     * @param maxNumberOfFragment Maximum number of the fragment to send
      */
-    public ARStreamSender (ARNetworkManager netManager, int dataBufferId, int ackBufferId, ARStreamSenderListener theEventListener, int frameBufferSize) {
-        this.cSender = nativeConstructor (netManager.getManager (), dataBufferId, ackBufferId, frameBufferSize);
+    public ARStreamSender (ARNetworkManager netManager, int dataBufferId, int ackBufferId, ARStreamSenderListener theEventListener, int frameBufferSize,  int maxFragmentSize, int maxNumberOfFragment)
+    {
+        this.cSender = nativeConstructor (netManager.getManager (), dataBufferId, ackBufferId, frameBufferSize, maxFragmentSize, maxNumberOfFragment);
         if (this.cSender != 0) {
             this.valid = true;
             this.eventListener = theEventListener;
@@ -248,8 +253,10 @@ public class ARStreamSender
      * ARStream data buffer.
      * @param cParams C-Pointer to the ARNetworkIOBufferParams internal representation
      * @param id The id of the param
+     * @param maxFragmentSize Maximum size of the fragment to send 
+     * @param maxNumberOfFragment Maximum number of the fragment to send
      */
-    private native static void nativeSetDataBufferParams (long cParams, int id);
+    private native static void nativeSetDataBufferParams (long cParams, int id, int maxFragmentSize, int maxNumberOfFragment);
 
     /**
      * Sets an ARNetworkIOBufferParams internal values to represent an
@@ -266,9 +273,10 @@ public class ARStreamSender
      * @param dataBufferId id of the data buffer to use
      * @param ackBufferId id of the ack buffer to use
      * @param nbFramesToBuffer number of frames that the object can keep in its internal buffer
+     * @param maxNumberOfFragment Maximum number of the fragment to send
      * @return C-Pointer to the ARSTREAM_Sender object (or null if any error occured)
      */
-    private native long nativeConstructor (long cNetManager, int dataBufferId, int ackBufferId, int nbFramesToBuffer);
+    private native long nativeConstructor (long cNetManager, int dataBufferId, int ackBufferId, int nbFramesToBuffer, int maxFragmentSize, int maxNumberOfFragment);
 
     /**
      * Entry point for the data thread<br>

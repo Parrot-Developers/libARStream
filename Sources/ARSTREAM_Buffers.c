@@ -40,7 +40,7 @@
 /*
  * Implementation
  */
-void ARSTREAM_Buffers_InitStreamDataBuffer (ARNETWORK_IOBufferParam_t *bufferParams, int bufferID)
+void ARSTREAM_Buffers_InitStreamDataBuffer (ARNETWORK_IOBufferParam_t *bufferParams, int bufferID, int maxFragmentSize, uint32_t maxFragmentPerFrame)
 {
     if (bufferParams != NULL)
     {
@@ -48,8 +48,8 @@ void ARSTREAM_Buffers_InitStreamDataBuffer (ARNETWORK_IOBufferParam_t *bufferPar
         bufferParams->ID = bufferID;
         bufferParams->dataType = ARSTREAM_BUFFERS_DATA_BUFFER_TYPE;
         bufferParams->sendingWaitTimeMs = ARSTREAM_BUFFERS_DATA_BUFFER_SEND_EVERY_MS;
-        bufferParams->numberOfCell = ARSTREAM_BUFFERS_DATA_BUFFER_NUMBER_OF_CELLS;
-        bufferParams->dataCopyMaxSize = ARSTREAM_BUFFERS_DATA_BUFFER_COPY_MAX_SIZE;
+        bufferParams->numberOfCell = maxFragmentPerFrame;
+        bufferParams->dataCopyMaxSize = maxFragmentSize + sizeof (ARSTREAM_NetworkHeaders_DataHeader_t);
         bufferParams->isOverwriting = ARSTREAM_BUFFERS_DATA_BUFFER_OVERWRITE;
     }
 }

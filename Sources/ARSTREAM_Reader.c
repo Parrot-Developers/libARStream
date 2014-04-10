@@ -123,9 +123,9 @@ eARNETWORK_MANAGER_CALLBACK_RETURN ARSTREAM_Reader_NetworkCallback (int IoBuffer
  * Implementation
  */
 
-void ARSTREAM_Reader_InitStreamDataBuffer (ARNETWORK_IOBufferParam_t *bufferParams, int bufferID)
+void ARSTREAM_Reader_InitStreamDataBuffer (ARNETWORK_IOBufferParam_t *bufferParams, int bufferID, int maxFragmentSize, uint32_t maxNumberOfFragment)
 {
-    ARSTREAM_Buffers_InitStreamDataBuffer (bufferParams, bufferID);
+    ARSTREAM_Buffers_InitStreamDataBuffer (bufferParams, bufferID, maxFragmentSize, maxNumberOfFragment);
 }
 
 void ARSTREAM_Reader_InitStreamAckBuffer (ARNETWORK_IOBufferParam_t *bufferParams, int bufferID)

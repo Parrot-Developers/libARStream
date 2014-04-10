@@ -65,11 +65,13 @@ public class ARStreamReader
     /**
      * Static builder for ARNetworkIOBufferParam of data buffers
      * @param bufferId Id of the new buffer
+     * @param  maxFragmentSize Maximum size of the fragment to send
+     * @param  maxNumberOfFragment Maximum number of the fragment to send
      * @return A new buffer, configured to be an ARStream data buffer
      */
-    public static ARNetworkIOBufferParam newDataARNetworkIOBufferParam (int bufferId) {
+    public static ARNetworkIOBufferParam newDataARNetworkIOBufferParam (int bufferId, int maxFragmentSize, int maxNumberOfFragment) {
         ARNetworkIOBufferParam retParam = new ARNetworkIOBufferParamBuilder (bufferId).build ();
-        nativeSetDataBufferParams (retParam.getNativePointer (), bufferId);
+        nativeSetDataBufferParams (retParam.getNativePointer (), bufferId, maxFragmentSize, maxNumberOfFragment);
         return retParam;
     }
 
@@ -99,7 +101,8 @@ public class ARStreamReader
      * @param theEventListener The event listener to use for this instance
      * @param maxFragmentSize Maximum allowed size for a video data fragment. Video frames larger that will be fragmented.
      */
-    public ARStreamReader (ARNetworkManager netManager, int dataBufferId, int ackBufferId, ARNativeData initialFrameBuffer, ARStreamReaderListener theEventListener, int maxFragmentSize) {
+    public ARStreamReader (ARNetworkManager netManager, int dataBufferId, int ackBufferId, ARNativeData initialFrameBuffer, ARStreamReaderListener theEventListener, int maxFragmentSize)
+    {
         this.cReader = nativeConstructor (netManager.getManager (), dataBufferId, ackBufferId, initialFrameBuffer.getData (), initialFrameBuffer.getCapacity (), maxFragmentSize);
         if (this.cReader != 0) {
             this.valid = true;
@@ -258,8 +261,10 @@ public class ARStreamReader
      * ARStream data buffer.
      * @param cParams C-Pointer to the ARNetworkIOBufferParams internal representation
      * @param id The id of the param
+     * @param maxFragmentSize Maximum size of the fragment to send
+     * @param maxNumberOfFragment Maximum number of the fragment to send
      */
-    private native static void nativeSetDataBufferParams (long cParams, int id);
+    private native static void nativeSetDataBufferParams (long cParams, int id, int maxFragmentSize, int maxNumberOfFragment);
 
     /**
      * Sets an ARNetworkIOBufferParams internal values to represent an
@@ -277,6 +282,7 @@ public class ARStreamReader
      * @param ackBufferId id of the ack buffer to use
      * @param frameBuffer C-Pointer to the initial frame buffer
      * @param frameBufferSize size of the initial frame buffer
+     * @param maxFragmentSize Maximum size of the fragment to send
      * @return C-Pointer to the ARSTREAM_Reader object (or null if any error occured)
      */
     private native long nativeConstructor (long cNetManager, int dataBufferId, int ackBufferId, long frameBuffer, int frameBufferSize, int maxFragmentSize);

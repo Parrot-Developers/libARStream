@@ -74,8 +74,10 @@ typedef struct ARSTREAM_Reader_t ARSTREAM_Reader_t;
  * @brief Sets an ARNETWORK_IOBufferParam_t to describe a stream data buffer
  * @param[in] bufferParams Pointer to the ARNETWORK_IOBufferParam_t to set
  * @param[in] bufferID ID to set in the ARNETWORK_IOBufferParam_t
+ * @param[in] maxFragmentSize Maximum allowed size for a video data fragment. Video frames larger that will be fragmented.
+ * @param[in] maxNumberOfFragment number maximum of fragment of one frame.
  */
-void ARSTREAM_Reader_InitStreamDataBuffer (ARNETWORK_IOBufferParam_t *bufferParams, int bufferID);
+void ARSTREAM_Reader_InitStreamDataBuffer (ARNETWORK_IOBufferParam_t *bufferParams, int bufferID, int maxFragmentSize, uint32_t maxNumberOfFragment);
 
 /**
  * @brief Sets an ARNETWORK_IOBufferParam_t to describe a stream ack buffer

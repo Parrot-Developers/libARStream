@@ -65,9 +65,9 @@ Java_com_parrot_arsdk_arstream_ARStreamReader_nativeInitClass (JNIEnv *env, jcla
 }
 
 JNIEXPORT void JNICALL
-Java_com_parrot_arsdk_arstream_ARStreamReader_nativeSetDataBufferParams (JNIEnv *env, jclass clazz, jlong cParams, jint id)
+Java_com_parrot_arsdk_arstream_ARStreamReader_nativeSetDataBufferParams (JNIEnv *env, jclass clazz, jlong cParams, jint id, jint maxFragmentSize, jint maxNumberOfFragment)
 {
-    ARSTREAM_Reader_InitStreamDataBuffer ((ARNETWORK_IOBufferParam_t *)(intptr_t)cParams, id);
+    ARSTREAM_Reader_InitStreamDataBuffer ((ARNETWORK_IOBufferParam_t *)(intptr_t)cParams, id, maxFragmentSize, maxNumberOfFragment);
 }
 
 JNIEXPORT void JNICALL
