@@ -8,7 +8,7 @@ static jmethodID g_cbWrapper_id = 0;
 static JavaVM *g_vm = NULL;
 static jobject g_thizz = NULL;
 
-uint8_t* internalCallback (eARSTREAM_READER_CAUSE cause, uint8_t *framePointer, uint32_t frameSize, int numberOfSkippedFrames, int isFlushFrame, uint32_t *newBufferCapacity, void *thizz)
+static uint8_t* internalCallback (eARSTREAM_READER_CAUSE cause, uint8_t *framePointer, uint32_t frameSize, int numberOfSkippedFrames, int isFlushFrame, uint32_t *newBufferCapacity, void *thizz)
 {
     JNIEnv *env = NULL;
     int wasAlreadyAttached = 1;
@@ -29,7 +29,7 @@ uint8_t* internalCallback (eARSTREAM_READER_CAUSE cause, uint8_t *framePointer, 
         *newBufferCapacity = 0;
         return NULL;
     }
-    
+
     jboolean isFlush = (isFlushFrame == 1) ? JNI_TRUE : JNI_FALSE;
     jlongArray newNativeDataInfos = (*env)->CallObjectMethod(env, (jobject)thizz, g_cbWrapper_id, (jint)cause, (jlong)(intptr_t)framePointer, (jint)frameSize, isFlush, (jint)numberOfSkippedFrames, (jint)*newBufferCapacity);
 
@@ -41,7 +41,7 @@ uint8_t* internalCallback (eARSTREAM_READER_CAUSE cause, uint8_t *framePointer, 
         retVal = (uint8_t *)(intptr_t)array[0];
         *newBufferCapacity = (int)array[1];
         (*env)->ReleaseLongArrayElements(env, newNativeDataInfos, array, 0);
-        
+
         (*env)->DeleteLocalRef (env, newNativeDataInfos);
     }
 
@@ -82,7 +82,7 @@ Java_com_parrot_arsdk_arstream_ARStreamReader_nativeConstructor (JNIEnv *env, jo
     eARSTREAM_ERROR err = ARSTREAM_OK;
     g_thizz = (*env)->NewGlobalRef(env, thizz);
     ARSTREAM_Reader_t *retReader = ARSTREAM_Reader_New ((ARNETWORK_Manager_t *)(intptr_t)cNetManager, dataBufferId, ackBufferId, internalCallback, (uint8_t *)(intptr_t)frameBuffer, frameBufferSize, maxFragmentSize, (void *)g_thizz, &err);
-    
+
     if (err != ARSTREAM_OK)
     {
         ARSAL_PRINT (ARSAL_PRINT_ERROR, JNI_READER_TAG, "Error while creating reader : %s", ARSTREAM_Error_ToString (err));

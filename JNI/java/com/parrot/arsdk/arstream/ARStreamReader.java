@@ -152,6 +152,16 @@ public class ARStreamReader
     /* **************** */
 
     /**
+     * Checks if the current manager is valid.<br>
+     * A valid manager is a manager which can be used to receive video frames.
+     * @return The validity of the manager.
+     */
+    public boolean isValid()
+    {
+        return this.valid;
+    }
+
+    /**
      * Stops the internal threads of the ARStreamReader.<br>
      * Calling this function allow the ARStreamReader Runnables to end
      */

@@ -152,6 +152,16 @@ public class ARStreamSender
     /* **************** */
 
     /**
+     * Checks if the current manager is valid.<br>
+     * A valid manager is a manager which can be used to send video frames.
+     * @return The validity of the manager.
+     */
+    public boolean isValid()
+    {
+        return this.valid;
+    }
+
+    /**
      * Stops the internal threads of the ARStreamSender.<br>
      * Calling this function allow the ARStreamSender Runnables to end
      */
@@ -182,8 +192,14 @@ public class ARStreamSender
      * @param frame The frame to send
      * @param flush If active, the ARStreamSender will cancel any remaining prevous frame, and start sending this one immediately
      */
-    ARSTREAM_ERROR_ENUM SendNewFrame (ARNativeData frame, boolean flush) {
-        return ARSTREAM_ERROR_ENUM.ARSTREAM_OK;
+    public ARSTREAM_ERROR_ENUM sendNewFrame (ARNativeData frame, boolean flush) {
+        int intErr = nativeSendNewFrame(frame.getData(), frame.getDataSize(), flush);
+        ARSTREAM_ERROR_ENUM err = ARSTREAM_ERROR_ENUM.getFromValue(intErr);
+        if (err == ARSTREAM_ERROR_ENUM.ARSTREAM_OK)
+        {
+            frames.put(frame.getData(), frame);
+        }
+        return ARSTREAM_ERROR_ENUM.getFromValue(intErr);
     }
 
     /**
@@ -253,7 +269,7 @@ public class ARStreamSender
      * ARStream data buffer.
      * @param cParams C-Pointer to the ARNetworkIOBufferParams internal representation
      * @param id The id of the param
-     * @param maxFragmentSize Maximum size of the fragment to send 
+     * @param maxFragmentSize Maximum size of the fragment to send
      * @param maxNumberOfFragment Maximum number of the fragment to send
      */
     private native static void nativeSetDataBufferParams (long cParams, int id, int maxFragmentSize, int maxNumberOfFragment);
@@ -309,6 +325,14 @@ public class ARStreamSender
      * @param cSender C-Pointer to the ARSTREAM_Sender C object
      */
     private native float nativeGetEfficiency (long cSender);
+
+    /**
+     * Tries to send a new frame.
+     * @param frameBuffer The c pointer to the frame.
+     * @param frameSize The size in bytes of the frame.
+     * @param flushPreviousFrame Whether to flush any queued frames or not.
+     */
+    private native int nativeSendNewFrame (long frameBuffer, int frameSize, boolean flushPreviousFrame);
 
     /**
      * Initializes global static references in native code
