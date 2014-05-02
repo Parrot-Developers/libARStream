@@ -28,7 +28,7 @@ static void internalCallback (eARSTREAM_SENDER_STATUS status, uint8_t *framePoin
         return;
     }
 
-    (*env)->CallObjectMethod(env, (jobject)thizz, g_cbWrapper_id, (jint)status, (jlong)(intptr_t)framePointer, (jint)frameSize);
+    (*env)->CallVoidMethod(env, (jobject)thizz, g_cbWrapper_id, (jint)status, (jlong)(intptr_t)framePointer, (jint)frameSize);
 
     if (wasAlreadyAttached == 0)
     {

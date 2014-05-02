@@ -195,13 +195,13 @@ public class ARStreamSender
      * @param flush If active, the ARStreamSender will cancel any remaining prevous frame, and start sending this one immediately
      */
     public ARSTREAM_ERROR_ENUM sendNewFrame (ARNativeData frame, boolean flush) {
-        int intErr = nativeSendNewFrame(frame.getData(), frame.getDataSize(), flush);
+        int intErr = nativeSendNewFrame(cSender, frame.getData(), frame.getDataSize(), flush);
         ARSTREAM_ERROR_ENUM err = ARSTREAM_ERROR_ENUM.getFromValue(intErr);
         if (err == ARSTREAM_ERROR_ENUM.ARSTREAM_OK)
         {
             frames.put(frame.getData(), frame);
         }
-        return ARSTREAM_ERROR_ENUM.getFromValue(intErr);
+        return err;
     }
 
     /**
@@ -330,11 +330,12 @@ public class ARStreamSender
 
     /**
      * Tries to send a new frame.
+     * @param cSender C-Pointer to the ARSTREAM_Sender C object
      * @param frameBuffer The c pointer to the frame.
      * @param frameSize The size in bytes of the frame.
      * @param flushPreviousFrame Whether to flush any queued frames or not.
      */
-    private native int nativeSendNewFrame (long frameBuffer, int frameSize, boolean flushPreviousFrame);
+    private native int nativeSendNewFrame (long cSender, long frameBuffer, int frameSize, boolean flushPreviousFrame);
 
     /**
      * Initializes global static references in native code
