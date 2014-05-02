@@ -794,7 +794,7 @@ void* ARSTREAM_Sender_RunDataThread (void *ARSTREAM_Sender_t_Param)
                 {
                     ARSAL_PRINT (ARSAL_PRINT_ERROR, ARSTREAM_SENDER_TAG, "Error occurred during sending of the fragment ; error: %d : %s", netError, ARNETWORK_Error_ToString(netError));
                 }
-                
+
                 ARSAL_Mutex_Lock (&(sender->packetsToSendMutex));
             }
         }
@@ -802,7 +802,7 @@ void* ARSTREAM_Sender_RunDataThread (void *ARSTREAM_Sender_t_Param)
         ARSAL_Mutex_Unlock (&(sender->packetsToSendMutex));
     }
     /* END OF PROCESS LOOP */
-    
+
     if (sender->currentFrameCbWasCalled == 0 && firstFrame == 0)
     {
 #ifdef DEBUG
@@ -873,6 +873,10 @@ void* ARSTREAM_Sender_RunAckThread (void *ARSTREAM_Sender_t_Param)
 
 float ARSTREAM_Sender_GetEstimatedEfficiency (ARSTREAM_Sender_t *sender)
 {
+    if (sender == NULL)
+    {
+        return -1.0f;
+    }
     float retVal = 1.0f;
     uint32_t totalPackets = 0;
     uint32_t sentPackets = 0;
@@ -898,4 +902,14 @@ float ARSTREAM_Sender_GetEstimatedEfficiency (ARSTREAM_Sender_t *sender)
         retVal = (1.f * totalPackets) / (1.f * sentPackets);
     }
     return retVal;
+}
+
+void* ARSTREAM_Sender_GetCustom (ARSTREAM_Sender_t *sender)
+{
+    void *ret = NULL;
+    if (sender != NULL)
+    {
+        ret = sender->custom;
+    }
+    return ret;
 }

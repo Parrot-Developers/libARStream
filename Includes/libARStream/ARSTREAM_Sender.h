@@ -160,4 +160,11 @@ void* ARSTREAM_Sender_RunAckThread (void *ARSTREAM_Sender_t_Param);
  */
 float ARSTREAM_Sender_GetEstimatedEfficiency (ARSTREAM_Sender_t *sender);
 
+/**
+ * @brief Gets the custom pointer associated with the sender
+ * @param[in] sender The ARSTREAM_Sender_t
+ * @return The custom pointer associated with this sender, or NULL if sender does not point to a valid sender
+ */
+void* ARSTREAM_Sender_GetCustom (ARSTREAM_Sender_t *sender);
+
 #endif /* _ARSTREAM_SENDER_H_ */

@@ -6,7 +6,6 @@
 
 static jmethodID g_cbWrapper_id = 0;
 static JavaVM *g_vm = NULL;
-static jobject g_thizz = NULL;
 
 static uint8_t* internalCallback (eARSTREAM_READER_CAUSE cause, uint8_t *framePointer, uint32_t frameSize, int numberOfSkippedFrames, int isFlushFrame, uint32_t *newBufferCapacity, void *thizz)
 {
@@ -80,7 +79,7 @@ JNIEXPORT jlong JNICALL
 Java_com_parrot_arsdk_arstream_ARStreamReader_nativeConstructor (JNIEnv *env, jobject thizz, jlong cNetManager, jint dataBufferId, jint ackBufferId, jlong frameBuffer, jint frameBufferSize, jint maxFragmentSize)
 {
     eARSTREAM_ERROR err = ARSTREAM_OK;
-    g_thizz = (*env)->NewGlobalRef(env, thizz);
+    jobject g_thizz = (*env)->NewGlobalRef(env, thizz);
     ARSTREAM_Reader_t *retReader = ARSTREAM_Reader_New ((ARNETWORK_Manager_t *)(intptr_t)cNetManager, dataBufferId, ackBufferId, internalCallback, (uint8_t *)(intptr_t)frameBuffer, frameBufferSize, maxFragmentSize, (void *)g_thizz, &err);
 
     if (err != ARSTREAM_OK)
@@ -113,16 +112,16 @@ Java_com_parrot_arsdk_arstream_ARStreamReader_nativeDispose (JNIEnv *env, jobjec
 {
     jboolean retVal = JNI_TRUE;
     ARSTREAM_Reader_t *reader = (ARSTREAM_Reader_t *)(intptr_t)cReader;
+    void *ref = ARSTREAM_Reader_GetCustom(reader);
     eARSTREAM_ERROR err = ARSTREAM_Reader_Delete (&reader);
     if (err != ARSTREAM_OK)
     {
         ARSAL_PRINT (ARSAL_PRINT_ERROR, JNI_READER_TAG, "Unable to delete reader : %s", ARSTREAM_Error_ToString (err));
         retVal = JNI_FALSE;
     }
-    if (retVal == JNI_TRUE)
+    if (retVal == JNI_TRUE && ref != NULL)
     {
-        (*env)->DeleteGlobalRef(env, g_thizz);
-        g_thizz = 0;
+        (*env)->DeleteGlobalRef(env, (jobject)ref);
     }
     return retVal;
 }

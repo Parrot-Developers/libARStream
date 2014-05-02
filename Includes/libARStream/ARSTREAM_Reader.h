@@ -156,4 +156,11 @@ void* ARSTREAM_Reader_RunAckThread (void *ARSTREAM_Reader_t_Param);
  */
 float ARSTREAM_Reader_GetEstimatedEfficiency (ARSTREAM_Reader_t *reader);
 
+/**
+ * @brief Gets the custom pointer associated with the reader
+ * @param[in] reader The ARSTREAM_Reader_t
+ * @return The custom pointer associated with this reader, or NULL if reader does not point to a valid reader
+ */
+void* ARSTREAM_Reader_GetCustom (ARSTREAM_Reader_t *reader);
+
 #endif /* _ARSTREAM_READER_H_ */

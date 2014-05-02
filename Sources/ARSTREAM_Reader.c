@@ -462,6 +462,10 @@ void* ARSTREAM_Reader_RunAckThread (void *ARSTREAM_Reader_t_Param)
 
 float ARSTREAM_Reader_GetEstimatedEfficiency (ARSTREAM_Reader_t *reader)
 {
+    if (reader == NULL)
+    {
+        return -1.0f;
+    }
     float retVal = 1.0f;
     uint32_t totalPackets = 0;
     uint32_t usefulPackets = 0;
@@ -487,4 +491,14 @@ float ARSTREAM_Reader_GetEstimatedEfficiency (ARSTREAM_Reader_t *reader)
         retVal = (1.f * usefulPackets) / (1.f * totalPackets);
     }
     return retVal;
+}
+
+void* ARSTREAM_Reader_GetCustom (ARSTREAM_Reader_t *reader)
+{
+    void *ret = NULL;
+    if (reader != NULL)
+    {
+        ret = reader->custom;
+    }
+    return ret;
 }

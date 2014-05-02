@@ -6,7 +6,6 @@
 
 static jmethodID g_cbWrapper_id = 0;
 static JavaVM *g_vm = NULL;
-static jobject g_thizz = NULL;
 
 
 static void internalCallback (eARSTREAM_SENDER_STATUS status, uint8_t *framePointer, uint32_t frameSize, void *thizz)
@@ -66,7 +65,7 @@ JNIEXPORT jlong JNICALL
 Java_com_parrot_arsdk_arstream_ARStreamSender_nativeConstructor (JNIEnv *env, jobject thizz, jlong cNetManager, jint dataBufferId, jint ackBufferId, jint framesBufferSize, jint maxFragmentSize, jint maxNumberOfFragment)
 {
     eARSTREAM_ERROR err = ARSTREAM_OK;
-    g_thizz = (*env)->NewGlobalRef(env, thizz);
+    jobject g_thizz = (*env)->NewGlobalRef(env, thizz);
     ARSTREAM_Sender_t *retSender = ARSTREAM_Sender_New ((ARNETWORK_Manager_t *)(intptr_t)cNetManager, dataBufferId, ackBufferId, internalCallback, framesBufferSize, maxFragmentSize, maxNumberOfFragment, (void *)g_thizz, &err);
 
     if (err != ARSTREAM_OK)
@@ -99,16 +98,16 @@ Java_com_parrot_arsdk_arstream_ARStreamSender_nativeDispose (JNIEnv *env, jobjec
 {
     jboolean retVal = JNI_TRUE;
     ARSTREAM_Sender_t *sender = (ARSTREAM_Sender_t *)(intptr_t)cSender;
+    void *ref = ARSTREAM_Sender_GetCustom (sender);
     eARSTREAM_ERROR err = ARSTREAM_Sender_Delete (&sender);
     if (err != ARSTREAM_OK)
     {
         ARSAL_PRINT (ARSAL_PRINT_ERROR, JNI_SENDER_TAG, "Unable to delete sender : %s", ARSTREAM_Error_ToString (err));
         retVal = JNI_FALSE;
     }
-    if (retVal == JNI_TRUE)
+    if (retVal == JNI_TRUE && ref != NULL)
     {
-        (*env)->DeleteGlobalRef(env, g_thizz);
-        g_thizz = 0;
+        (*env)->DeleteGlobalRef(env, (jobject)ref);
     }
     return retVal;
 }
