@@ -70,6 +70,7 @@ public class ARStreamSender
     public static ARNetworkIOBufferParam newDataARNetworkIOBufferParam (int bufferId, int maxFragmentSize, int maxNumberOfFragment) {
         ARNetworkIOBufferParam retParam = new ARNetworkIOBufferParamBuilder (bufferId).build ();
         nativeSetDataBufferParams (retParam.getNativePointer (), bufferId, maxFragmentSize, maxNumberOfFragment);
+        retParam.updateFromNative();
         return retParam;
     }
 
@@ -81,6 +82,7 @@ public class ARStreamSender
     public static ARNetworkIOBufferParam newAckARNetworkIOBufferParam (int bufferId) {
         ARNetworkIOBufferParam retParam = new ARNetworkIOBufferParamBuilder (bufferId).build ();
         nativeSetAckBufferParams (retParam.getNativePointer (), bufferId);
+        retParam.updateFromNative();
         return retParam;
     }
 
