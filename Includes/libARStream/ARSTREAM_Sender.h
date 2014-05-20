@@ -137,6 +137,15 @@ eARSTREAM_ERROR ARSTREAM_Sender_Delete (ARSTREAM_Sender_t **sender);
 eARSTREAM_ERROR ARSTREAM_Sender_SendNewFrame (ARSTREAM_Sender_t *sender, uint8_t *frameBuffer, uint32_t frameSize, int flushPreviousFrames, int *nbPreviousFrames);
 
 /**
+ * @brief Flushes all currently queued frames
+ *
+ * @param[in] sender The ARSTREAM_Sender_t to be flushed.
+ * @return ARSTREAM_OK if no error occured.
+ * @return ARSTREAM_ERROR_BAD_PARAMETERS if the sender is invalid.
+ */
+eARSTREAM_ERROR ARSTREAM_Sender_FlushFramesQueue (ARSTREAM_Sender_t *sender);
+
+/**
  * @brief Runs the data loop of the ARSTREAM_Sender_t
  * @warning This function never returns until ARSTREAM_Sender_StopSender() is called. Thus, it should be called on its own thread
  * @post Stop the ARSTREAM_Sender_t by calling ARSTREAM_Sender_StopSender() before joining the thread calling this function

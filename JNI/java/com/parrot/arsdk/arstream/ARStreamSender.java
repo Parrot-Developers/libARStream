@@ -205,6 +205,15 @@ public class ARStreamSender
     }
 
     /**
+     * Flushes all currently queued frames on the ARStreamSender.
+     */
+    public ARSTREAM_ERROR_ENUM flushFrameQueue ()
+    {
+        int intErr = nativeFlushFrameQueue(cSender);
+        return ARSTREAM_ERROR_ENUM.getFromValue(intErr);
+    }
+
+    /**
      * Gets the Data Runnable<br>
      * Each runnable must be run exactly ONE time
      * @return The Data Runnable

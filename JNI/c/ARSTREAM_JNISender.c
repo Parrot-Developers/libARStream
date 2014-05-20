@@ -125,3 +125,10 @@ Java_com_parrot_arsdk_arstream_ARStreamSender_nativeSendNewFrame (JNIEnv *env, j
     eARSTREAM_ERROR err = ARSTREAM_Sender_SendNewFrame((ARSTREAM_Sender_t *)(intptr_t)cSender, (uint8_t *)(intptr_t)frameBuffer, frameSize, flush, NULL);
     return (jint)err;
 }
+
+JNIEXPORT jint JNICALL
+Java_com_parrot_arsdk_arstream_ARStreamSender_nativeFlushFrameQueue (JNIEnv *env, jobject thizz, jlong cSender)
+{
+    eARSTREAM_ERROR err = ARSTREAM_Sender_FlushFramesQueue ((ARSTREAM_Sender_t *)(intptr_t)cSender);
+    return (jint)err;
+}

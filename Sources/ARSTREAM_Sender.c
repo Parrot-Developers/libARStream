@@ -651,6 +651,22 @@ eARSTREAM_ERROR ARSTREAM_Sender_SendNewFrame (ARSTREAM_Sender_t *sender, uint8_t
     return retVal;
 }
 
+eARSTREAM_ERROR ARSTREAM_Sender_FlushFramesQueue (ARSTREAM_Sender_t *sender)
+{
+    eARSTREAM_ERROR retVal = ARSTREAM_OK;
+    if (sender == NULL)
+    {
+        retVal = ARSTREAM_ERROR_BAD_PARAMETERS;
+    }
+    if (retVal == ARSTREAM_OK)
+    {
+        ARSAL_Mutex_Lock (&(sender->nextFrameMutex));
+        ARSTREAM_Sender_FlushQueue (sender);
+        ARSAL_Mutex_Unlock (&(sender->nextFrameMutex));
+    }
+    return retVal;
+}
+
 void* ARSTREAM_Sender_RunDataThread (void *ARSTREAM_Sender_t_Param)
 {
     /* Local declarations */
