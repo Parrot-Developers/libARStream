@@ -347,6 +347,12 @@ public class ARStreamSender
     private native int nativeSendNewFrame (long cSender, long frameBuffer, int frameSize, boolean flushPreviousFrame);
 
     /**
+     * Flushed the frames queue.
+     * @param cSender C-Pointer to the ARSTREAM_Sender C object
+     */
+    private native int nativeFlushFrameQueue(long cSender);
+
+    /**
      * Initializes global static references in native code
      */
     private native static void nativeInitClass ();
