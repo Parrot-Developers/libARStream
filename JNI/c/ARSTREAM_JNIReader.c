@@ -122,6 +122,10 @@ Java_com_parrot_arsdk_arstream_ARStreamReader_nativeDispose (JNIEnv *env, jobjec
     if (retVal == JNI_TRUE && ref != NULL)
     {
         (*env)->DeleteGlobalRef(env, (jobject)ref);
+	if ((*env)->ExceptionOccurred(env) != NULL)
+	{
+	    (*env)->ExceptionDescribe(env);
+	}
     }
     return retVal;
 }
