@@ -281,7 +281,7 @@ static int ARSTREAM_Sender_PopFromQueue (ARSTREAM_Sender_t *sender, ARSTREAM_Sen
     // If not, wait for a frame ready event
     if (retVal == 0)
     {
-        struct timeval start, end;
+        struct timespec start, end;
         int timewaited = 0;
         int waitTime = ARNETWORK_Manager_GetEstimatedLatency (sender->manager);
         if (waitTime < 0) // Unable to get latency
@@ -300,10 +300,10 @@ static int ARSTREAM_Sender_PopFromQueue (ARSTREAM_Sender_t *sender, ARSTREAM_Sen
         while ((retVal == 0) &&
                (hadTimeout == 0))
         {
-            gettimeofday (&start, NULL);
+            ARSAL_Time_GetTime(&start);
             int err = ARSAL_Cond_Timedwait (&(sender->nextFrameCond), &(sender->nextFrameMutex), waitTime - timewaited);
-            gettimeofday (&end, NULL);
-            timewaited += ARSAL_Time_ComputeMsTimeDiff (&start, &end);
+            ARSAL_Time_GetTime(&end);
+            timewaited += ARSAL_Time_ComputeTimespecMsTimeDiff (&start, &end);
             if (err == ETIMEDOUT)
             {
                 hadTimeout = 1;
