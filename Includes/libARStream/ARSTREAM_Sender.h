@@ -53,6 +53,23 @@ typedef void (*ARSTREAM_Sender_FrameUpdateCallback_t)(eARSTREAM_SENDER_STATUS st
  */
 typedef struct ARSTREAM_Sender_t ARSTREAM_Sender_t;
 
+/**
+ * @brief Default minimum wait time for ARSTREAM_Sender_SetTimeBetweenRetries calls
+ */
+#define ARSTREAM_SENDER_DEFAULT_MINIMUM_TIME_BETWEEN_RETRIES_MS (15)
+/**
+ * @brief Default maximum wait time for ARSTREAM_Sender_SetTimeBetweenRetries calls
+ */
+#define ARSTREAM_SENDER_DEFAULT_MAXIMUM_TIME_BETWEEN_RETRIES_MS (50)
+/**
+ * @brief "Infinite" time.
+ * Use this time as both minimum and maximum time in ARSTREAM_Sender_SetTimeBetweenRetries
+ * to disable retries.
+ * @warning Disabling the retry system will lower the reliability of the stream!
+ */
+#define ARSTREAM_SENDER_INFINITE_TIME_BETWEEN_RETRIES (100000)
+
+
 /*
  * Functions declarations
  */
@@ -96,6 +113,28 @@ void ARSTREAM_Sender_InitStreamAckBuffer (ARNETWORK_IOBufferParam_t *bufferParam
  * @see ARSTREAM_Sender_Delete()
  */
 ARSTREAM_Sender_t* ARSTREAM_Sender_New (ARNETWORK_Manager_t *manager, int dataBufferID, int ackBufferID, ARSTREAM_Sender_FrameUpdateCallback_t callback, uint32_t framesBufferSize, uint32_t maxFragmentSize, uint32_t maxNumberOfFragment,  void *custom, eARSTREAM_ERROR *error);
+
+/**
+ * @brief Sets the minimum and maximum time between retries.
+ * Setting a small retry time might increase reliability, at the cost of network and cpu loads.
+ * Setting a high retry time might decrease reliability, but also reduce the network and cpu loads.
+ * These rules apply to both the minimum and the maximum time.
+ *
+ * The library selects a wait time between the two bounds using data retrieved from the ARNETWORK_Manager_t.
+ *
+ * If the minimum and maximum wait times are equal, then the library will always use this time.
+ *
+ * @note To reset to default values, use ARSTREAM_SENDER_DEFAULT_MINIMUM_TIME_BETWEEN_RETRIES_MS and ARSTREAM_SENDER_DEFAULT_MAXIMUM_TIME_BETWEEN_RETRIES_MS.
+ * @note To disable retries, use ARSTREAM_SENDER_INFINITE_TIME_BETWEEN_RETRIES as both minimum and maximum time.
+ * @warning Setting a too low maximum wait time might create a very high network bandwidth, and a very high cpu load.
+ * @warning Setting a too big minimum wait time (i.e. greater than the time between two flush frames) will effectively disable retries.
+ * @param minWaitTimeMs The minimum time between two retries, in miliseconds.
+ * @param maxWaitTimeMs The maximum time between two retries, in miliseconds.
+ *
+ * @return ARSTREAM_OK if the new time range is set.
+ * @return ARSTREAM_ERROR_BAD_PARAMETERS if sender is NULL, or if minWaitTimeMs is greater than maxWaitTimeMs.
+ */
+eARSTREAM_ERROR ARSTREAM_Sender_SetTimeBetweenRetries (ARSTREAM_Sender_t *sender, int minWaitTimeMs, int maxWaitTimeMs);
 
 /**
  * @brief Stops a running ARSTREAM_Sender_t

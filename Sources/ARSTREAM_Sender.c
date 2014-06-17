@@ -71,15 +71,6 @@
 #define ARSTREAM_SENDER_DEFAULT_ESTIMATED_LATENCY_MS (100)
 
 /**
- * Minimum time between two retries
- */
-#define ARSTREAM_SENDER_MINIMUM_TIME_BETWEEN_RETRIES_MS (15)
-/**
- * Maximum time between two retries
- */
-#define ARSTREAM_SENDER_MAXIMUM_TIME_BETWEEN_RETRIES_MS (50)
-
-/**
  * Number of frames for the moving average of efficiency
  */
 #define ARSTREAM_SENDER_EFFICIENCY_AVERAGE_NB_FRAMES (15)
@@ -118,6 +109,10 @@ struct ARSTREAM_Sender_t {
     uint32_t maxFragmentSize;
     uint32_t maxNumberOfFragment;
     void *custom;
+
+    /* Other configuration */
+    int minRetryTimeMs;
+    int maxRetryTimeMs;
 
     /* Current frame storage */
     ARSTREAM_Sender_Frame_t currentFrame;
@@ -289,10 +284,10 @@ static int ARSTREAM_Sender_PopFromQueue (ARSTREAM_Sender_t *sender, ARSTREAM_Sen
             waitTime = ARSTREAM_SENDER_DEFAULT_ESTIMATED_LATENCY_MS;
         }
         waitTime += 5; // Add some time to avoid optimistic waitTime, and 0ms waitTime
-        if (waitTime > ARSTREAM_SENDER_MAXIMUM_TIME_BETWEEN_RETRIES_MS)
-            waitTime = ARSTREAM_SENDER_MAXIMUM_TIME_BETWEEN_RETRIES_MS;
-        if (waitTime < ARSTREAM_SENDER_MINIMUM_TIME_BETWEEN_RETRIES_MS)
-            waitTime = ARSTREAM_SENDER_MINIMUM_TIME_BETWEEN_RETRIES_MS;
+        if (waitTime > sender->maxRetryTimeMs)
+            waitTime = sender->maxRetryTimeMs;
+        if (waitTime < sender->minRetryTimeMs)
+            waitTime = sender->minRetryTimeMs;
 #if ENABLE_RETRIES == 0
         waitTime = 100000; // Put an extremely long wait time (100 sec) to simulate a "no retry" case
 #endif
@@ -393,7 +388,7 @@ eARNETWORK_MANAGER_CALLBACK_RETURN ARSTREAM_Sender_NetworkCallback (int IoBuffer
 }
 
 
-void ARSTREAM_Sender_FrameWasAck (ARSTREAM_Sender_t *sender)
+static void ARSTREAM_Sender_FrameWasAck (ARSTREAM_Sender_t *sender)
 {
     sender->callback (ARSTREAM_SENDER_STATUS_FRAME_SENT, sender->currentFrame.frameBuffer, sender->currentFrame.frameSize, sender->custom);
     sender->currentFrameCbWasCalled = 1;
@@ -453,6 +448,13 @@ ARSTREAM_Sender_t* ARSTREAM_Sender_New (ARNETWORK_Manager_t *manager, int dataBu
         retSender->maxNumberOfFragment = maxNumberOfFragment;
         retSender->maxNumberOfNextFrames = framesBufferSize;
         retSender->maxFragmentSize = maxFragmentSize;
+    }
+
+    /* Initialize internal config */
+    if (internalError == ARSTREAM_OK)
+    {
+        retSender->minRetryTimeMs = ARSTREAM_SENDER_DEFAULT_MINIMUM_TIME_BETWEEN_RETRIES_MS;
+        retSender->maxRetryTimeMs = ARSTREAM_SENDER_DEFAULT_MAXIMUM_TIME_BETWEEN_RETRIES_MS;
     }
 
     /* Setup internal mutexes/sems */
@@ -573,6 +575,25 @@ ARSTREAM_Sender_t* ARSTREAM_Sender_New (ARNETWORK_Manager_t *manager, int dataBu
 
     SET_WITH_CHECK (error, internalError);
     return retSender;
+}
+
+
+eARSTREAM_ERROR ARSTREAM_Sender_SetTimeBetweenRetries (ARSTREAM_Sender_t *sender, int minWaitTimeMs, int maxWaitTimeMs)
+{
+    eARSTREAM_ERROR err = ARSTREAM_OK;
+    if (sender == NULL ||
+        minWaitTimeMs < 0 ||
+        maxWaitTimeMs < minWaitTimeMs)
+    {
+        err = ARSTREAM_ERROR_BAD_PARAMETERS;
+    }
+
+    if (err == ARSTREAM_OK)
+    {
+        sender->minRetryTimeMs = minWaitTimeMs;
+        sender->maxRetryTimeMs = maxWaitTimeMs;
+    }
+    return err;
 }
 
 void ARSTREAM_Sender_StopSender (ARSTREAM_Sender_t *sender)
