@@ -33,6 +33,7 @@
 typedef enum {
     ARSTREAM_SENDER_STATUS_FRAME_SENT = 0, /**< Frame was sent and acknowledged by peer */
     ARSTREAM_SENDER_STATUS_FRAME_CANCEL, /**< Frame was not sent, and was cancelled by a new frame */
+    ARSTREAM_SENDER_STATUS_FRAME_LATE_ACK, /**< We received a full ack for an old frame. The callback will be called with null pointer and zero size. */
     ARSTREAM_SENDER_STATUS_MAX,
 } eARSTREAM_SENDER_STATUS;
 
@@ -40,10 +41,17 @@ typedef enum {
  * @brief Callback type for sender informations
  * This callback is called when a frame pointer is no longer needed by the library.
  * This can occur when a frame is acknowledged, cancelled, or if a network error happened.
+ *
+ * This callback is also used when we receive the first "full-ack" for an old frame. In
+ * this case, the framePointer and frameSize arguments are unused and set to NULL. There
+ * is no way to identify the "old" frame, but the library guarantees that the LATE_ACK status
+ * will only be called for previously cancelled frames, and at most once per cancelled frame.
+ *
  * @param[in] status Why the call was made
  * @param[in] framePointer Pointer to the frame which was sent/cancelled
  * @param[in] frameSize Size, in bytes, of the frame
  * @param[in] custom Custom pointer passed during ARSTREAM_Sender_New
+ * @warning If the status is ARSTREAM_SENDER_STATUS_FRAME_LATE_ACK, then the framePointer will be NULL.
  * @see eARSTREAM_SENDER_STATUS
  */
 typedef void (*ARSTREAM_Sender_FrameUpdateCallback_t)(eARSTREAM_SENDER_STATUS status, uint8_t *framePointer, uint32_t frameSize, void *custom);
@@ -68,6 +76,7 @@ typedef struct ARSTREAM_Sender_t ARSTREAM_Sender_t;
  * @warning Disabling the retry system will lower the reliability of the stream!
  */
 #define ARSTREAM_SENDER_INFINITE_TIME_BETWEEN_RETRIES (100000)
+
 
 
 /*

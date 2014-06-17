@@ -347,7 +347,7 @@ void* ARSTREAM_Reader_RunDataThread (void *ARSTREAM_Reader_t_Param)
                     ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARSTREAM_READER_TAG, "Dropping a frame (missing %d fragments)", nackPackets);
                 }
 #endif
-                ARSTREAM_NetworkHeaders_AckPacketReset (&(reader->ackPacket));
+                ARSTREAM_NetworkHeaders_AckPacketResetUpTo (&(reader->ackPacket), header->fragmentsPerFrame);
             }
             packetWasAlreadyAck = ARSTREAM_NetworkHeaders_AckPacketFlagIsSet (&(reader->ackPacket), header->fragmentNumber);
             ARSTREAM_NetworkHeaders_AckPacketSetFlag (&(reader->ackPacket), header->fragmentNumber);

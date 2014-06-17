@@ -104,6 +104,25 @@ void ARSTREAM_NetworkHeaders_AckPacketReset (ARSTREAM_NetworkHeaders_AckPacket_t
     packet->lowPacketsAck = 0ll;
 }
 
+void ARSTREAM_NetworkHeaders_AckPacketResetUpTo (ARSTREAM_NetworkHeaders_AckPacket_t *packet, int maxFlag)
+{
+    if (0 <= maxFlag && maxFlag < 64)
+    {
+        packet->highPacketsAck = UINT64_MAX;
+        packet->lowPacketsAck = UINT64_MAX << maxFlag;
+    }
+    else if (64 <= maxFlag && maxFlag < 128)
+    {
+        packet->highPacketsAck = UINT64_MAX << (maxFlag - 64);
+        packet->lowPacketsAck = 0ll;
+    }
+    else
+    {
+        packet->highPacketsAck = 0ll;
+        packet->lowPacketsAck = 0ll;
+    }
+}
+
 void ARSTREAM_NetworkHeaders_AckPacketSetFlag (ARSTREAM_NetworkHeaders_AckPacket_t *packet, int flagToSet)
 {
     if (0 <= flagToSet && flagToSet < 64)

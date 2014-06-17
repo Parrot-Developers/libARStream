@@ -99,6 +99,13 @@ int ARSTREAM_NetworkHeaders_AckPacketFlagIsSet (ARSTREAM_NetworkHeaders_AckPacke
 void ARSTREAM_NetworkHeaders_AckPacketReset (ARSTREAM_NetworkHeaders_AckPacket_t *packet);
 
 /**
+ * @brief Resets all flags up to maxFlag in a packet to zero, and the others to one
+ * @param packet The packet to reset
+ * @param maxFlag The maximum index to reset to zero
+ */
+void ARSTREAM_NetworkHeaders_AckPacketResetUpTo (ARSTREAM_NetworkHeaders_AckPacket_t *packet, int maxFlag);
+
+/**
  * @brief Sets a flag in a packet
  * This function has no effect if the flag was already set
  * @param packet The packet to modify

@@ -76,6 +76,11 @@
 #define ARSTREAM_SENDER_EFFICIENCY_AVERAGE_NB_FRAMES (15)
 
 /**
+ * Number of previous frames to memorize
+ */
+#define ARSTREAM_SENDER_PREVIOUS_FRAME_NB_SAVE (10)
+
+/**
  * Sets *PTR to VAL if PTR is not null
  */
 #define SET_WITH_CHECK(PTR,VAL)                 \
@@ -133,6 +138,11 @@ struct ARSTREAM_Sender_t {
     uint32_t indexGetNextFrame;
     uint32_t numberOfWaitingFrames;
     ARSTREAM_Sender_Frame_t *nextFrames;
+
+    /* Previous frame storage (for LATE_ACKs) */
+    ARSAL_Mutex_t previousFramesMutex;
+    int *previousFramesStatus;
+    int previousFrameIndex;
 
     /* Thread status */
     int threadsShouldStop;
@@ -198,6 +208,15 @@ eARNETWORK_MANAGER_CALLBACK_RETURN ARSTREAM_Sender_NetworkCallback (int IoBuffer
  * @param sender The sender
  */
 static void ARSTREAM_Sender_FrameWasAck (ARSTREAM_Sender_t *sender);
+
+/**
+ * @brief Calls LATE_ACK callback if required
+ * @param sender The sender
+ * @param frameId The id of the late acknowledged frame
+ * @return 1 if the function called the callback with LATE_ACK
+ * @return 0 if the LATE_ACK was already sent for this frame, or if any other error occured
+ */
+static int ARSTREAM_Sender_SendLateAck (ARSTREAM_Sender_t *sender, uint16_t frameId);
 
 /*
  * Internal functions implementation
@@ -397,6 +416,22 @@ static void ARSTREAM_Sender_FrameWasAck (ARSTREAM_Sender_t *sender)
     ARSAL_Mutex_Unlock (&(sender->nextFrameMutex));
 }
 
+static int ARSTREAM_Sender_SendLateAck (ARSTREAM_Sender_t *sender, uint16_t frameId)
+{
+    int retVal = 0;
+    ARSAL_Mutex_Lock (&(sender->previousFramesMutex));
+    int deltaNum = sender->currentFrame.frameNumber - frameId;
+    int index = (ARSTREAM_SENDER_PREVIOUS_FRAME_NB_SAVE + sender->previousFrameIndex - deltaNum) % ARSTREAM_SENDER_PREVIOUS_FRAME_NB_SAVE;
+    if (sender->previousFramesStatus[index] == 0)
+    {
+        sender->previousFramesStatus[index] = 1;
+        retVal = 1;
+        sender->callback (ARSTREAM_SENDER_STATUS_FRAME_LATE_ACK, NULL, 0, sender->custom);
+    }
+    ARSAL_Mutex_Unlock (&(sender->previousFramesMutex));
+    return retVal;
+}
+
 /*
  * Implementation
  */
@@ -418,7 +453,9 @@ ARSTREAM_Sender_t* ARSTREAM_Sender_New (ARNETWORK_Manager_t *manager, int dataBu
     int ackMutexWasInit = 0;
     int nextFrameMutexWasInit = 0;
     int nextFrameCondWasInit = 0;
+    int previousFramesMutexWasInit = 0;
     int nextFramesArrayWasCreated = 0;
+    int previousFramesArrayWasCreated = 0;
     eARSTREAM_ERROR internalError = ARSTREAM_OK;
     /* ARGS Check */
     if ((manager == NULL) ||
@@ -506,6 +543,18 @@ ARSTREAM_Sender_t* ARSTREAM_Sender_New (ARNETWORK_Manager_t *manager, int dataBu
             nextFrameCondWasInit = 1;
         }
     }
+    if (internalError == ARSTREAM_OK)
+    {
+        int mutexInitRet = ARSAL_Mutex_Init (&(retSender->previousFramesMutex));
+        if (mutexInitRet != 0)
+        {
+            internalError = ARSTREAM_ERROR_ALLOC;
+        }
+        else
+        {
+            previousFramesMutexWasInit = 1;
+        }
+    }
 
     /* Allocate next frame storage */
     if (internalError == ARSTREAM_OK)
@@ -518,6 +567,20 @@ ARSTREAM_Sender_t* ARSTREAM_Sender_New (ARNETWORK_Manager_t *manager, int dataBu
         else
         {
             nextFramesArrayWasCreated = 1;
+        }
+    }
+
+    /* Allocate previous frame storage */
+    if (internalError == ARSTREAM_OK)
+    {
+        retSender->previousFramesStatus = calloc (ARSTREAM_SENDER_PREVIOUS_FRAME_NB_SAVE, sizeof (int));
+        if (retSender->previousFramesStatus == NULL)
+        {
+            internalError = ARSTREAM_ERROR_ALLOC;
+        }
+        else
+        {
+            previousFramesArrayWasCreated = 1;
         }
     }
 
@@ -535,6 +598,7 @@ ARSTREAM_Sender_t* ARSTREAM_Sender_New (ARNETWORK_Manager_t *manager, int dataBu
         retSender->indexAddNextFrame = 0;
         retSender->indexGetNextFrame = 0;
         retSender->numberOfWaitingFrames = 0;
+        retSender->previousFrameIndex = 0;
         retSender->threadsShouldStop = 0;
         retSender->dataThreadStarted = 0;
         retSender->ackThreadStarted = 0;
@@ -565,9 +629,17 @@ ARSTREAM_Sender_t* ARSTREAM_Sender_New (ARNETWORK_Manager_t *manager, int dataBu
         {
             ARSAL_Cond_Destroy (&(retSender->nextFrameCond));
         }
+        if (previousFramesMutexWasInit)
+        {
+            ARSAL_Mutex_Destroy (&(retSender->previousFramesMutex));
+        }
         if (nextFramesArrayWasCreated == 1)
         {
             free (retSender->nextFrames);
+        }
+        if (previousFramesArrayWasCreated == 1)
+        {
+            free (retSender->previousFramesStatus);
         }
         free (retSender);
         retSender = NULL;
@@ -624,7 +696,9 @@ eARSTREAM_ERROR ARSTREAM_Sender_Delete (ARSTREAM_Sender_t **sender)
             ARSAL_Mutex_Destroy (&((*sender)->ackMutex));
             ARSAL_Mutex_Destroy (&((*sender)->nextFrameMutex));
             ARSAL_Cond_Destroy (&((*sender)->nextFrameCond));
+            ARSAL_Mutex_Destroy (&((*sender)->previousFramesMutex));
             free ((*sender)->nextFrames);
+            free ((*sender)->previousFramesStatus);
             free (*sender);
             *sender = NULL;
             retVal = ARSTREAM_OK;
@@ -728,6 +802,7 @@ void* ARSTREAM_Sender_RunDataThread (void *ARSTREAM_Sender_t_Param)
         ARSAL_Mutex_Lock (&(sender->ackMutex));
         if (waitRes == 1)
         {
+            int previousWasAck = 1;
             ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARSTREAM_SENDER_TAG, "Previous frame was sent in %d packets. Frame size was %d packets", numbersOfFragmentsSentForCurrentFrame, nbPackets);
             sender->efficiency_nbFragments [sender->efficiency_index ] = nbPackets;
             sender->efficiency_nbSent [sender->efficiency_index] = numbersOfFragmentsSentForCurrentFrame;
@@ -749,6 +824,7 @@ void* ARSTREAM_Sender_RunDataThread (void *ARSTREAM_Sender_t_Param)
                 ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARSTREAM_SENDER_TAG, "Receiver acknowledged %d of %d packets", ARSTREAM_NetworkHeaders_AckPacketCountSet (&(sender->ackPacket), nbPackets), nbPackets);
 #endif
 
+                previousWasAck = 0;
                 ARNETWORK_Manager_FlushInputBuffer (sender->manager, sender->dataBufferID);
 
                 sender->callback (ARSTREAM_SENDER_STATUS_FRAME_CANCEL, sender->currentFrame.frameBuffer, sender->currentFrame.frameSize, sender->custom);
@@ -757,11 +833,19 @@ void* ARSTREAM_Sender_RunDataThread (void *ARSTREAM_Sender_t_Param)
             firstFrame = 0;
 
             /* Save next frame data into current frame data */
+            ARSAL_Mutex_Lock (&(sender->previousFramesMutex));
+
             sender->currentFrame.frameNumber = nextFrame.frameNumber;
             sender->currentFrame.frameBuffer = nextFrame.frameBuffer;
             sender->currentFrame.frameSize   = nextFrame.frameSize;
             sender->currentFrame.isHighPriority = nextFrame.isHighPriority;
             sendSize = nextFrame.frameSize;
+
+            sender->previousFramesStatus[sender->previousFrameIndex] = previousWasAck;
+            sender->previousFrameIndex = (sender->previousFrameIndex + 1) % ARSTREAM_SENDER_PREVIOUS_FRAME_NB_SAVE;
+
+            ARSAL_Mutex_Unlock (&(sender->previousFramesMutex));
+
 
             /* Reset ack packet - No packets are ack on the new frame */
             sender->ackPacket.frameNumber = sender->currentFrame.frameNumber;
@@ -898,6 +982,10 @@ void* ARSTREAM_Sender_RunAckThread (void *ARSTREAM_Sender_t_Param)
                 {
                     ARSTREAM_Sender_FrameWasAck (sender);
                 }
+            }
+            else if (ARSTREAM_NetworkHeaders_AckPacketAllFlagsSet (&recvPacket, sender->maxNumberOfFragment) == 1)
+            {
+                ARSTREAM_Sender_SendLateAck (sender, recvPacket.frameNumber);
             }
             ARSAL_Mutex_Unlock (&(sender->ackMutex));
         }
