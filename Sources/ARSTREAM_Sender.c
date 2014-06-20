@@ -218,6 +218,17 @@ static void ARSTREAM_Sender_FrameWasAck (ARSTREAM_Sender_t *sender);
  */
 static int ARSTREAM_Sender_SendLateAck (ARSTREAM_Sender_t *sender, uint16_t frameId);
 
+/**
+ * @brief Internal wrapper around the callback calls
+ * This wrapper includes checks for framePointer value, and avoids calling
+ * the actual callback on invalid frames
+ * @param sernder The sender
+ * @param status Why the call was made
+ * @param framePointer Pointer to the frame which was sent/cancelled
+ * @param frameSize Size, in bytes, of the frame
+ */
+static void ARSTREAM_Sender_CallCallback (ARSTREAM_Sender_t *sender, eARSTREAM_SENDER_STATUS status, uint8_t *framePointer, uint32_t frameSize);
+
 /*
  * Internal functions implementation
  */
@@ -227,7 +238,7 @@ static void ARSTREAM_Sender_FlushQueue (ARSTREAM_Sender_t *sender)
     while (sender->numberOfWaitingFrames > 0)
     {
         ARSTREAM_Sender_Frame_t *nextFrame = &(sender->nextFrames [sender->indexGetNextFrame]);
-        sender->callback (ARSTREAM_SENDER_STATUS_FRAME_CANCEL, nextFrame->frameBuffer, nextFrame->frameSize, sender->custom);
+        ARSTREAM_Sender_CallCallback (sender, ARSTREAM_SENDER_STATUS_FRAME_CANCEL, nextFrame->frameBuffer, nextFrame->frameSize);
         sender->indexGetNextFrame++;
         sender->indexGetNextFrame %= sender->maxNumberOfNextFrames;
         sender->numberOfWaitingFrames--;
@@ -409,7 +420,7 @@ eARNETWORK_MANAGER_CALLBACK_RETURN ARSTREAM_Sender_NetworkCallback (int IoBuffer
 
 static void ARSTREAM_Sender_FrameWasAck (ARSTREAM_Sender_t *sender)
 {
-    sender->callback (ARSTREAM_SENDER_STATUS_FRAME_SENT, sender->currentFrame.frameBuffer, sender->currentFrame.frameSize, sender->custom);
+    ARSTREAM_Sender_CallCallback (sender, ARSTREAM_SENDER_STATUS_FRAME_SENT, sender->currentFrame.frameBuffer, sender->currentFrame.frameSize);
     sender->currentFrameCbWasCalled = 1;
     ARSAL_Mutex_Lock (&(sender->nextFrameMutex));
     ARSAL_Cond_Signal (&(sender->nextFrameCond));
@@ -426,10 +437,25 @@ static int ARSTREAM_Sender_SendLateAck (ARSTREAM_Sender_t *sender, uint16_t fram
     {
         sender->previousFramesStatus[index] = 1;
         retVal = 1;
-        sender->callback (ARSTREAM_SENDER_STATUS_FRAME_LATE_ACK, NULL, 0, sender->custom);
+        ARSTREAM_Sender_CallCallback (sender, ARSTREAM_SENDER_STATUS_FRAME_LATE_ACK, NULL, 0);
     }
     ARSAL_Mutex_Unlock (&(sender->previousFramesMutex));
     return retVal;
+}
+
+static void ARSTREAM_Sender_CallCallback (ARSTREAM_Sender_t *sender, eARSTREAM_SENDER_STATUS status, uint8_t *framePointer, uint32_t frameSize)
+{
+    int needToCall = 1;
+    // Dont call if the frame is null, except for LATE_ACKs
+    if (framePointer == NULL && status != ARSTREAM_SENDER_STATUS_FRAME_LATE_ACK)
+    {
+        needToCall = 0;
+    }
+
+    if (needToCall == 1)
+    {
+        sender->callback(status, framePointer, frameSize, sender->custom);
+    }
 }
 
 /*
@@ -674,6 +700,12 @@ void ARSTREAM_Sender_StopSender (ARSTREAM_Sender_t *sender)
     {
         sender->threadsShouldStop = 1;
     }
+    // When stopping the sender, add a dummy flush frame in the queue
+    // in order to unlock the data thread. Without this, the thread might
+    // stop after sender->maxRetryTimeMs, instead of immediately. When this
+    // time is set to ARSTREAM_SENDER_INFINITE_TIME_BETWEEN_RETRIES, it means
+    // That the thread will be joinable 100 seconds after this call.
+    ARSTREAM_Sender_AddToQueue(sender, 0, NULL, 1);
 }
 
 eARSTREAM_ERROR ARSTREAM_Sender_Delete (ARSTREAM_Sender_t **sender)
@@ -799,6 +831,13 @@ void* ARSTREAM_Sender_RunDataThread (void *ARSTREAM_Sender_t_Param)
     {
         int waitRes;
         waitRes = ARSTREAM_Sender_PopFromQueue (sender, &nextFrame);
+        // Check again if we should be stopping (after the wait).
+        // If we're trying to send the dummy frame from ARSTREAM_Sender_StopSender
+        // we need to make sure that we never dereference the pointer, as its NULL
+        if (sender->threadsShouldStop != 0)
+        {
+            break;
+        }
         ARSAL_Mutex_Lock (&(sender->ackMutex));
         if (waitRes == 1)
         {
@@ -827,7 +866,7 @@ void* ARSTREAM_Sender_RunDataThread (void *ARSTREAM_Sender_t_Param)
                 previousWasAck = 0;
                 ARNETWORK_Manager_FlushInputBuffer (sender->manager, sender->dataBufferID);
 
-                sender->callback (ARSTREAM_SENDER_STATUS_FRAME_CANCEL, sender->currentFrame.frameBuffer, sender->currentFrame.frameSize, sender->custom);
+                ARSTREAM_Sender_CallCallback(sender, ARSTREAM_SENDER_STATUS_FRAME_CANCEL, sender->currentFrame.frameBuffer, sender->currentFrame.frameSize);
             }
             sender->currentFrameCbWasCalled = 0; // New frame
             firstFrame = 0;
@@ -930,7 +969,7 @@ void* ARSTREAM_Sender_RunDataThread (void *ARSTREAM_Sender_t_Param)
         ARSTREAM_NetworkHeaders_AckPacketDump ("Cancel frame:", &(sender->ackPacket));
         ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARSTREAM_SENDER_TAG, "Receiver acknowledged %d of %d packets", ARSTREAM_NetworkHeaders_AckPacketCountSet (&(sender->ackPacket), nbPackets), nbPackets);
 #endif
-        sender->callback (ARSTREAM_SENDER_STATUS_FRAME_CANCEL, sender->currentFrame.frameBuffer, sender->currentFrame.frameSize, sender->custom);
+        ARSTREAM_Sender_CallCallback (sender, ARSTREAM_SENDER_STATUS_FRAME_CANCEL, sender->currentFrame.frameBuffer, sender->currentFrame.frameSize);
     }
 
     ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARSTREAM_SENDER_TAG, "Sender thread ended");
