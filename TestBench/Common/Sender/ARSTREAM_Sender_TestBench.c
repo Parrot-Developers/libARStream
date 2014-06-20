@@ -21,6 +21,8 @@
 #include <libARSAL/ARSAL_Print.h>
 #include <libARStream/ARSTREAM_Sender.h>
 
+#include "../ARSTREAM_TB_Config.h"
+
 /*
  * Macros
  */
@@ -153,8 +155,8 @@ void ARSTREAM_SenderTb_initMultiBuffers ()
 
 void ARSTREAM_SenderTb_FrameUpdateCallback (eARSTREAM_SENDER_STATUS status, uint8_t *framePointer, uint32_t frameSize, void *custom)
 {
-    static struct timeval prev = {0};
-    struct timeval now = {0};
+    static struct timespec prev = {0};
+    struct timespec now = {0};
     int dt;
     custom = custom;
     switch (status)
@@ -162,10 +164,10 @@ void ARSTREAM_SenderTb_FrameUpdateCallback (eARSTREAM_SENDER_STATUS status, uint
     case ARSTREAM_SENDER_STATUS_FRAME_SENT:
         ARSTREAM_SenderTb_SetBufferFree (framePointer);
         ARSAL_PRINT (ARSAL_PRINT_WARNING, __TAG__, "Successfully sent a frame of size %u", frameSize);
-        gettimeofday (&now, NULL);
-        dt = ARSAL_Time_ComputeMsTimeDiff(&prev, &now);
+        ARSAL_Time_GetTime(&now);
+        dt = ARSAL_Time_ComputeTimespecMsTimeDiff(&prev, &now);
         prev.tv_sec = now.tv_sec;
-        prev.tv_usec = now.tv_usec;
+        prev.tv_nsec = now.tv_nsec;
         lastDt[currentIndexInDt] = dt;
         currentIndexInDt ++;
         currentIndexInDt %= NB_FRAMES_FOR_AVERAGE;
@@ -178,6 +180,11 @@ void ARSTREAM_SenderTb_FrameUpdateCallback (eARSTREAM_SENDER_STATUS status, uint
         ARSAL_PRINT (ARSAL_PRINT_WARNING, __TAG__, "Cancelled a frame of size %u", frameSize);
         nbSent++;
         nbSkippedSinceLast++;
+        ARSTREAM_Sender_PercentOk = (100.f * nbOk) / (1.f * nbSent);
+        break;
+    case ARSTREAM_SENDER_STATUS_FRAME_LATE_ACK:
+        ARSAL_PRINT (ARSAL_PRINT_WARNING, __TAG__, "Received a late acknowledge");
+        nbOk++;
         ARSTREAM_Sender_PercentOk = (100.f * nbOk) / (1.f * nbSent);
         break;
     default:
@@ -285,7 +292,7 @@ int ARSTREAM_SenderTb_StartStreamTest (ARNETWORK_Manager_t *manager)
     int retVal = 0;
     eARSTREAM_ERROR err;
     ARSTREAM_SenderTb_initMultiBuffers ();
-    g_Sender = ARSTREAM_Sender_New (manager, DATA_BUFFER_ID, ACK_BUFFER_ID, ARSTREAM_SenderTb_FrameUpdateCallback, NB_BUFFERS, NULL, &err);
+    g_Sender = ARSTREAM_Sender_New (manager, DATA_BUFFER_ID, ACK_BUFFER_ID, ARSTREAM_SenderTb_FrameUpdateCallback, NB_BUFFERS, ARSTREAM_TB_FRAG_SIZE, ARSTREAM_TB_MAX_NB_FRAG, NULL, &err);
     if (g_Sender == NULL)
     {
         ARSAL_PRINT (ARSAL_PRINT_ERROR, __TAG__, "Error during ARSTREAM_Sender_New call : %s", ARSTREAM_Error_ToString(err));
@@ -337,7 +344,7 @@ int ARSTREAM_Sender_TestBenchMain (int argc, char *argv[])
 
     int nbInBuff = 1;
     ARNETWORK_IOBufferParam_t inParams;
-    ARSTREAM_Sender_InitStreamDataBuffer (&inParams, DATA_BUFFER_ID);
+    ARSTREAM_Sender_InitStreamDataBuffer (&inParams, DATA_BUFFER_ID, ARSTREAM_TB_FRAG_SIZE, ARSTREAM_TB_MAX_NB_FRAG);
     int nbOutBuff = 1;
     ARNETWORK_IOBufferParam_t outParams;
     ARSTREAM_Sender_InitStreamAckBuffer (&outParams, ACK_BUFFER_ID);
@@ -353,7 +360,7 @@ int ARSTREAM_Sender_TestBenchMain (int argc, char *argv[])
 
     if(specificError == ARNETWORKAL_OK)
     {
-        g_Manager = ARNETWORK_Manager_New(osspecificManagerPtr, nbInBuff, &inParams, nbOutBuff, &outParams, SENDER_PING_DELAY, &error);
+        g_Manager = ARNETWORK_Manager_New(osspecificManagerPtr, nbInBuff, &inParams, nbOutBuff, &outParams, SENDER_PING_DELAY, NULL, NULL,  &error);
     }
     else
     {

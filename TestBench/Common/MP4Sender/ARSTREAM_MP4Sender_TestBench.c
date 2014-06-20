@@ -16,6 +16,7 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <arpa/inet.h>
+#include <errno.h>
 
 /*
  * ARSDK Headers
@@ -23,6 +24,8 @@
 
 #include <libARSAL/ARSAL_Print.h>
 #include <libARStream/ARSTREAM_Sender.h>
+
+#include "../ARSTREAM_TB_Config.h"
 
 /*
  * Macros
@@ -288,7 +291,7 @@ int ARSTREAM_MP4SenderTb_StartStreamTest (const char *fpath, ARNETWORK_Manager_t
     eARSTREAM_ERROR err;
     ARSTREAM_Sender_t *sender;
     ARSTREAM_MP4SenderTb_initMultiBuffers (ARSTREAM_MP4SenderTb_OpenStreamFile (fpath));
-    sender = ARSTREAM_Sender_New (manager, DATA_BUFFER_ID, ACK_BUFFER_ID, ARSTREAM_MP4SenderTb_FrameUpdateCallback, NB_BUFFERS, NULL, &err);
+    sender = ARSTREAM_Sender_New (manager, DATA_BUFFER_ID, ACK_BUFFER_ID, ARSTREAM_MP4SenderTb_FrameUpdateCallback, NB_BUFFERS, ARSTREAM_TB_FRAG_SIZE, ARSTREAM_TB_MAX_NB_FRAG, NULL, &err);
     if (sender == NULL)
     {
         ARSAL_PRINT (ARSAL_PRINT_ERROR, __TAG__, "Error during ARSTREAM_Sender_New call : %s", ARSTREAM_Error_ToString(err));
@@ -430,7 +433,11 @@ uint32_t ARSTREAM_MP4SenderTb_GetNextFrame (uint8_t *nextFrame, int nextFrameSiz
     if (nextSize <= nextFrameSize)
     {
         fseek (mp4File, nextOffset, SEEK_SET);
-        fread (nextFrame, 1, nextSize, mp4File);
+        int readRes = fread (nextFrame, 1, nextSize, mp4File);
+        if (readRes != nextSize)
+        {
+            ARSAL_PRINT (ARSAL_PRINT_ERROR, __TAG__, "Fread error: %s", strerror(errno));
+        }
     }
     else
     {
@@ -565,7 +572,7 @@ int ARSTREAM_MP4Sender_TestBenchMain (int argc, char *argv[])
 
     int nbInBuff = 1;
     ARNETWORK_IOBufferParam_t inParams;
-    ARSTREAM_Sender_InitStreamDataBuffer (&inParams, DATA_BUFFER_ID);
+    ARSTREAM_Sender_InitStreamDataBuffer (&inParams, DATA_BUFFER_ID, ARSTREAM_TB_FRAG_SIZE, ARSTREAM_TB_MAX_NB_FRAG);
     int nbOutBuff = 1;
     ARNETWORK_IOBufferParam_t outParams;
     ARSTREAM_Sender_InitStreamAckBuffer (&outParams, ACK_BUFFER_ID);
@@ -582,7 +589,7 @@ int ARSTREAM_MP4Sender_TestBenchMain (int argc, char *argv[])
 
     if(specificError == ARNETWORKAL_OK)
     {
-        manager = ARNETWORK_Manager_New(osspecificManagerPtr, nbInBuff, &inParams, nbOutBuff, &outParams, MP4SENDER_PING_DELAY, &error);
+        manager = ARNETWORK_Manager_New(osspecificManagerPtr, nbInBuff, &inParams, nbOutBuff, &outParams, MP4SENDER_PING_DELAY, NULL, NULL, &error);
     }
     else
     {

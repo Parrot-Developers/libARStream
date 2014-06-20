@@ -68,7 +68,7 @@ void* tbMain (void *params)
 
     retVal = ARSTREAM_TCPReader_Main (args->argc, args->argv);
 
-    return (void *)retVal;
+    return (void *)(intptr_t)retVal;
 }
 
 void* reportMain (void *params)

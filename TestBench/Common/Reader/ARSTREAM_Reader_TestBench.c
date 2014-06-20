@@ -21,6 +21,8 @@
 #include <libARSAL/ARSAL_Sem.h>
 #include <libARStream/ARSTREAM_Reader.h>
 
+#include "../ARSTREAM_TB_Config.h"
+
 /*
  * Macros
  */
@@ -55,7 +57,7 @@
  */
 
 
-static struct timeval lastRecv = {0};
+static struct timespec lastRecv = {0};
 static int lastDt [NB_FRAMES_FOR_AVERAGE] = {0};
 static int currentIndexInDt = 0;
 
@@ -156,7 +158,7 @@ void reallocBuffer (int id, int newSize)
 uint8_t* ARSTREAM_ReaderTb_FrameCompleteCallback (eARSTREAM_READER_CAUSE cause, uint8_t *framePointer, uint32_t frameSize, int numberOfSkippedFrames, int isFlushFrame, uint32_t *newBufferCapacity, void *buffer)
 {
     uint8_t *retVal = NULL;
-    struct timeval now;
+    struct timespec now;
     int dt;
     buffer = buffer;
     switch (cause)
@@ -179,13 +181,13 @@ uint8_t* ARSTREAM_ReaderTb_FrameCompleteCallback (eARSTREAM_READER_CAUSE cause, 
         {
             fwrite (framePointer, 1, frameSize, outFile);
         }
-        gettimeofday(&now, NULL);
-        dt = ARSAL_Time_ComputeMsTimeDiff(&lastRecv, &now);
+        ARSAL_Time_GetTime(&now);
+        dt = ARSAL_Time_ComputeTimespecMsTimeDiff(&lastRecv, &now);
         lastDt [currentIndexInDt] = dt;
         currentIndexInDt ++;
         currentIndexInDt %= NB_FRAMES_FOR_AVERAGE;
         lastRecv.tv_sec = now.tv_sec;
-        lastRecv.tv_usec = now.tv_usec;
+        lastRecv.tv_nsec = now.tv_nsec;
         ARSTREAM_ReaderTb_SetBufferFree (framePointer);
         retVal = ARSTREAM_ReaderTb_GetNextFreeBuffer (newBufferCapacity, 0);
         break;
@@ -267,7 +269,7 @@ int ARSTREAM_ReaderTb_StartStreamTest (ARNETWORK_Manager_t *manager, const char 
     ARSTREAM_ReaderTb_initMultiBuffers (FRAME_MAX_SIZE);
     ARSAL_Sem_Init (&closeSem, 0, 0);
     firstFrame = ARSTREAM_ReaderTb_GetNextFreeBuffer (&firstFrameSize, 0);
-    g_Reader = ARSTREAM_Reader_New (manager, DATA_BUFFER_ID, ACK_BUFFER_ID, ARSTREAM_ReaderTb_FrameCompleteCallback, firstFrame, firstFrameSize, NULL, &err);
+    g_Reader = ARSTREAM_Reader_New (manager, DATA_BUFFER_ID, ACK_BUFFER_ID, ARSTREAM_ReaderTb_FrameCompleteCallback, firstFrame, firstFrameSize, ARSTREAM_TB_FRAG_SIZE, NULL, &err);
     if (g_Reader == NULL)
     {
         ARSAL_PRINT (ARSAL_PRINT_ERROR, __TAG__, "Error during ARSTREAM_Reader_New call : %s", ARSTREAM_Error_ToString(err));
@@ -331,7 +333,7 @@ int ARSTREAM_Reader_TestBenchMain (int argc, char *argv[])
     ARSTREAM_Reader_InitStreamAckBuffer (&inParams, ACK_BUFFER_ID);
     int nbOutBuff = 1;
     ARNETWORK_IOBufferParam_t outParams;
-    ARSTREAM_Reader_InitStreamDataBuffer (&outParams, DATA_BUFFER_ID);
+    ARSTREAM_Reader_InitStreamDataBuffer (&outParams, DATA_BUFFER_ID, ARSTREAM_TB_FRAG_SIZE, ARSTREAM_TB_MAX_NB_FRAG);
 
     eARNETWORK_ERROR error;
     eARNETWORKAL_ERROR specificError = ARNETWORKAL_OK;
@@ -348,7 +350,7 @@ int ARSTREAM_Reader_TestBenchMain (int argc, char *argv[])
 
     if(specificError == ARNETWORKAL_OK)
     {
-        g_Manager = ARNETWORK_Manager_New(osspecificManagerPtr, nbInBuff, &inParams, nbOutBuff, &outParams, READER_PING_DELAY, &error);
+        g_Manager = ARNETWORK_Manager_New(osspecificManagerPtr, nbInBuff, &inParams, nbOutBuff, &outParams, READER_PING_DELAY, NULL, NULL, &error);
     }
     else
     {

@@ -254,8 +254,8 @@ int ARSTREAM_TCPReader_Main (int argc, char *argv[])
     int retVal = 0;
 
     char *ip = __IP;
-    struct timeval now;
-    struct timeval prev;
+    struct timespec now;
+    struct timespec prev;
     int dt;
 
     uint8_t *frameBuffer = malloc (FRAME_MAX_SIZE);
@@ -274,7 +274,7 @@ int ARSTREAM_TCPReader_Main (int argc, char *argv[])
 
     stillRunning = 1;
 
-    gettimeofday (&prev, NULL);
+    ARSAL_Time_GetTime (&prev);
 
     while (stillRunning)
     {
@@ -282,13 +282,13 @@ int ARSTREAM_TCPReader_Main (int argc, char *argv[])
         if (size > 0)
         {
             ARSAL_PRINT (ARSAL_PRINT_WARNING, __TAG__, "Got a frame of size %d", size);
-            gettimeofday (&now, NULL);
-            dt = ARSAL_Time_ComputeMsTimeDiff (&prev, &now);
+            ARSAL_Time_GetTime (&now);
+            dt = ARSAL_Time_ComputeTimespecMsTimeDiff (&prev, &now);
             lastDt [currentIndexInDt] = dt;
             currentIndexInDt ++;
             currentIndexInDt %= NB_FRAMES_FOR_AVERAGE;
             prev.tv_sec = now.tv_sec;
-            prev.tv_usec = now.tv_usec;
+            prev.tv_nsec = now.tv_nsec;
         }
         else
         {
