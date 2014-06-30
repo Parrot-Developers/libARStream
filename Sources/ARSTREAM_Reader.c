@@ -437,6 +437,7 @@ void* ARSTREAM_Reader_RunAckThread (void *ARSTREAM_Reader_t_Param)
 {
     ARSTREAM_NetworkHeaders_AckPacket_t sendPacket = {0};
     ARSTREAM_Reader_t *reader = (ARSTREAM_Reader_t *)ARSTREAM_Reader_t_Param;
+    memset(&sendPacket, 0, sizeof(sendPacket));
 
     ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARSTREAM_READER_TAG, "Ack sender thread running");
     reader->ackThreadStarted = 1;
