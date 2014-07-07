@@ -59,6 +59,11 @@ public class ARStreamReader
     private Runnable ackRunnable;
 
     /* **************** */
+    /* PUBLIC CONSTANTS */
+    /* **************** */
+    public static final int DEFAULT_MAX_ACK_INTERVAL = nativeGetDefaultMaxAckInterval();
+
+    /* **************** */
     /* STATIC FUNCTIONS */
     /* **************** */
 
@@ -103,9 +108,9 @@ public class ARStreamReader
      * @param theEventListener The event listener to use for this instance
      * @param maxFragmentSize Maximum allowed size for a video data fragment. Video frames larger that will be fragmented.
      */
-    public ARStreamReader (ARNetworkManager netManager, int dataBufferId, int ackBufferId, ARNativeData initialFrameBuffer, ARStreamReaderListener theEventListener, int maxFragmentSize)
+    public ARStreamReader (ARNetworkManager netManager, int dataBufferId, int ackBufferId, ARNativeData initialFrameBuffer, ARStreamReaderListener theEventListener, int maxFragmentSize, int maxAckInterval)
     {
-        this.cReader = nativeConstructor (netManager.getManager (), dataBufferId, ackBufferId, initialFrameBuffer.getData (), initialFrameBuffer.getCapacity (), maxFragmentSize);
+        this.cReader = nativeConstructor (netManager.getManager (), dataBufferId, ackBufferId, initialFrameBuffer.getData (), initialFrameBuffer.getCapacity (), maxFragmentSize, maxAckInterval);
         if (this.cReader != 0) {
             this.valid = true;
             this.eventListener = theEventListener;
@@ -269,6 +274,11 @@ public class ARStreamReader
     /* **************** */
 
     /**
+     * Get the default value for the maxAckInterval contructor parameter.
+     */
+    private native static int nativeGetDefaultMaxAckInterval ();
+
+    /**
      * Sets an ARNetworkIOBufferParams internal values to represent an
      * ARStream data buffer.
      * @param cParams C-Pointer to the ARNetworkIOBufferParams internal representation
@@ -295,9 +305,10 @@ public class ARStreamReader
      * @param frameBuffer C-Pointer to the initial frame buffer
      * @param frameBufferSize size of the initial frame buffer
      * @param maxFragmentSize Maximum size of the fragment to send
+     * @param maxAckInterval Maximum duration without sending an ACK.
      * @return C-Pointer to the ARSTREAM_Reader object (or null if any error occured)
      */
-    private native long nativeConstructor (long cNetManager, int dataBufferId, int ackBufferId, long frameBuffer, int frameBufferSize, int maxFragmentSize);
+    private native long nativeConstructor (long cNetManager, int dataBufferId, int ackBufferId, long frameBuffer, int frameBufferSize, int maxFragmentSize, int maxAckInterval);
 
     /**
      * Entry point for the data thread<br>

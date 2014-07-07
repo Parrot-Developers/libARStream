@@ -63,6 +63,12 @@ Java_com_parrot_arsdk_arstream_ARStreamReader_nativeInitClass (JNIEnv *env, jcla
     g_cbWrapper_id = (*env)->GetMethodID (env, clazz, "callbackWrapper", "(IJIZII)[J");
 }
 
+JNIEXPORT jint JNICALL
+Java_com_parrot_arsdk_arstream_ARStreamReader_nativeGetDefaultMaxAckInterval (JNIEnv *env, jclass clazz)
+{
+    return ARSTREAM_READER_MAX_ACK_INTERVAL_DEFAULT;
+}
+
 JNIEXPORT void JNICALL
 Java_com_parrot_arsdk_arstream_ARStreamReader_nativeSetDataBufferParams (JNIEnv *env, jclass clazz, jlong cParams, jint id, jint maxFragmentSize, jint maxNumberOfFragment)
 {
@@ -76,11 +82,11 @@ Java_com_parrot_arsdk_arstream_ARStreamReader_nativeSetAckBufferParams (JNIEnv *
 }
 
 JNIEXPORT jlong JNICALL
-Java_com_parrot_arsdk_arstream_ARStreamReader_nativeConstructor (JNIEnv *env, jobject thizz, jlong cNetManager, jint dataBufferId, jint ackBufferId, jlong frameBuffer, jint frameBufferSize, jint maxFragmentSize)
+Java_com_parrot_arsdk_arstream_ARStreamReader_nativeConstructor (JNIEnv *env, jobject thizz, jlong cNetManager, jint dataBufferId, jint ackBufferId, jlong frameBuffer, jint frameBufferSize, jint maxFragmentSize, jint maxAckInterval)
 {
     eARSTREAM_ERROR err = ARSTREAM_OK;
     jobject g_thizz = (*env)->NewGlobalRef(env, thizz);
-    ARSTREAM_Reader_t *retReader = ARSTREAM_Reader_New ((ARNETWORK_Manager_t *)(intptr_t)cNetManager, dataBufferId, ackBufferId, internalCallback, (uint8_t *)(intptr_t)frameBuffer, frameBufferSize, maxFragmentSize, (void *)g_thizz, &err);
+    ARSTREAM_Reader_t *retReader = ARSTREAM_Reader_New ((ARNETWORK_Manager_t *)(intptr_t)cNetManager, dataBufferId, ackBufferId, internalCallback, (uint8_t *)(intptr_t)frameBuffer, frameBufferSize, maxFragmentSize, maxAckInterval, (void *)g_thizz, &err);
 
     if (err != ARSTREAM_OK)
     {

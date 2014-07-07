@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <errno.h>
 
 /*
  * Private Headers
@@ -37,7 +38,6 @@
 
 #define ARSTREAM_READER_TAG "ARSTREAM_Reader"
 #define ARSTREAM_READER_DATAREAD_TIMEOUT_MS (500)
-#define ARSTREAM_READER_MAX_TIME_BETWEEN_ACK_MS (5)
 
 #define ARSTREAM_READER_EFFICIENCY_AVERAGE_NB_FRAMES (15)
 
@@ -63,6 +63,7 @@ struct ARSTREAM_Reader_t {
     int dataBufferID;
     int ackBufferID;
     uint32_t maxFragmentSize;
+    int32_t maxAckInterval;
     ARSTREAM_Reader_FrameCompleteCallback_t callback;
     void *custom;
 
@@ -133,7 +134,7 @@ void ARSTREAM_Reader_InitStreamAckBuffer (ARNETWORK_IOBufferParam_t *bufferParam
     ARSTREAM_Buffers_InitStreamAckBuffer (bufferParams, bufferID);
 }
 
-ARSTREAM_Reader_t* ARSTREAM_Reader_New (ARNETWORK_Manager_t *manager, int dataBufferID, int ackBufferID, ARSTREAM_Reader_FrameCompleteCallback_t callback, uint8_t *frameBuffer, uint32_t frameBufferSize, uint32_t maxFragmentSize, void *custom, eARSTREAM_ERROR *error)
+ARSTREAM_Reader_t* ARSTREAM_Reader_New (ARNETWORK_Manager_t *manager, int dataBufferID, int ackBufferID, ARSTREAM_Reader_FrameCompleteCallback_t callback, uint8_t *frameBuffer, uint32_t frameBufferSize, uint32_t maxFragmentSize, int32_t maxAckInterval, void *custom, eARSTREAM_ERROR *error)
 {
     ARSTREAM_Reader_t *retReader = NULL;
     int ackPacketMutexWasInit = 0;
@@ -145,7 +146,8 @@ ARSTREAM_Reader_t* ARSTREAM_Reader_New (ARNETWORK_Manager_t *manager, int dataBu
         (callback == NULL) ||
         (frameBuffer == NULL) ||
         (frameBufferSize == 0) ||
-        (maxFragmentSize == 0))
+        (maxFragmentSize == 0) ||
+        (maxAckInterval < -1))
     {
         SET_WITH_CHECK (error, ARSTREAM_ERROR_BAD_PARAMETERS);
         return retReader;
@@ -165,6 +167,7 @@ ARSTREAM_Reader_t* ARSTREAM_Reader_New (ARNETWORK_Manager_t *manager, int dataBu
         retReader->dataBufferID = dataBufferID;
         retReader->ackBufferID = ackBufferID;
         retReader->maxFragmentSize = maxFragmentSize;
+        retReader->maxAckInterval = maxAckInterval;
         retReader->callback = callback;
         retReader->custom = custom;
         retReader->currentFrameBufferSize = frameBufferSize;
@@ -253,6 +256,15 @@ void ARSTREAM_Reader_StopReader (ARSTREAM_Reader_t *reader)
     if (reader != NULL)
     {
         reader->threadsShouldStop = 1;
+        /* Force unblock the ACK thread to allow it to shutdown quickly.
+         * This is necessary if maxAckInterval is set to -1, 0 or a large value.
+         * If maxAckInterval >= 0, an ACK packet will be sent as a side-effect. */
+        if (reader->ackThreadStarted == 1)
+        {
+            ARSAL_Mutex_Lock (&(reader->ackSendMutex));
+            ARSAL_Cond_Signal (&(reader->ackSendCond));
+            ARSAL_Mutex_Unlock (&(reader->ackSendMutex));
+        }
     }
 }
 
@@ -444,16 +456,33 @@ void* ARSTREAM_Reader_RunAckThread (void *ARSTREAM_Reader_t_Param)
 
     while (reader->threadsShouldStop == 0)
     {
+        int isPeriodicAck = 0;
         ARSAL_Mutex_Lock (&(reader->ackSendMutex));
-        ARSAL_Cond_Timedwait (&(reader->ackSendCond), &(reader->ackSendMutex), ARSTREAM_READER_MAX_TIME_BETWEEN_ACK_MS);
+        if (reader->maxAckInterval <= 0)
+        {
+            ARSAL_Cond_Wait (&(reader->ackSendCond), &(reader->ackSendMutex));
+        }
+        else
+        {
+            int retval = ARSAL_Cond_Timedwait (&(reader->ackSendCond), &(reader->ackSendMutex), reader->maxAckInterval);
+            if (retval == -1 && errno == ETIMEDOUT)
+            {
+                isPeriodicAck = 1;
+            }
+        }
         ARSAL_Mutex_Unlock (&(reader->ackSendMutex));
-        ARSAL_Mutex_Lock (&(reader->ackPacketMutex));
-        sendPacket.frameNumber = htods  (reader->ackPacket.frameNumber);
-        sendPacket.highPacketsAck = htodll (reader->ackPacket.highPacketsAck);
-        sendPacket.lowPacketsAck  = htodll (reader->ackPacket.lowPacketsAck);
-        ARSAL_Mutex_Unlock (&(reader->ackPacketMutex));
 
-        ARNETWORK_Manager_SendData (reader->manager, reader->ackBufferID, (uint8_t *)&sendPacket, sizeof (sendPacket), NULL, ARSTREAM_Reader_NetworkCallback, 1);
+        /* Only send an ACK if the maxAckInterval value allows it. */
+        if ((reader->maxAckInterval > 0) ||
+            ((reader->maxAckInterval == 0) && (isPeriodicAck == 0)))
+        {
+            ARSAL_Mutex_Lock (&(reader->ackPacketMutex));
+            sendPacket.frameNumber = htods  (reader->ackPacket.frameNumber);
+            sendPacket.highPacketsAck = htodll (reader->ackPacket.highPacketsAck);
+            sendPacket.lowPacketsAck  = htodll (reader->ackPacket.lowPacketsAck);
+            ARSAL_Mutex_Unlock (&(reader->ackPacketMutex));
+            ARNETWORK_Manager_SendData (reader->manager, reader->ackBufferID, (uint8_t *)&sendPacket, sizeof (sendPacket), NULL, ARSTREAM_Reader_NetworkCallback, 1);
+        }
     }
 
     ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARSTREAM_READER_TAG, "Ack sender thread ended");
