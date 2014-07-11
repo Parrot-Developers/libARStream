@@ -195,11 +195,15 @@ public class ARStreamSender
      * @param flush If active, the ARStreamSender will cancel any remaining prevous frame, and start sending this one immediately
      */
     public ARSTREAM_ERROR_ENUM sendNewFrame (ARNativeData frame, boolean flush) {
-        int intErr = nativeSendNewFrame(cSender, frame.getData(), frame.getDataSize(), flush);
-        ARSTREAM_ERROR_ENUM err = ARSTREAM_ERROR_ENUM.getFromValue(intErr);
-        if (err == ARSTREAM_ERROR_ENUM.ARSTREAM_OK)
+        ARSTREAM_ERROR_ENUM err = ARSTREAM_ERROR_ENUM.ARSTREAM_ERROR_BAD_PARAMETERS;
+        synchronized (this)
         {
-            frames.put(frame.getData(), frame);
+            int intErr = nativeSendNewFrame(cSender, frame.getData(), frame.getDataSize(), flush);
+            err = ARSTREAM_ERROR_ENUM.getFromValue(intErr);
+            if (err == ARSTREAM_ERROR_ENUM.ARSTREAM_OK)
+            {
+                frames.put(frame.getData(), frame);
+            }
         }
         return err;
     }
