@@ -975,6 +975,12 @@ void* ARSTREAM_Sender_RunDataThread (void *ARSTREAM_Sender_t_Param)
     ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARSTREAM_SENDER_TAG, "Sender thread ended");
     sender->dataThreadStarted = 0;
 
+    if(sendFragment)
+    {
+        free(sendFragment);
+        sendFragment = NULL;
+    }
+
     return (void *)0;
 }
 
