@@ -140,7 +140,6 @@ struct ARSTREAM_Sender_t {
     ARSTREAM_Sender_Frame_t *nextFrames;
 
     /* Previous frame storage (for LATE_ACKs) */
-    ARSAL_Mutex_t previousFramesMutex;
     int *previousFramesStatus;
     int previousFrameIndex;
 
@@ -430,7 +429,6 @@ static void ARSTREAM_Sender_FrameWasAck (ARSTREAM_Sender_t *sender)
 static int ARSTREAM_Sender_SendLateAck (ARSTREAM_Sender_t *sender, uint16_t frameId)
 {
     int retVal = 0;
-    ARSAL_Mutex_Lock (&(sender->previousFramesMutex));
     int deltaNum = sender->currentFrame.frameNumber - frameId;
     int index = (ARSTREAM_SENDER_PREVIOUS_FRAME_NB_SAVE + sender->previousFrameIndex - deltaNum) % ARSTREAM_SENDER_PREVIOUS_FRAME_NB_SAVE;
     if (sender->previousFramesStatus[index] == 0)
@@ -439,7 +437,6 @@ static int ARSTREAM_Sender_SendLateAck (ARSTREAM_Sender_t *sender, uint16_t fram
         retVal = 1;
         ARSTREAM_Sender_CallCallback (sender, ARSTREAM_SENDER_STATUS_FRAME_LATE_ACK, NULL, 0);
     }
-    ARSAL_Mutex_Unlock (&(sender->previousFramesMutex));
     return retVal;
 }
 
@@ -479,7 +476,6 @@ ARSTREAM_Sender_t* ARSTREAM_Sender_New (ARNETWORK_Manager_t *manager, int dataBu
     int ackMutexWasInit = 0;
     int nextFrameMutexWasInit = 0;
     int nextFrameCondWasInit = 0;
-    int previousFramesMutexWasInit = 0;
     int nextFramesArrayWasCreated = 0;
     int previousFramesArrayWasCreated = 0;
     eARSTREAM_ERROR internalError = ARSTREAM_OK;
@@ -569,18 +565,6 @@ ARSTREAM_Sender_t* ARSTREAM_Sender_New (ARNETWORK_Manager_t *manager, int dataBu
             nextFrameCondWasInit = 1;
         }
     }
-    if (internalError == ARSTREAM_OK)
-    {
-        int mutexInitRet = ARSAL_Mutex_Init (&(retSender->previousFramesMutex));
-        if (mutexInitRet != 0)
-        {
-            internalError = ARSTREAM_ERROR_ALLOC;
-        }
-        else
-        {
-            previousFramesMutexWasInit = 1;
-        }
-    }
 
     /* Allocate next frame storage */
     if (internalError == ARSTREAM_OK)
@@ -655,10 +639,6 @@ ARSTREAM_Sender_t* ARSTREAM_Sender_New (ARNETWORK_Manager_t *manager, int dataBu
         {
             ARSAL_Cond_Destroy (&(retSender->nextFrameCond));
         }
-        if (previousFramesMutexWasInit)
-        {
-            ARSAL_Mutex_Destroy (&(retSender->previousFramesMutex));
-        }
         if (nextFramesArrayWasCreated == 1)
         {
             free (retSender->nextFrames);
@@ -728,7 +708,6 @@ eARSTREAM_ERROR ARSTREAM_Sender_Delete (ARSTREAM_Sender_t **sender)
             ARSAL_Mutex_Destroy (&((*sender)->ackMutex));
             ARSAL_Mutex_Destroy (&((*sender)->nextFrameMutex));
             ARSAL_Cond_Destroy (&((*sender)->nextFrameCond));
-            ARSAL_Mutex_Destroy (&((*sender)->previousFramesMutex));
             free ((*sender)->nextFrames);
             free ((*sender)->previousFramesStatus);
             free (*sender);
@@ -872,8 +851,6 @@ void* ARSTREAM_Sender_RunDataThread (void *ARSTREAM_Sender_t_Param)
             firstFrame = 0;
 
             /* Save next frame data into current frame data */
-            ARSAL_Mutex_Lock (&(sender->previousFramesMutex));
-
             sender->currentFrame.frameNumber = nextFrame.frameNumber;
             sender->currentFrame.frameBuffer = nextFrame.frameBuffer;
             sender->currentFrame.frameSize   = nextFrame.frameSize;
@@ -882,8 +859,6 @@ void* ARSTREAM_Sender_RunDataThread (void *ARSTREAM_Sender_t_Param)
 
             sender->previousFramesStatus[sender->previousFrameIndex] = previousWasAck;
             sender->previousFrameIndex = (sender->previousFrameIndex + 1) % ARSTREAM_SENDER_PREVIOUS_FRAME_NB_SAVE;
-
-            ARSAL_Mutex_Unlock (&(sender->previousFramesMutex));
 
 
             /* Reset ack packet - No packets are ack on the new frame */
