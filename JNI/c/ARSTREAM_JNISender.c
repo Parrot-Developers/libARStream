@@ -38,6 +38,24 @@ static void internalCallback (eARSTREAM_SENDER_STATUS status, uint8_t *framePoin
     return;
 }
 
+JNIEXPORT jint JNICALL
+Java_com_parrot_arsdk_arstream_ARStreamSender_nativeGetDefaultMinTimeBetweenRetries (JNIEnv *env, jclass clazz)
+{
+    return ARSTREAM_SENDER_DEFAULT_MINIMUM_TIME_BETWEEN_RETRIES_MS;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_parrot_arsdk_arstream_ARStreamSender_nativeGetDefaultMaxTimeBetweenRetries (JNIEnv *env, jclass clazz)
+{
+    return ARSTREAM_SENDER_DEFAULT_MAXIMUM_TIME_BETWEEN_RETRIES_MS;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_parrot_arsdk_arstream_ARStreamSender_nativeGetInfiniteTimeBetweenRetries (JNIEnv *env, jclass clazz)
+{
+    return ARSTREAM_SENDER_INFINITE_TIME_BETWEEN_RETRIES;
+}
+
 JNIEXPORT void JNICALL
 Java_com_parrot_arsdk_arstream_ARStreamSender_nativeInitClass (JNIEnv *env, jclass clazz)
 {
@@ -73,6 +91,13 @@ Java_com_parrot_arsdk_arstream_ARStreamSender_nativeConstructor (JNIEnv *env, jo
         ARSAL_PRINT (ARSAL_PRINT_ERROR, JNI_SENDER_TAG, "Error while creating sender : %s", ARSTREAM_Error_ToString (err));
     }
     return (jlong)(intptr_t)retSender;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_parrot_arsdk_arstream_ARStreamSender_nativeSetTimeBetweenRetries(JNIEnv *env, jobject thizz, jlong cSender, jint minWaitTimeMs, jint maxWaitTimeMs)
+{
+    eARSTREAM_ERROR err = ARSTREAM_Sender_SetTimeBetweenRetries ((ARSTREAM_Sender_t *)(intptr_t)cSender, minWaitTimeMs, maxWaitTimeMs);
+    return (jint)err;
 }
 
 JNIEXPORT void JNICALL

@@ -56,6 +56,13 @@ public class ARStreamSender
      */
     private Runnable ackRunnable;
 
+    /*
+     * C #defined constants
+     */
+    public static final int DEFAULT_MINIMUM_TIME_BETWEEN_RETRIES_MS = nativeGetDefaultMinTimeBetweenRetries();
+    public static final int DEFAULT_MAXIUMU_TIME_BETWEEN_RETRIES_MS = nativeGetDefaultMaxTimeBetweenRetries();
+    public static final int INFINITE_TIME_BETWEEN_RETRIES = nativeGetInfiniteTimeBetweenRetries();
+
     /* **************** */
     /* STATIC FUNCTIONS */
     /* **************** */
@@ -152,6 +159,24 @@ public class ARStreamSender
     /* **************** */
     /* PUBLIC FUNCTIONS */
     /* **************** */
+
+    /**
+     * Sets the minimum and maximum time between retries.<br>
+     * Setting a small retry time might increase reliability, at the cost of network and cpu loads.<br>
+     * Setting a high retry time might decrease reliability, but also reduce the network and cpu loads.<br>
+     * These rules apply to both the minimum and the maximum time.<br>
+     * @note To reset to default values, use DEFAULT_MINIMUM_TIME_BETWEEN_RETRIES_MS and DEFAULT_MAXIMUM_TIME_BETWEEN_RETRIES_MS.<br>
+     * @note To disable retries, use INFINITE_TIME_BETWEEN_RETRIES as both minimum and maximum time.<br>
+     * @warning Setting a too low maximum wait time might create a very high network bandwidth, and a very high cpu load.
+     * @warning Setting a too big minimum wait time (i.e. greater than the time between two flush frames) will effectively disable retries.
+     * @param minTimeMs The minimum time between two retries, in miliseconds.
+     * @param maxTimeMs The maximum time between two retries, in miliseconds.
+     */
+    public ARSTREAM_ERROR_ENUM setTimeBetweenRetries(int minTimeMs, int maxTimeMs)
+    {
+        int err = nativeSetTimeBetweenRetries(cSender, minTimeMs, maxTimeMs);
+        return ARSTREAM_ERROR_ENUM.getFromValue(err);
+    }
 
     /**
      * Checks if the current manager is valid.<br>
@@ -351,15 +376,30 @@ public class ARStreamSender
     private native int nativeSendNewFrame (long cSender, long frameBuffer, int frameSize, boolean flushPreviousFrame);
 
     /**
-     * Flushed the frames queue.
+     * Flushes the frames queue.
      * @param cSender C-Pointer to the ARSTREAM_Sender C object
      */
     private native int nativeFlushFrameQueue(long cSender);
 
     /**
+     * Sets the min/max times between retries.
+     * @param cSender C-Pointer to the ARSTREAM_Sender C object
+     * @param min minimum time between retries, in ms
+     * @param max maximum time between retries, in ms
+     */
+    private native int nativeSetTimeBetweenRetries(long cSender, int min, int max);
+
+    /**
      * Initializes global static references in native code
      */
     private native static void nativeInitClass ();
+
+    /*
+     * Getters for C #defines
+     */
+    private native static int nativeGetDefaultMinTimeBetweenRetries();
+    private native static int nativeGetDefaultMaxTimeBetweenRetries();
+    private native static int nativeGetInfiniteTimeBetweenRetries();
 
     /* *********** */
     /* STATIC BLOC */
