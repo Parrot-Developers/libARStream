@@ -88,12 +88,12 @@
  * 0 -> Consider all frames given to network as "sent"
  * 1 -> Wait for an ARSTREAM_Reader full acknowledge of a frame before trying the next frame
  */
-#define ENABLE_ACK_WAIT (1)
+#define ENABLE_ACK_WAIT (0)
 
 /* Warning */
-#if ENABLE_ACK_WAIT == 0
-#warning Ack wait is disabled in this build
-#endif
+//#if ENABLE_ACK_WAIT == 0
+//#warning Ack wait is disabled in this build
+//#endif
 
 /**
  * Latency used when the network can't give us a valid value
