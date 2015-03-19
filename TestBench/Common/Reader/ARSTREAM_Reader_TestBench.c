@@ -299,7 +299,7 @@ int ARSTREAM_ReaderTb_StartStreamTest (ARNETWORK_Manager_t *manager, const char 
     ARSTREAM_ReaderTb_initMultiBuffers (FRAME_MAX_SIZE);
     ARSAL_Sem_Init (&closeSem, 0, 0);
     firstFrame = ARSTREAM_ReaderTb_GetNextFreeBuffer (&firstFrameSize, 0);
-    g_Reader = ARSTREAM_Reader_New (manager, DATA_BUFFER_ID, ACK_BUFFER_ID, ARSTREAM_ReaderTb_FrameCompleteCallback, firstFrame, firstFrameSize, ARSTREAM_TB_FRAG_SIZE, NULL, &err);
+    g_Reader = ARSTREAM_Reader_New (manager, DATA_BUFFER_ID, ACK_BUFFER_ID, ARSTREAM_ReaderTb_FrameCompleteCallback, firstFrame, firstFrameSize, ARSTREAM_TB_FRAG_SIZE, 0, NULL, &err);
     if (g_Reader == NULL)
     {
         ARSAL_PRINT (ARSAL_PRINT_ERROR, __TAG__, "Error during ARSTREAM_Reader_New call : %s", ARSTREAM_Error_ToString(err));
