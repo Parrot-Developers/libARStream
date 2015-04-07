@@ -41,6 +41,7 @@
  * System Headers
  */
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -70,6 +71,14 @@
 #define ARSTREAM_READER_DATAREAD_TIMEOUT_MS (500)
 
 #define ARSTREAM_READER_EFFICIENCY_AVERAGE_NB_FRAMES (15)
+
+//#define ARSTREAM_VIDEO_OUTPUT_DUMP
+#ifdef ARSTREAM_VIDEO_OUTPUT_DUMP
+    const char* ARSTREAM_VIDEO_OUTPUT_DUMP_PATH_NAP_USB = "/tmp/mnt/STREAMDUMP";
+    const char* ARSTREAM_VIDEO_OUTPUT_DUMP_PATH_NAP_INTERNAL = "/data/skycontroller/streams";
+    const char* ARSTREAM_VIDEO_OUTPUT_DUMP_PATH_ANDROID_INTERNAL = "/storage/emulated/legacy/FF";
+#endif
+
 
 /**
  * Sets *PTR to VAL if PTR is not null
@@ -117,6 +126,10 @@ struct ARSTREAM_Reader_t {
     int efficiency_nbUseful [ARSTREAM_READER_EFFICIENCY_AVERAGE_NB_FRAMES];
     int efficiency_nbTotal  [ARSTREAM_READER_EFFICIENCY_AVERAGE_NB_FRAMES];
     int efficiency_index;
+
+#ifdef ARSTREAM_VIDEO_OUTPUT_DUMP
+    FILE* outputDumpFile;
+#endif
 };
 
 /*
@@ -256,6 +269,9 @@ ARSTREAM_Reader_t* ARSTREAM_Reader_New (ARNETWORK_Manager_t *manager, int dataBu
             retReader->efficiency_nbTotal [i] = 0;
             retReader->efficiency_nbUseful [i] = 0;
         }
+#ifdef ARSTREAM_VIDEO_OUTPUT_DUMP
+        retReader->outputDumpFile = NULL;
+#endif
     }
 
     if ((internalError != ARSTREAM_OK) &&
@@ -355,6 +371,43 @@ void* ARSTREAM_Reader_RunDataThread (void *ARSTREAM_Reader_t_Param)
         return (void *)0;
     }
     header = (ARSTREAM_NetworkHeaders_DataHeader_t *)recvData;
+
+#ifdef ARSTREAM_VIDEO_OUTPUT_DUMP
+    int i;
+    char szFilename[128];
+    const char* pszFilePath = NULL;
+    szFilename[0] = '\0';
+
+    if ((access(ARSTREAM_VIDEO_OUTPUT_DUMP_PATH_NAP_USB, F_OK) == 0) && (access(ARSTREAM_VIDEO_OUTPUT_DUMP_PATH_NAP_USB, W_OK) == 0))
+    {
+        pszFilePath = ARSTREAM_VIDEO_OUTPUT_DUMP_PATH_NAP_USB;
+    }
+    else if ((access(ARSTREAM_VIDEO_OUTPUT_DUMP_PATH_NAP_INTERNAL, F_OK) == 0) && (access(ARSTREAM_VIDEO_OUTPUT_DUMP_PATH_NAP_INTERNAL, W_OK) == 0))
+    {
+        pszFilePath = ARSTREAM_VIDEO_OUTPUT_DUMP_PATH_NAP_INTERNAL;
+    }
+    else if ((access(ARSTREAM_VIDEO_OUTPUT_DUMP_PATH_ANDROID_INTERNAL, F_OK) == 0) && (access(ARSTREAM_VIDEO_OUTPUT_DUMP_PATH_ANDROID_INTERNAL, W_OK) == 0))
+    {
+        pszFilePath = ARSTREAM_VIDEO_OUTPUT_DUMP_PATH_ANDROID_INTERNAL;
+    }
+    if (pszFilePath)
+    {
+        for (i = 0; i < 100; i++)
+        {
+            snprintf(szFilename, 128, "%s/stream_%02d.264", pszFilePath, i);
+            if (access(szFilename, F_OK) == -1)
+            {
+                // file does not exist
+                break;
+            }
+            szFilename[0] = '\0';
+        }
+        if (strlen(szFilename))
+        {
+            reader->outputDumpFile = fopen(szFilename, "wb");
+        }
+    }
+#endif
 
     ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARSTREAM_READER_TAG, "Stream reader thread running");
     reader->dataThreadStarted = 1;
@@ -456,6 +509,12 @@ void* ARSTREAM_Reader_RunDataThread (void *ARSTREAM_Reader_t_Param)
                         }
                         previousFNum = header->frameNumber;
                         skipCurrentFrame = 1;
+#ifdef ARSTREAM_VIDEO_OUTPUT_DUMP
+                        if (reader->outputDumpFile)
+                        {
+                            fwrite(reader->currentFrameBuffer, reader->currentFrameSize, 1, reader->outputDumpFile);
+                        }
+#endif
                         reader->currentFrameBuffer = reader->callback (ARSTREAM_READER_CAUSE_FRAME_COMPLETE, reader->currentFrameBuffer, reader->currentFrameSize, nbMissedFrame, isFlushFrame, &(reader->currentFrameBufferSize), reader->custom);
                     }
                 }
@@ -467,6 +526,14 @@ void* ARSTREAM_Reader_RunDataThread (void *ARSTREAM_Reader_t_Param)
     free (recvData);
 
     reader->callback (ARSTREAM_READER_CAUSE_CANCEL, reader->currentFrameBuffer, reader->currentFrameSize, 0, 0, &(reader->currentFrameBufferSize), reader->custom);
+
+#ifdef ARSTREAM_VIDEO_OUTPUT_DUMP
+    if (reader->outputDumpFile)
+    {
+        fclose(reader->outputDumpFile);
+        reader->outputDumpFile = NULL;
+    }
+#endif
 
     ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARSTREAM_READER_TAG, "Stream reader thread ended");
     reader->dataThreadStarted = 0;
