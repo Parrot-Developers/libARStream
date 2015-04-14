@@ -348,7 +348,7 @@ eARSTREAM_ERROR ARSTREAM_Reader_Delete (ARSTREAM_Reader_t **reader)
 void* ARSTREAM_Reader_RunDataThread (void *ARSTREAM_Reader_t_Param)
 {
     uint8_t *recvData = NULL;
-    int recvSize;
+    int recvSize, endIndex = 0;
     uint16_t previousFNum = UINT16_MAX;
     int skipCurrentFrame = 0;
     int packetWasAlreadyAck = 0;
@@ -424,7 +424,7 @@ void* ARSTREAM_Reader_RunDataThread (void *ARSTREAM_Reader_t_Param)
         }
         else
         {
-            int cpIndex, cpSize, endIndex;
+            int cpIndex, cpSize;
             ARSAL_Mutex_Lock (&(reader->ackPacketMutex));
             if (header->frameNumber != reader->ackPacket.frameNumber)
             {
@@ -434,6 +434,7 @@ void* ARSTREAM_Reader_RunDataThread (void *ARSTREAM_Reader_t_Param)
                 reader->efficiency_nbUseful [reader->efficiency_index] = 0;
                 skipCurrentFrame = 0;
                 reader->currentFrameSize = 0;
+                endIndex = 0;
                 reader->ackPacket.frameNumber = header->frameNumber;
                 uint32_t nackPackets = ARSTREAM_NetworkHeaders_AckPacketCountNotSet (&(reader->ackPacket), header->fragmentsPerFrame);
                 if (nackPackets != 0)
@@ -458,67 +459,62 @@ void* ARSTREAM_Reader_RunDataThread (void *ARSTREAM_Reader_t_Param)
             ARSAL_Mutex_Unlock (&(reader->ackSendMutex));
 
 
-            cpIndex = reader->maxFragmentSize * header->fragmentNumber;
-            cpSize = recvSize - sizeof (ARSTREAM_NetworkHeaders_DataHeader_t);
-            endIndex = cpIndex + cpSize;
-            while ((endIndex > reader->currentFrameBufferSize) &&
-                   (skipCurrentFrame == 0) &&
-                   (packetWasAlreadyAck == 0))
+            if (packetWasAlreadyAck == 0)
             {
-                uint32_t nextFrameBufferSize = reader->maxFragmentSize * header->fragmentsPerFrame;
-                uint32_t dummy;
-                uint8_t *nextFrameBuffer = reader->callback (ARSTREAM_READER_CAUSE_FRAME_TOO_SMALL, reader->currentFrameBuffer, reader->currentFrameSize, 0, 0, &nextFrameBufferSize, reader->custom);
-                if (nextFrameBufferSize >= reader->currentFrameSize && nextFrameBufferSize > 0)
+                cpSize = recvSize - sizeof (ARSTREAM_NetworkHeaders_DataHeader_t);
+                cpIndex = endIndex;
+                endIndex += cpSize;
+                while ((endIndex > reader->currentFrameBufferSize) &&
+                       (skipCurrentFrame == 0))
                 {
-                    memcpy (nextFrameBuffer, reader->currentFrameBuffer, reader->currentFrameSize);
-                }
-                else
-                {
-                    skipCurrentFrame = 1;
-                }
-                //TODO: Add "SKIP_FRAME"
-                reader->callback (ARSTREAM_READER_CAUSE_COPY_COMPLETE, reader->currentFrameBuffer, reader->currentFrameSize, 0, skipCurrentFrame, &dummy, reader->custom);
-                reader->currentFrameBuffer = nextFrameBuffer;
-                reader->currentFrameBufferSize = nextFrameBufferSize;
-            }
-
-            if (skipCurrentFrame == 0)
-            {
-                if (packetWasAlreadyAck == 0)
-                {
-                    memcpy (&(reader->currentFrameBuffer)[cpIndex], &recvData[sizeof (ARSTREAM_NetworkHeaders_DataHeader_t)], recvSize - sizeof (ARSTREAM_NetworkHeaders_DataHeader_t));
-                }
-
-                if (endIndex > reader->currentFrameSize)
-                {
-                    reader->currentFrameSize = endIndex;
-                }
-
-                ARSAL_Mutex_Lock (&(reader->ackPacketMutex));
-                if (ARSTREAM_NetworkHeaders_AckPacketAllFlagsSet (&(reader->ackPacket), header->fragmentsPerFrame))
-                {
-                    if (header->frameNumber != previousFNum)
+                    uint32_t nextFrameBufferSize = endIndex;
+                    uint32_t dummy;
+                    uint8_t *nextFrameBuffer = reader->callback (ARSTREAM_READER_CAUSE_FRAME_TOO_SMALL, reader->currentFrameBuffer, reader->currentFrameSize, 0, 0, &nextFrameBufferSize, reader->custom);
+                    if (nextFrameBufferSize >= reader->currentFrameSize && nextFrameBufferSize > 0)
                     {
-                        int nbMissedFrame = 0;
-                        int isFlushFrame = ((header->frameFlags & ARSTREAM_NETWORK_HEADERS_FLAG_FLUSH_FRAME) != 0) ? 1 : 0;
-                        ARSAL_PRINT (ARSAL_PRINT_VERBOSE, ARSTREAM_READER_TAG, "Ack all in frame %d (isFlush : %d)", header->frameNumber, isFlushFrame);
-                        if (header->frameNumber != previousFNum + 1)
-                        {
-                            nbMissedFrame = header->frameNumber - previousFNum - 1;
-                            ARSAL_PRINT (ARSAL_PRINT_INFO, ARSTREAM_READER_TAG, "Missed %d frames !", nbMissedFrame);
-                        }
-                        previousFNum = header->frameNumber;
-                        skipCurrentFrame = 1;
-#ifdef ARSTREAM_VIDEO_OUTPUT_DUMP
-                        if (reader->outputDumpFile)
-                        {
-                            fwrite(reader->currentFrameBuffer, reader->currentFrameSize, 1, reader->outputDumpFile);
-                        }
-#endif
-                        reader->currentFrameBuffer = reader->callback (ARSTREAM_READER_CAUSE_FRAME_COMPLETE, reader->currentFrameBuffer, reader->currentFrameSize, nbMissedFrame, isFlushFrame, &(reader->currentFrameBufferSize), reader->custom);
+                        memcpy (nextFrameBuffer, reader->currentFrameBuffer, reader->currentFrameSize);
                     }
+                    else
+                    {
+                        skipCurrentFrame = 1;
+                    }
+                    //TODO: Add "SKIP_FRAME"
+                    reader->callback (ARSTREAM_READER_CAUSE_COPY_COMPLETE, reader->currentFrameBuffer, reader->currentFrameSize, 0, skipCurrentFrame, &dummy, reader->custom);
+                    reader->currentFrameBuffer = nextFrameBuffer;
+                    reader->currentFrameBufferSize = nextFrameBufferSize;
                 }
-                ARSAL_Mutex_Unlock (&(reader->ackPacketMutex));
+
+                if (skipCurrentFrame == 0)
+                {
+                    memcpy (&(reader->currentFrameBuffer)[cpIndex], &recvData[sizeof (ARSTREAM_NetworkHeaders_DataHeader_t)], cpSize);
+                    reader->currentFrameSize = endIndex;
+
+                    ARSAL_Mutex_Lock (&(reader->ackPacketMutex));
+                    if (ARSTREAM_NetworkHeaders_AckPacketAllFlagsSet (&(reader->ackPacket), header->fragmentsPerFrame))
+                    {
+                        if (header->frameNumber != previousFNum)
+                        {
+                            int nbMissedFrame = 0;
+                            int isFlushFrame = ((header->frameFlags & ARSTREAM_NETWORK_HEADERS_FLAG_FLUSH_FRAME) != 0) ? 1 : 0;
+                            ARSAL_PRINT (ARSAL_PRINT_VERBOSE, ARSTREAM_READER_TAG, "Ack all in frame %d (isFlush : %d)", header->frameNumber, isFlushFrame);
+                            if (header->frameNumber != previousFNum + 1)
+                            {
+                                nbMissedFrame = header->frameNumber - previousFNum - 1;
+                                ARSAL_PRINT (ARSAL_PRINT_ERROR, ARSTREAM_READER_TAG, "======== Missed %d frames before frame #%d", nbMissedFrame, header->frameNumber);
+                            }
+                            previousFNum = header->frameNumber;
+                            skipCurrentFrame = 1;
+#ifdef ARSTREAM_VIDEO_OUTPUT_DUMP
+                            if (reader->outputDumpFile)
+                            {
+                                fwrite(reader->currentFrameBuffer, reader->currentFrameSize, 1, reader->outputDumpFile);
+                            }
+#endif
+                            reader->currentFrameBuffer = reader->callback (ARSTREAM_READER_CAUSE_FRAME_COMPLETE, reader->currentFrameBuffer, reader->currentFrameSize, nbMissedFrame, isFlushFrame, &(reader->currentFrameBufferSize), reader->custom);
+                        }
+                    }
+                    ARSAL_Mutex_Unlock (&(reader->ackPacketMutex));
+                }
             }
         }
     }
