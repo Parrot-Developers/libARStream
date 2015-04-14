@@ -194,7 +194,8 @@ uint8_t* ARSTREAM_ReaderTb_FrameCompleteCallback (eARSTREAM_READER_CAUSE cause, 
     switch (cause)
     {
     case ARSTREAM_READER_CAUSE_FRAME_COMPLETE:
-        ARSAL_PRINT (ARSAL_PRINT_WARNING, __TAG__, "Got a complete frame of size %d, at address %p (isFlush : %d)", frameSize, framePointer, isFlushFrame);
+    case ARSTREAM_READER_CAUSE_FRAME_INCOMPLETE:
+        ARSAL_PRINT (ARSAL_PRINT_WARNING, __TAG__, "Got a frame of size %d, at address %p (isFlush : %d)", frameSize, framePointer, isFlushFrame);
         if (isFlushFrame != 0)
         nbRead++;
         if (numberOfSkippedFrames != 0)

@@ -66,6 +66,7 @@ typedef enum {
     ARSTREAM_READER_CAUSE_FRAME_TOO_SMALL, /**< Frame buffer is too small for the frame on the network */
     ARSTREAM_READER_CAUSE_COPY_COMPLETE, /**< Copy of previous frame buffer is complete (called only after ARSTREAM_READER_CAUSE_FRAME_TOO_SMALL) */
     ARSTREAM_READER_CAUSE_CANCEL, /**< Reader is closing, so buffer is no longer used */
+    ARSTREAM_READER_CAUSE_FRAME_INCOMPLETE, /**< Frame is incomplete (mising fragments) */
     ARSTREAM_READER_CAUSE_MAX,
 } eARSTREAM_READER_CAUSE;
 
@@ -83,6 +84,7 @@ typedef enum {
  * @return address of a new buffer which will hold the next frame
  *
  * @note If cause is ARSTREAM_READER_CAUSE_FRAME_COMPLETE, framePointer contains a valid frame.
+ * @note If cause is ARSTREAM_READER_CAUSE_FRAME_INCOMPLETE, framePointer contains an incomplete frame that may be partly decodable.
  * @note If cause is ARSTREAM_READER_CAUSE_FRAME_TOO_SMALL, datas will be copied into the new frame. Old frame buffer will still be in use until the callback is called again with ARSTREAM_READER_CAUSE_COPY_COMPLETE cause. If the new frame is still too small, the callback will be called again, until a suitable buffer is provided. newBufferCapacity holds a suitable capacity for the new buffer, but still has to be updated by the application.
  * @note If cause is ARSTREAM_READER_CAUSE_COPY_COMPLETE, the return value and newBufferCapacity are unused. If numberOfSkippedFrames is non-zero, then the current frame will be skipped (usually because the buffer returned after the ARSTREAM_READER_CAUSE_FRAME_TOO_SMALL was smaller than the previous buffer).
  * @note If cause is ARSTREAM_READER_CAUSE_CANCEL, the return value and newBufferCapacity are unused

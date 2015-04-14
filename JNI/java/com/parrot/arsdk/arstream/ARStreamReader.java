@@ -271,6 +271,7 @@ public class ARStreamReader
 
         switch (cause) {
         case ARSTREAM_READER_CAUSE_FRAME_COMPLETE:
+        case ARSTREAM_READER_CAUSE_FRAME_INCOMPLETE:
             currentFrameBuffer.setUsedSize(ndSize);
             currentFrameBuffer = eventListener.didUpdateFrameStatus (cause, currentFrameBuffer, isFlush, nbSkip, newBufferCapacity);
             break;

@@ -72,6 +72,8 @@
 
 #define ARSTREAM_READER_EFFICIENCY_AVERAGE_NB_FRAMES (15)
 
+//#define ARSTREAM_VIDEO_OUTPUT_INCOMPLETE_FRAMES
+
 //#define ARSTREAM_VIDEO_OUTPUT_DUMP
 #ifdef ARSTREAM_VIDEO_OUTPUT_DUMP
     const char* ARSTREAM_VIDEO_OUTPUT_DUMP_PATH_NAP_USB = "/tmp/mnt/STREAMDUMP";
@@ -350,6 +352,7 @@ void* ARSTREAM_Reader_RunDataThread (void *ARSTREAM_Reader_t_Param)
     uint8_t *recvData = NULL;
     int recvSize, endIndex = 0;
     uint16_t previousFNum = UINT16_MAX;
+    uint8_t previousFrameFlags = 0, previousFragmentsPerFrame = 0;
     int skipCurrentFrame = 0;
     int packetWasAlreadyAck = 0;
     ARSTREAM_Reader_t *reader = (ARSTREAM_Reader_t *)ARSTREAM_Reader_t_Param;
@@ -428,6 +431,30 @@ void* ARSTREAM_Reader_RunDataThread (void *ARSTREAM_Reader_t_Param)
             ARSAL_Mutex_Lock (&(reader->ackPacketMutex));
             if (header->frameNumber != reader->ackPacket.frameNumber)
             {
+                uint32_t nackPackets = ARSTREAM_NetworkHeaders_AckPacketCountNotSet (&(reader->ackPacket), previousFragmentsPerFrame);
+                if (nackPackets != 0)
+                {
+#ifdef ARSTREAM_VIDEO_OUTPUT_INCOMPLETE_FRAMES
+                    int nbMissedFrame = 0;
+                    int isFlushFrame = ((previousFrameFlags & ARSTREAM_NETWORK_HEADERS_FLAG_FLUSH_FRAME) != 0) ? 1 : 0;
+                    if (reader->ackPacket.frameNumber != previousFNum + 1)
+                    {
+                        nbMissedFrame = header->frameNumber - previousFNum - 1;
+                        ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARSTREAM_READER_TAG, "Missed %d frames before frame #%d", nbMissedFrame, reader->ackPacket.frameNumber);
+                    }
+                    previousFNum = reader->ackPacket.frameNumber;
+                    ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARSTREAM_READER_TAG, "Output incomplete frame #%d (missing %d fragments)", reader->ackPacket.frameNumber, nackPackets);
+#ifdef ARSTREAM_VIDEO_OUTPUT_DUMP
+                    if (reader->outputDumpFile)
+                    {
+                        fwrite(reader->currentFrameBuffer, reader->currentFrameSize, 1, reader->outputDumpFile);
+                    }
+#endif
+                    reader->currentFrameBuffer = reader->callback (ARSTREAM_READER_CAUSE_FRAME_INCOMPLETE, reader->currentFrameBuffer, reader->currentFrameSize, nbMissedFrame, isFlushFrame, &(reader->currentFrameBufferSize), reader->custom);
+#else
+                    ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARSTREAM_READER_TAG, "Dropping incomplete frame #%d (missing %d fragments)", reader->ackPacket.frameNumber, nackPackets);
+#endif
+                }
                 reader->efficiency_index ++;
                 reader->efficiency_index %= ARSTREAM_READER_EFFICIENCY_AVERAGE_NB_FRAMES;
                 reader->efficiency_nbTotal [reader->efficiency_index] = 0;
@@ -436,15 +463,12 @@ void* ARSTREAM_Reader_RunDataThread (void *ARSTREAM_Reader_t_Param)
                 reader->currentFrameSize = 0;
                 endIndex = 0;
                 reader->ackPacket.frameNumber = header->frameNumber;
-                uint32_t nackPackets = ARSTREAM_NetworkHeaders_AckPacketCountNotSet (&(reader->ackPacket), header->fragmentsPerFrame);
-                if (nackPackets != 0)
-                {
-                    ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARSTREAM_READER_TAG, "Dropping a frame (missing %d fragments)", nackPackets);
-                }
                 ARSTREAM_NetworkHeaders_AckPacketResetUpTo (&(reader->ackPacket), header->fragmentsPerFrame);
             }
             packetWasAlreadyAck = ARSTREAM_NetworkHeaders_AckPacketFlagIsSet (&(reader->ackPacket), header->fragmentNumber);
             ARSTREAM_NetworkHeaders_AckPacketSetFlag (&(reader->ackPacket), header->fragmentNumber);
+            previousFrameFlags = header->frameFlags;
+            previousFragmentsPerFrame = header->fragmentsPerFrame;
 
             reader->efficiency_nbTotal [reader->efficiency_index] ++;
             if (packetWasAlreadyAck == 0)
@@ -500,7 +524,7 @@ void* ARSTREAM_Reader_RunDataThread (void *ARSTREAM_Reader_t_Param)
                             if (header->frameNumber != previousFNum + 1)
                             {
                                 nbMissedFrame = header->frameNumber - previousFNum - 1;
-                                ARSAL_PRINT (ARSAL_PRINT_ERROR, ARSTREAM_READER_TAG, "======== Missed %d frames before frame #%d", nbMissedFrame, header->frameNumber);
+                                ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARSTREAM_READER_TAG, "Missed %d frames before frame #%d", nbMissedFrame, header->frameNumber);
                             }
                             previousFNum = header->frameNumber;
                             skipCurrentFrame = 1;
