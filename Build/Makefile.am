@@ -4,9 +4,11 @@
 ACLOCAL_AMFLAGS                                             =   -I m4
 
 # The list of header files that belong to the library (to be installed later)
-HEADER_FILES                                                =   ../Includes/libARStream/ARSTREAM_Sender.h \
-                                                                ../Includes/libARStream/ARSTREAM_Reader.h \
-                                                                ../Includes/libARStream/ARSTREAM_Error.h  \
+HEADER_FILES                                                =   ../Includes/libARStream/ARSTREAM_Sender.h  \
+                                                                ../Includes/libARStream/ARSTREAM_Sender2.h \
+                                                                ../Includes/libARStream/ARSTREAM_Reader.h  \
+                                                                ../Includes/libARStream/ARSTREAM_Reader2.h \
+                                                                ../Includes/libARStream/ARSTREAM_Error.h   \
                                                                 ../Includes/libARStream/ARStream.h
 
 # The sources to add to the library and to add to the source distribution
@@ -15,7 +17,9 @@ SOURCE_FILES                                                =   $(HEADER_FILES) 
                                                                 ../Sources/ARSTREAM_Buffers.h            \
                                                                 ../Sources/ARSTREAM_Error.c              \
                                                                 ../Sources/ARSTREAM_Sender.c             \
+                                                                ../Sources/ARSTREAM_Sender2.c            \
                                                                 ../Sources/ARSTREAM_Reader.c             \
+                                                                ../Sources/ARSTREAM_Reader2.c            \
                                                                 ../Sources/ARSTREAM_NetworkHeaders.c     \
                                                                 ../Sources/ARSTREAM_Buffers.c
 
