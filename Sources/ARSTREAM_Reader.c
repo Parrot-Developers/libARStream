@@ -83,6 +83,13 @@
 
 
 /**
+ * Configuration : Enable acks (0,1)
+ * 0 -> Don't send acks
+ * 1 -> Send acks
+ */
+#define ENABLE_ACKS (0)
+
+/**
  * Sets *PTR to VAL if PTR is not null
  */
 #define SET_WITH_CHECK(PTR,VAL)                 \
@@ -569,6 +576,7 @@ void* ARSTREAM_Reader_RunAckThread (void *ARSTREAM_Reader_t_Param)
     ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARSTREAM_READER_TAG, "Ack sender thread running");
     reader->ackThreadStarted = 1;
 
+#if ENABLE_ACKS == 1
     while (reader->threadsShouldStop == 0)
     {
         int isPeriodicAck = 0;
@@ -599,6 +607,7 @@ void* ARSTREAM_Reader_RunAckThread (void *ARSTREAM_Reader_t_Param)
             ARNETWORK_Manager_SendData (reader->manager, reader->ackBufferID, (uint8_t *)&sendPacket, sizeof (sendPacket), NULL, ARSTREAM_Reader_NetworkCallback, 1);
         }
     }
+#endif
 
     ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARSTREAM_READER_TAG, "Ack sender thread ended");
     reader->ackThreadStarted = 0;
