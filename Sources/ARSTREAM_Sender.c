@@ -733,7 +733,9 @@ eARSTREAM_ERROR ARSTREAM_Sender_Delete (ARSTREAM_Sender_t **sender)
 
         if (canDelete == 1)
         {
+            ARSAL_Mutex_Lock (&((*sender)->nextFrameMutex));
             ARSTREAM_Sender_FlushQueue (*sender);
+            ARSAL_Mutex_Unlock (&((*sender)->nextFrameMutex));
             ARSAL_Mutex_Destroy (&((*sender)->packetsToSendMutex));
             ARSAL_Mutex_Destroy (&((*sender)->ackMutex));
             ARSAL_Mutex_Destroy (&((*sender)->nextFrameMutex));
