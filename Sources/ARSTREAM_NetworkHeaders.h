@@ -102,6 +102,16 @@ typedef struct {
     uint64_t lowPacketsAck; /**< Lower 64 packets bitfield */
 } __attribute__ ((packed)) ARSTREAM_NetworkHeaders_AckPacket_t;
 
+/**
+ * @brief Header for v2 stream data frames (RTP-like, see RFC3550)
+ */
+typedef struct {
+    uint16_t flags;
+    uint16_t seqNum;
+    uint32_t timestamp;
+    uint32_t ssrc;
+} __attribute__ ((packed)) ARSTREAM_NetworkHeaders_DataHeader2_t;
+
 /*
  * Functions declarations
  */
