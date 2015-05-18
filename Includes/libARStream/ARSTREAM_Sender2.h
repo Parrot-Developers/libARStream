@@ -61,8 +61,8 @@
  * @brief Callback status values
  */
 typedef enum {
-    ARSTREAM_SENDER2_STATUS_FRAME_SENT = 0, /**< Frame was sent and acknowledged by peer */
-    ARSTREAM_SENDER2_STATUS_FRAME_CANCEL, /**< Frame was not sent, and was cancelled by a new frame */
+    ARSTREAM_SENDER2_STATUS_AU_SENT = 0, /**< Access Unit was sent */
+    ARSTREAM_SENDER2_STATUS_AU_CANCELLED, /**< Access Unit was cancelled (not sent or partly sent) */
     ARSTREAM_SENDER2_STATUS_MAX,
 } eARSTREAM_SENDER2_STATUS;
 
@@ -77,7 +77,7 @@ typedef enum {
  * @param[in] custom Custom pointer passed during ARSTREAM_Sender2_New
  * @see eARSTREAM_SENDER2_STATUS
  */
-typedef void (*ARSTREAM_Sender2_FrameUpdateCallback_t)(eARSTREAM_SENDER2_STATUS status, uint8_t *framePointer, uint32_t frameSize, void *custom);
+typedef void (*ARSTREAM_Sender2_AuCallback_t)(eARSTREAM_SENDER2_STATUS status, void *auUserPtr, void *custom);
 
 /**
  * @brief An ARSTREAM_Sender2_t instance allow streaming frames over a network
@@ -97,7 +97,7 @@ typedef struct ARSTREAM_Sender2_t ARSTREAM_Sender2_t;
  * @param[in] maxFragmentSize Maximum allowed size for a video data fragment. Video frames larger that will be fragmented.
  * @param[in] maxNumberOfFragment number maximum of fragment of one frame.
  */
-void ARSTREAM_Sender2_InitStreamDataBuffer (ARNETWORK_IOBufferParam_t *bufferParams, int bufferID, int maxFragmentSize, uint32_t maxFragmentPerFrame);
+void ARSTREAM_Sender2_InitStreamDataBuffer (ARNETWORK_IOBufferParam_t *bufferParams, int bufferID, int maxPacketSize);
 
 /**
  * @brief Sets an ARNETWORK_IOBufferParam_t to describe a stream ack buffer
@@ -128,7 +128,7 @@ void ARSTREAM_Sender2_InitStreamAckBuffer (ARNETWORK_IOBufferParam_t *bufferPara
  * @see ARSTREAM_Sender2_StopSender()
  * @see ARSTREAM_Sender2_Delete()
  */
-ARSTREAM_Sender2_t* ARSTREAM_Sender2_New (ARNETWORK_Manager_t *manager, int dataBufferID, int ackBufferID, ARSTREAM_Sender2_FrameUpdateCallback_t callback, uint32_t framesBufferSize, uint32_t maxFragmentSize, uint32_t maxNumberOfFragment,  void *custom, eARSTREAM_ERROR *error);
+ARSTREAM_Sender2_t* ARSTREAM_Sender2_New (ARNETWORK_Manager_t *manager, int dataBufferID, int ackBufferID, ARSTREAM_Sender2_AuCallback_t auCallback, int naluFifoSize, int maxPacketSize, void *custom, eARSTREAM_ERROR *error);
 
 /**
  * @brief Stops a running ARSTREAM_Sender2_t
@@ -167,24 +167,7 @@ eARSTREAM_ERROR ARSTREAM_Sender2_Delete (ARSTREAM_Sender2_t **sender);
  * @return ARSTREAM_ERROR_FRAME_TOO_LARGE if the frameSize is greater that the maximum frame size of the libARStream (typically 128000 bytes)
  * @return ARSTREAM_ERROR_QUEUE_FULL if the frame can not be added to queue. This value can not happen if flushPreviousFrames is active
  */
-eARSTREAM_ERROR ARSTREAM_Sender2_SendNewFrame (ARSTREAM_Sender2_t *sender, uint8_t *frameBuffer, uint32_t frameSize, int flushPreviousFrames, int *nbPreviousFrames);
-
-/**
- * @brief Sends a new frame fragment
- *
- * @param[in] sender The ARSTREAM_Sender2_t which will try to send the fragment
- * @param[in] fragmentBuffer pointer to the fragment in memory
- * @param[in] fragmentSize size of the fragment in memory
- * @param[in] frameUserPtr optional pointer to the frame user data (must be the same for all fragments of a frame)
- * @param[in] isLast Boolean-like flag (0/1). If active, tells the sender that the fragment is the last fragment of the frame.
- * @param[in] flushPreviousFrames Boolean-like flag (0/1). If active, tells the sender to flush the frame queue when adding this frame.
- * @param[out] nbPreviousFrames Optionnal int pointer which will store the number of frames previously in the buffer (even if the buffer is flushed)
- * @return ARSTREAM_OK if no error happened
- * @return ARSTREAM_ERROR_BAD_PARAMETERS if the sender or fragmentBuffer pointer is invalid, or if fragmentSize is zero
- * @return ARSTREAM_ERROR_FRAME_TOO_LARGE if the fragmentSize is greater that the maximum fragment size of the libARStream (typically 128000 bytes)
- * @return ARSTREAM_ERROR_QUEUE_FULL if the frame can not be added to queue. This value can not happen if flushPreviousFrames is active
- */
-eARSTREAM_ERROR ARSTREAM_Sender2_SendNewFragment (ARSTREAM_Sender2_t *sender, uint8_t *fragmentBuffer, uint32_t fragmentSize, void *frameUserPtr, int isLast, int flushPreviousFrames, int *nbPreviousFrames);
+eARSTREAM_ERROR ARSTREAM_Sender2_SendNewNalu (ARSTREAM_Sender2_t *sender, uint8_t *naluBuffer, uint32_t naluSize, uint64_t auTimestamp, int isLastInAu, void *auUserPtr);
 
 /**
  * @brief Flushes all currently queued frames
@@ -193,7 +176,7 @@ eARSTREAM_ERROR ARSTREAM_Sender2_SendNewFragment (ARSTREAM_Sender2_t *sender, ui
  * @return ARSTREAM_OK if no error occured.
  * @return ARSTREAM_ERROR_BAD_PARAMETERS if the sender is invalid.
  */
-eARSTREAM_ERROR ARSTREAM_Sender2_FlushFramesQueue (ARSTREAM_Sender2_t *sender);
+eARSTREAM_ERROR ARSTREAM_Sender2_FlushNaluQueue (ARSTREAM_Sender2_t *sender);
 
 /**
  * @brief Runs the data loop of the ARSTREAM_Sender2_t

@@ -57,10 +57,10 @@
  * @brief Causes for FrameComplete callback
  */
 typedef enum {
-    ARSTREAM_READER2_CAUSE_FRAME_COMPLETE = 0, /**< Frame is complete (no error) */
-    ARSTREAM_READER2_CAUSE_FRAME_INCOMPLETE, /**< Frame is incomplete (mising fragments) */
-    ARSTREAM_READER2_CAUSE_FRAME_TOO_SMALL, /**< Frame buffer is too small for the frame on the network */
-    ARSTREAM_READER2_CAUSE_COPY_COMPLETE, /**< Copy of previous frame buffer is complete (called only after ARSTREAM_READER2_CAUSE_FRAME_TOO_SMALL) */
+    ARSTREAM_READER2_CAUSE_AU_COMPLETE = 0, /**< Frame is complete (no error) */
+    ARSTREAM_READER2_CAUSE_AU_INCOMPLETE, /**< Frame is incomplete (mising fragments) */
+    ARSTREAM_READER2_CAUSE_AU_BUFFER_TOO_SMALL, /**< Frame buffer is too small for the frame on the network */
+    ARSTREAM_READER2_CAUSE_AU_COPY_COMPLETE, /**< Copy of previous frame buffer is complete (called only after ARSTREAM_READER2_CAUSE_FRAME_TOO_SMALL) */
     ARSTREAM_READER2_CAUSE_CANCEL, /**< Reader is closing, so buffer is no longer used */
     ARSTREAM_READER2_CAUSE_MAX,
 } eARSTREAM_READER2_CAUSE;
@@ -89,7 +89,7 @@ typedef enum {
  * @warning If the cause is ARSTREAM_READER2_CAUSE_FRAME_TOO_SMALL, returning a buffer shorter than 'frameSize' will cause the library to skip the current frame
  * @warning In any case, returning a NULL buffer is not supported.
  */
-typedef uint8_t* (*ARSTREAM_Reader2_FrameCompleteCallback_t) (eARSTREAM_READER2_CAUSE cause, uint8_t *framePointer, uint32_t frameSize, int numberOfSkippedFrames, int numberOfMissingFramgents, int totalFragments, int isFlushFrame, uint32_t *newBufferCapacity, void *custom);
+typedef uint8_t* (*ARSTREAM_Reader2_AuCallback_t) (eARSTREAM_READER2_CAUSE cause, uint8_t *auBuffer, int auSize, uint64_t auTimestamp, int numberOfMissingPackets, int *newAuBufferSize, void *custom);
 
 /**
  * @brief An ARSTREAM_Reader2_t instance allow reading streamed frames from a network
@@ -107,7 +107,7 @@ typedef struct ARSTREAM_Reader2_t ARSTREAM_Reader2_t;
  * @param[in] maxFragmentSize Maximum allowed size for a video data fragment. Video frames larger that will be fragmented.
  * @param[in] maxNumberOfFragment number maximum of fragment of one frame.
  */
-void ARSTREAM_Reader2_InitStreamDataBuffer (ARNETWORK_IOBufferParam_t *bufferParams, int bufferID, int maxFragmentSize, uint32_t maxNumberOfFragment);
+void ARSTREAM_Reader2_InitStreamDataBuffer (ARNETWORK_IOBufferParam_t *bufferParams, int bufferID, int maxPacketSize);
 
 /**
  * @brief Sets an ARNETWORK_IOBufferParam_t to describe a stream ack buffer
@@ -135,7 +135,7 @@ void ARSTREAM_Reader2_InitStreamAckBuffer (ARNETWORK_IOBufferParam_t *bufferPara
  * @see ARSTREAM_Reader2_StopReader()
  * @see ARSTREAM_Reader2_Delete()
  */
-ARSTREAM_Reader2_t* ARSTREAM_Reader2_New (ARNETWORK_Manager_t *manager, int dataBufferID, int ackBufferID, ARSTREAM_Reader2_FrameCompleteCallback_t callback, uint8_t *frameBuffer, uint32_t frameBufferSize, uint32_t maxFragmentSize, void *custom, eARSTREAM_ERROR *error);
+ARSTREAM_Reader2_t* ARSTREAM_Reader2_New (ARNETWORK_Manager_t *manager, int dataBufferID, int ackBufferID, ARSTREAM_Reader2_AuCallback_t auCallback, uint8_t *auBuffer, int auBufferSize, int maxPacketSize, int insertStartCode, void *custom, eARSTREAM_ERROR *error);
 
 /**
  * @brief Stops a running ARSTREAM_Reader2_t

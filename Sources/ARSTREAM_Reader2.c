@@ -70,6 +70,9 @@
 #define ARSTREAM_READER2_TAG "ARSTREAM_Reader2"
 #define ARSTREAM_READER2_DATAREAD_TIMEOUT_MS (500)
 
+#define ARSTREAM_H264_STARTCODE 0x00000001
+#define ARSTREAM_H264_STARTCODE_LENGTH 4
+
 #define ARSTREAM_VIDEO_OUTPUT_INCOMPLETE_FRAMES
 
 //#define ARSTREAM_VIDEO_OUTPUT_DUMP
@@ -101,19 +104,18 @@ struct ARSTREAM_Reader2_t {
     ARNETWORK_Manager_t *manager;
     int dataBufferID;
     int ackBufferID;
-    uint32_t maxFragmentSize;
-    ARSTREAM_Reader2_FrameCompleteCallback_t callback;
+    int maxPacketSize;
+    int insertStartCode;
+    ARSTREAM_Reader2_AuCallback_t auCallback;
     void *custom;
 
     /* Current frame storage */
-    uint32_t currentFrameBufferSize; // Usable length of the buffer
-    uint32_t currentFrameSize;       // Actual data length
-    uint8_t *currentFrameBuffer;
-
-    /* Acknowledge storage */
-    ARSTREAM_NetworkHeaders_AckPacket_t ackPacket; //TODO: delete?
+    int currentAuBufferSize; // Usable length of the buffer
+    int currentAuSize;       // Actual data length
+    uint8_t *currentAuBuffer;
 
     /* Thread status */
+    ARSAL_Mutex_t streamMutex;
     int threadsShouldStop;
     int dataThreadStarted;
     int ackThreadStarted;
@@ -123,26 +125,9 @@ struct ARSTREAM_Reader2_t {
 #endif
 };
 
-/*
- * Internal functions declarations
- */
-
-/**
- * @brief ARNETWORK_Manager_Callback_t for ARNETWORK_... calls
- * @param IoBufferId Unused as we always send on one unique buffer
- * @param dataPtr Unused as we don't need to free the memory
- * @param customData Unused
- * @param status Unused
- * @return ARNETWORK_MANAGER_CALLBACK_RETURN_DEFAULT
- */
-eARNETWORK_MANAGER_CALLBACK_RETURN ARSTREAM_Reader2_NetworkCallback (int IoBufferId, uint8_t *dataPtr, void *customData, eARNETWORK_MANAGER_CALLBACK_STATUS status);
-
-/*
- * Internal functions implementation
- */
 
 //TODO: Network, NULL callback should be ok ?
-eARNETWORK_MANAGER_CALLBACK_RETURN ARSTREAM_Reader2_NetworkCallback (int IoBufferId, uint8_t *dataPtr, void *customData, eARNETWORK_MANAGER_CALLBACK_STATUS status)
+eARNETWORK_MANAGER_CALLBACK_RETURN ARSTREAM_Reader2_NetworkCallback(int IoBufferId, uint8_t *dataPtr, void *customData, eARNETWORK_MANAGER_CALLBACK_STATUS status)
 {
     /* Avoid "unused parameters" warnings */
     (void)IoBufferId;
@@ -154,37 +139,37 @@ eARNETWORK_MANAGER_CALLBACK_RETURN ARSTREAM_Reader2_NetworkCallback (int IoBuffe
     return ARNETWORK_MANAGER_CALLBACK_RETURN_DEFAULT;
 }
 
-/*
- * Implementation
- */
 
-void ARSTREAM_Reader2_InitStreamDataBuffer (ARNETWORK_IOBufferParam_t *bufferParams, int bufferID, int maxFragmentSize, uint32_t maxNumberOfFragment)
+void ARSTREAM_Reader2_InitStreamDataBuffer(ARNETWORK_IOBufferParam_t *bufferParams, int bufferID, int maxPacketSize)
 {
-    ARSTREAM_Buffers_InitStreamDataBuffer (bufferParams, bufferID, maxFragmentSize, maxNumberOfFragment);
+    ARSTREAM_Buffers_InitStreamDataBuffer(bufferParams, bufferID, maxPacketSize, ARSTREAM_BUFFERS_DATA_BUFFER_NUMBER_OF_CELLS);
 }
 
-void ARSTREAM_Reader2_InitStreamAckBuffer (ARNETWORK_IOBufferParam_t *bufferParams, int bufferID)
+
+void ARSTREAM_Reader2_InitStreamAckBuffer(ARNETWORK_IOBufferParam_t *bufferParams, int bufferID)
 {
-    ARSTREAM_Buffers_InitStreamAckBuffer (bufferParams, bufferID);
+    ARSTREAM_Buffers_InitStreamAckBuffer(bufferParams, bufferID);
 }
 
-ARSTREAM_Reader2_t* ARSTREAM_Reader2_New (ARNETWORK_Manager_t *manager, int dataBufferID, int ackBufferID, ARSTREAM_Reader2_FrameCompleteCallback_t callback, uint8_t *frameBuffer, uint32_t frameBufferSize, uint32_t maxFragmentSize, void *custom, eARSTREAM_ERROR *error)
+
+ARSTREAM_Reader2_t* ARSTREAM_Reader2_New(ARNETWORK_Manager_t *manager, int dataBufferID, int ackBufferID, ARSTREAM_Reader2_AuCallback_t auCallback, uint8_t *auBuffer, int auBufferSize, int maxPacketSize, int insertStartCode, void *custom, eARSTREAM_ERROR *error)
 {
     ARSTREAM_Reader2_t *retReader = NULL;
+    int streamMutexWasInit = 0;
     eARSTREAM_ERROR internalError = ARSTREAM_OK;
     /* ARGS Check */
     if ((manager == NULL) ||
-        (callback == NULL) ||
-        (frameBuffer == NULL) ||
-        (frameBufferSize == 0) ||
-        (maxFragmentSize == 0))
+        (auCallback == NULL) ||
+        (auBuffer == NULL) ||
+        (auBufferSize == 0) ||
+        (maxPacketSize == 0))
     {
-        SET_WITH_CHECK (error, ARSTREAM_ERROR_BAD_PARAMETERS);
+        SET_WITH_CHECK(error, ARSTREAM_ERROR_BAD_PARAMETERS);
         return retReader;
     }
 
     /* Alloc new reader */
-    retReader = malloc (sizeof (ARSTREAM_Reader2_t));
+    retReader = malloc(sizeof(ARSTREAM_Reader2_t));
     if (retReader == NULL)
     {
         internalError = ARSTREAM_ERROR_ALLOC;
@@ -196,18 +181,33 @@ ARSTREAM_Reader2_t* ARSTREAM_Reader2_New (ARNETWORK_Manager_t *manager, int data
         retReader->manager = manager;
         retReader->dataBufferID = dataBufferID;
         retReader->ackBufferID = ackBufferID;
-        retReader->maxFragmentSize = maxFragmentSize;
-        retReader->callback = callback;
+        retReader->maxPacketSize = maxPacketSize;
+        retReader->insertStartCode = insertStartCode;
+        retReader->auCallback = auCallback;
         retReader->custom = custom;
-        retReader->currentFrameBufferSize = frameBufferSize;
-        retReader->currentFrameBuffer = frameBuffer;
+        retReader->currentAuBufferSize = auBufferSize;
+        retReader->currentAuBuffer = auBuffer;
+    }
+
+    /* Setup internal mutexes/sems */
+    if (internalError == ARSTREAM_OK)
+    {
+        int mutexInitRet = ARSAL_Mutex_Init(&(retReader->streamMutex));
+        if (mutexInitRet != 0)
+        {
+            internalError = ARSTREAM_ERROR_ALLOC;
+        }
+        else
+        {
+            streamMutexWasInit = 1;
+        }
     }
 
     /* Setup internal variables */
     if (internalError == ARSTREAM_OK)
     {
         int i;
-        retReader->currentFrameSize = 0;
+        retReader->currentAuSize = 0;
         retReader->threadsShouldStop = 0;
         retReader->dataThreadStarted = 0;
         retReader->ackThreadStarted = 0;
@@ -219,76 +219,99 @@ ARSTREAM_Reader2_t* ARSTREAM_Reader2_New (ARNETWORK_Manager_t *manager, int data
     if ((internalError != ARSTREAM_OK) &&
         (retReader != NULL))
     {
-        free (retReader);
+        if (streamMutexWasInit == 1)
+        {
+            ARSAL_Mutex_Destroy(&(retReader->streamMutex));
+        }
+        free(retReader);
         retReader = NULL;
     }
 
-    SET_WITH_CHECK (error, internalError);
+    SET_WITH_CHECK(error, internalError);
     return retReader;
 }
 
-void ARSTREAM_Reader2_StopReader (ARSTREAM_Reader2_t *reader)
+
+void ARSTREAM_Reader2_StopReader(ARSTREAM_Reader2_t *reader)
 {
     if (reader != NULL)
     {
+        ARSAL_Mutex_Lock(&(reader->streamMutex));
         reader->threadsShouldStop = 1;
+        ARSAL_Mutex_Unlock(&(reader->streamMutex));
     }
 }
 
-eARSTREAM_ERROR ARSTREAM_Reader2_Delete (ARSTREAM_Reader2_t **reader)
+
+eARSTREAM_ERROR ARSTREAM_Reader2_Delete(ARSTREAM_Reader2_t **reader)
 {
     eARSTREAM_ERROR retVal = ARSTREAM_ERROR_BAD_PARAMETERS;
     if ((reader != NULL) &&
         (*reader != NULL))
     {
         int canDelete = 0;
+        ARSAL_Mutex_Lock(&((*reader)->streamMutex));
         if (((*reader)->dataThreadStarted == 0) &&
             ((*reader)->ackThreadStarted == 0))
         {
             canDelete = 1;
         }
+        ARSAL_Mutex_Unlock(&((*reader)->streamMutex));
 
         if (canDelete == 1)
         {
-            free (*reader);
+            ARSAL_Mutex_Destroy(&((*reader)->streamMutex));
+            free(*reader);
             *reader = NULL;
             retVal = ARSTREAM_OK;
         }
         else
         {
-            ARSAL_PRINT (ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Call ARSTREAM_Reader2_StopReader before calling this function");
+            ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Call ARSTREAM_Reader2_StopReader before calling this function");
             retVal = ARSTREAM_ERROR_BUSY;
         }
     }
     return retVal;
 }
 
-void* ARSTREAM_Reader2_RunDataThread (void *ARSTREAM_Reader2_t_Param)
+
+void* ARSTREAM_Reader2_RunDataThread(void *ARSTREAM_Reader2_t_Param)
 {
-    uint8_t *recvData = NULL;
-    int recvSize, endIndex = 0;
-    uint16_t previousFNum = UINT16_MAX;
-    uint8_t previousFrameFlags = 0, previousFragmentsPerFrame = 0;
-    int skipCurrentFrame = 0;
     ARSTREAM_Reader2_t *reader = (ARSTREAM_Reader2_t *)ARSTREAM_Reader2_t_Param;
-    ARSTREAM_NetworkHeaders_DataHeader_t *header = NULL;
-    int recvDataLen = reader->maxFragmentSize + sizeof (ARSTREAM_NetworkHeaders_DataHeader_t);
+    uint8_t *recvBuffer = NULL;
+    int recvBufferSize;
+    int recvSize, payloadSize;
+    ARSTREAM_NetworkHeaders_DataHeader2_t *header = NULL;
+    uint64_t currentTimestamp = 0, previousTimestamp = 0;
+    uint16_t currentFlags;
+    int previousSeqNum = -1, currentSeqNum, seqNumDelta;
+    int gapsInSeqNum = 0;
+    uint32_t startCode = 0;
+    int startCodeLength = 0;
+    int shouldStop;
 
     /* Parameters check */
     if (reader == NULL)
     {
-        ARSAL_PRINT (ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Error while starting %s, bad parameters", __FUNCTION__);
+        ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Error while starting %s, bad parameters", __FUNCTION__);
         return (void *)0;
     }
 
-    /* Alloc and check */
-    recvData = malloc (recvDataLen);
-    if (recvData == NULL)
+    recvBufferSize = reader->maxPacketSize;
+    if (reader->insertStartCode)
     {
-        ARSAL_PRINT (ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Error while starting %s, can not alloc memory", __FUNCTION__);
+        startCode = htonl(ARSTREAM_H264_STARTCODE);
+        startCodeLength = ARSTREAM_H264_STARTCODE_LENGTH;
+    }
+
+    /* Alloc and check */
+    recvBuffer = malloc(recvBufferSize);
+    if (recvBuffer == NULL)
+    {
+        ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Error while starting %s, can not alloc memory", __FUNCTION__);
         return (void *)0;
     }
-    header = (ARSTREAM_NetworkHeaders_DataHeader_t *)recvData;
+    header = (ARSTREAM_NetworkHeaders_DataHeader2_t *)recvBuffer;
 
 #ifdef ARSTREAM_VIDEO_OUTPUT_DUMP
     int i;
@@ -327,117 +350,104 @@ void* ARSTREAM_Reader2_RunDataThread (void *ARSTREAM_Reader2_t_Param)
     }
 #endif
 
-    ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Stream reader thread running");
+    ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Stream reader thread running");
+    ARSAL_Mutex_Lock(&(reader->streamMutex));
     reader->dataThreadStarted = 1;
+    shouldStop = reader->threadsShouldStop;
+    ARSAL_Mutex_Unlock(&(reader->streamMutex));
 
-    while (reader->threadsShouldStop == 0)
+    while (shouldStop == 0)
     {
-        eARNETWORK_ERROR err = ARNETWORK_Manager_ReadDataWithTimeout (reader->manager, reader->dataBufferID, recvData, recvDataLen, &recvSize, ARSTREAM_READER2_DATAREAD_TIMEOUT_MS);
+        eARNETWORK_ERROR err = ARNETWORK_Manager_ReadDataWithTimeout(reader->manager, reader->dataBufferID, recvBuffer, recvBufferSize, &recvSize, ARSTREAM_READER2_DATAREAD_TIMEOUT_MS);
         if (ARNETWORK_OK != err)
         {
             if (ARNETWORK_ERROR_BUFFER_EMPTY != err)
             {
-                ARSAL_PRINT (ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Error while reading stream data: %s", ARNETWORK_Error_ToString (err));
+                ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Error while reading stream data: %s", ARNETWORK_Error_ToString (err));
             }
         }
         else
         {
-            int cpIndex, cpSize;
-ARSAL_PRINT (ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "==== Received frameNumber %d, fragment %d/%d", header->frameNumber, header->fragmentNumber, header->fragmentsPerFrame);
-            if (header->frameNumber != reader->ackPacket.frameNumber)
+            currentTimestamp = (((uint64_t)ntohl(header->timestamp) * 1000) + 45) / 90; /* 90000 Hz clock to microseconds */
+            currentSeqNum = (int)ntohs(header->seqNum);
+            currentFlags = ntohs(header->flags);
+            if (previousSeqNum != -1)
             {
-                uint32_t nackPackets = ARSTREAM_NetworkHeaders_AckPacketCountNotSet (&(reader->ackPacket), previousFragmentsPerFrame);
-                if (nackPackets != 0)
+                seqNumDelta = currentSeqNum - previousSeqNum;
+                if (seqNumDelta < -32768) seqNumDelta += 65536; /* handle seqNum 16 bits loopback */
+                gapsInSeqNum += seqNumDelta - 1;
+            }
+            if ((previousTimestamp != 0) && (currentTimestamp != previousTimestamp))
+            {
+                if (gapsInSeqNum)
                 {
 #ifdef ARSTREAM_VIDEO_OUTPUT_INCOMPLETE_FRAMES
-                    int nbMissedFrame = 0;
-                    int isFlushFrame = ((previousFrameFlags & ARSTREAM_NETWORK_HEADERS_FLAG_FLUSH_FRAME) != 0) ? 1 : 0;
-                    if (reader->ackPacket.frameNumber != previousFNum + 1)
-                    {
-                        nbMissedFrame = header->frameNumber - previousFNum - 1;
-                        ARSAL_PRINT (ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "======== Missed %d frames before frame #%d", nbMissedFrame, reader->ackPacket.frameNumber);
-                    }
-                    previousFNum = reader->ackPacket.frameNumber;
-                    ARSAL_PRINT (ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "======== Output incomplete frame #%d (missing %d fragments)", reader->ackPacket.frameNumber, nackPackets);
+                    ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Output incomplete access unit before seqNum %d, size %d bytes (missing %d packets)", currentSeqNum, reader->currentAuSize, gapsInSeqNum);
 #ifdef ARSTREAM_VIDEO_OUTPUT_DUMP
                     if (reader->outputDumpFile)
                     {
-                        fwrite(reader->currentFrameBuffer, reader->currentFrameSize, 1, reader->outputDumpFile);
+                        fwrite(reader->currentAuBuffer, reader->currentAuSize, 1, reader->outputDumpFile);
                     }
 #endif
-                    reader->currentFrameBuffer = reader->callback (ARSTREAM_READER2_CAUSE_FRAME_INCOMPLETE, reader->currentFrameBuffer, reader->currentFrameSize, nbMissedFrame, (int)nackPackets, previousFragmentsPerFrame, isFlushFrame, &(reader->currentFrameBufferSize), reader->custom);
+                    reader->currentAuBuffer = reader->auCallback(ARSTREAM_READER2_CAUSE_AU_INCOMPLETE, reader->currentAuBuffer, reader->currentAuSize, previousTimestamp, gapsInSeqNum, &(reader->currentAuBufferSize), reader->custom);
 #else
-                    ARSAL_PRINT (ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "======== Dropping incomplete frame #%d (missing %d fragments)", reader->ackPacket.frameNumber, nackPackets);
+                    ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Dropping incomplete access unit before seqNum %d, size %d bytes (missing %d packets)", currentSeqNum, reader->currentAuSize, gapsInSeqNum);
 #endif
                 }
-                skipCurrentFrame = 0;
-                reader->currentFrameSize = 0;
-                endIndex = 0;
-                reader->ackPacket.frameNumber = header->frameNumber;
-                ARSTREAM_NetworkHeaders_AckPacketResetUpTo (&(reader->ackPacket), header->fragmentsPerFrame);
-            }
-            ARSTREAM_NetworkHeaders_AckPacketSetFlag (&(reader->ackPacket), header->fragmentNumber);
-            previousFrameFlags = header->frameFlags;
-            previousFragmentsPerFrame = header->fragmentsPerFrame;
-
-            cpSize = recvSize - sizeof (ARSTREAM_NetworkHeaders_DataHeader_t);
-            cpIndex = endIndex;
-            endIndex += cpSize;
-            while ((endIndex > reader->currentFrameBufferSize) &&
-                   (skipCurrentFrame == 0))
-            {
-                uint32_t nextFrameBufferSize = endIndex;
-                uint32_t dummy;
-                uint8_t *nextFrameBuffer = reader->callback (ARSTREAM_READER2_CAUSE_FRAME_TOO_SMALL, reader->currentFrameBuffer, reader->currentFrameSize, 0, 0, 0, 0, &nextFrameBufferSize, reader->custom);
-                if (nextFrameBufferSize >= reader->currentFrameSize && nextFrameBufferSize > 0)
-                {
-                    memcpy (nextFrameBuffer, reader->currentFrameBuffer, reader->currentFrameSize);
-                }
-                else
-                {
-                    skipCurrentFrame = 1;
-                }
-                //TODO: Add "SKIP_FRAME"
-                reader->callback (ARSTREAM_READER2_CAUSE_COPY_COMPLETE, reader->currentFrameBuffer, reader->currentFrameSize, 0, 0, 0, skipCurrentFrame, &dummy, reader->custom);
-                reader->currentFrameBuffer = nextFrameBuffer;
-                reader->currentFrameBufferSize = nextFrameBufferSize;
+                gapsInSeqNum = 0;
+                reader->currentAuSize = 0;
             }
 
-            if (skipCurrentFrame == 0)
+            payloadSize = recvSize - sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t);
+            if (reader->currentAuSize + payloadSize + startCodeLength > reader->currentAuBufferSize)
             {
-                memcpy (&(reader->currentFrameBuffer)[cpIndex], &recvData[sizeof (ARSTREAM_NetworkHeaders_DataHeader_t)], cpSize);
-                reader->currentFrameSize = endIndex;
-
-                if (ARSTREAM_NetworkHeaders_AckPacketAllFlagsSet (&(reader->ackPacket), header->fragmentsPerFrame))
+                uint32_t nextAuBufferSize = reader->currentAuSize + payloadSize + startCodeLength, dummy = 0;
+                uint8_t *nextAuBuffer = reader->auCallback(ARSTREAM_READER2_CAUSE_AU_BUFFER_TOO_SMALL, reader->currentAuBuffer, 0, 0, 0, &nextAuBufferSize, reader->custom);
+                if ((nextAuBufferSize > 0) && (nextAuBufferSize >= reader->currentAuSize + payloadSize + startCodeLength))
                 {
-                    if (header->frameNumber != previousFNum)
-                    {
-                        int nbMissedFrame = 0;
-                        int isFlushFrame = ((header->frameFlags & ARSTREAM_NETWORK_HEADERS_FLAG_FLUSH_FRAME) != 0) ? 1 : 0;
-                        ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Ack all in frame %d (isFlush : %d)", header->frameNumber, isFlushFrame);
-                        if (header->frameNumber != previousFNum + 1)
-                        {
-                            nbMissedFrame = header->frameNumber - previousFNum - 1;
-                            ARSAL_PRINT (ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "======== Missed %d frames before frame #%d", nbMissedFrame, header->frameNumber);
-                        }
-                        previousFNum = header->frameNumber;
-                        skipCurrentFrame = 1;
+                    memcpy(nextAuBuffer, reader->currentAuBuffer, reader->currentAuSize);
+                    reader->auCallback(ARSTREAM_READER2_CAUSE_AU_COPY_COMPLETE, reader->currentAuBuffer, 0, 0, 0, &dummy, reader->custom);
+                }
+                reader->currentAuBuffer = nextAuBuffer;
+                reader->currentAuBufferSize = nextAuBufferSize;
+            }
+
+            if (reader->currentAuSize + payloadSize + startCodeLength <= reader->currentAuBufferSize)
+            {
+                if (startCodeLength > 0)
+                {
+                    memcpy(reader->currentAuBuffer + reader->currentAuSize, &startCode, startCodeLength);
+                }
+                memcpy(reader->currentAuBuffer + reader->currentAuSize + startCodeLength, recvBuffer + sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t), payloadSize);
+                reader->currentAuSize += payloadSize + startCodeLength;
+
+                if (currentFlags & (1 << 7))
+                {
+                    /* the marker bit is set: output the access unit */
+                    ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Output access unit at seqNum %d, size %d bytes (missing %d packets)", currentSeqNum, reader->currentAuSize, gapsInSeqNum);
+
 #ifdef ARSTREAM_VIDEO_OUTPUT_DUMP
-                        if (reader->outputDumpFile)
-                        {
-                            fwrite(reader->currentFrameBuffer, reader->currentFrameSize, 1, reader->outputDumpFile);
-                        }
-#endif
-                        reader->currentFrameBuffer = reader->callback (ARSTREAM_READER2_CAUSE_FRAME_COMPLETE, reader->currentFrameBuffer, reader->currentFrameSize, nbMissedFrame, 0, header->fragmentsPerFrame, isFlushFrame, &(reader->currentFrameBufferSize), reader->custom);
+                    if (reader->outputDumpFile)
+                    {
+                        fwrite(reader->currentAuBuffer, reader->currentAuSize, 1, reader->outputDumpFile);
                     }
+#endif
+                    reader->currentAuBuffer = reader->auCallback(ARSTREAM_READER2_CAUSE_AU_COMPLETE, reader->currentAuBuffer, reader->currentAuSize, currentTimestamp, gapsInSeqNum, &(reader->currentAuBufferSize), reader->custom);
+                    gapsInSeqNum = 0;
+                    reader->currentAuSize = 0;
                 }
             }
+
+            previousSeqNum = currentSeqNum;
+            previousTimestamp = currentTimestamp;
         }
+
+        ARSAL_Mutex_Lock(&(reader->streamMutex));
+        shouldStop = reader->threadsShouldStop;
+        ARSAL_Mutex_Unlock(&(reader->streamMutex));
     }
 
-    free (recvData);
-
-    reader->callback (ARSTREAM_READER2_CAUSE_CANCEL, reader->currentFrameBuffer, reader->currentFrameSize, 0, 0, 0, 0, &(reader->currentFrameBufferSize), reader->custom);
+    reader->auCallback(ARSTREAM_READER2_CAUSE_CANCEL, reader->currentAuBuffer, 0, 0, 0, &(reader->currentAuBufferSize), reader->custom);
 
 #ifdef ARSTREAM_VIDEO_OUTPUT_DUMP
     if (reader->outputDumpFile)
@@ -447,20 +457,40 @@ ARSAL_PRINT (ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "==== Received frameNumber
     }
 #endif
 
-    ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Stream reader thread ended");
+    ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Stream reader thread ended");
+    ARSAL_Mutex_Lock(&(reader->streamMutex));
     reader->dataThreadStarted = 0;
+    ARSAL_Mutex_Unlock(&(reader->streamMutex));
+
+    if (recvBuffer)
+    {
+        free(recvBuffer);
+        recvBuffer = NULL;
+    }
+
     return (void *)0;
 }
 
-void* ARSTREAM_Reader2_RunAckThread (void *ARSTREAM_Reader2_t_Param)
+
+void* ARSTREAM_Reader2_RunAckThread(void *ARSTREAM_Reader2_t_Param)
 {
     ARSTREAM_Reader2_t *reader = (ARSTREAM_Reader2_t *)ARSTREAM_Reader2_t_Param;
 
+    ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Ack thread running");
+    ARSAL_Mutex_Lock(&(reader->streamMutex));
+    reader->ackThreadStarted = 1;
+    ARSAL_Mutex_Unlock(&(reader->streamMutex));
+
+    ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Ack thread ended");
+    ARSAL_Mutex_Lock(&(reader->streamMutex));
     reader->ackThreadStarted = 0;
+    ARSAL_Mutex_Unlock(&(reader->streamMutex));
+
     return (void *)0;
 }
 
-void* ARSTREAM_Reader2_GetCustom (ARSTREAM_Reader2_t *reader)
+
+void* ARSTREAM_Reader2_GetCustom(ARSTREAM_Reader2_t *reader)
 {
     void *ret = NULL;
     if (reader != NULL)
@@ -469,3 +499,4 @@ void* ARSTREAM_Reader2_GetCustom (ARSTREAM_Reader2_t *reader)
     }
     return ret;
 }
+
