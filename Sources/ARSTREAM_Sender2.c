@@ -240,30 +240,28 @@ static int ARSTREAM_Sender2_DequeueNalu(ARSTREAM_Sender2_t *sender, ARSTREAM_Sen
 
 static int ARSTREAM_Sender2_FlushNaluFifo(ARSTREAM_Sender2_t *sender)
 {
-    int i;
-    ARSTREAM_Sender2_Nalu_t* cur = NULL;
-
     if (!sender)
     {
         return -1;
     }
 
-    ARSAL_Mutex_Lock(&(sender->fifoMutex));
+    int fifoRes;
+    ARSTREAM_Sender2_Nalu_t nalu;
 
-    if (sender->fifoHead)
+    while ((fifoRes = ARSTREAM_Sender2_DequeueNalu(sender, &nalu)) == 0)
     {
-        for (cur = sender->fifoHead; cur; cur = cur->next)
+        /* last NALU in the Access Unit: call the auCallback */
+        if (nalu.isLastInAu)
         {
-            /* cancel the Access Unit */
             ARSAL_Mutex_Lock(&(sender->streamMutex));
-            if (cur->auTimestamp != sender->lastAuTimestamp)
+            if (nalu.auTimestamp != sender->lastAuTimestamp)
             {
-                sender->lastAuTimestamp = cur->auTimestamp;
+                sender->lastAuTimestamp = nalu.auTimestamp;
                 ARSAL_Mutex_Unlock(&(sender->streamMutex));
 
                 /* call the auCallback */
-                ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_SENDER2_TAG, "Time %llu: cancel frame -> auCallback", cur->auTimestamp);
-                sender->auCallback(ARSTREAM_SENDER2_STATUS_AU_CANCELLED, cur->auUserPtr, sender->custom);
+                ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Time %llu: flushing NALU FIFO -> auCallback", nalu.auTimestamp);
+                sender->auCallback(ARSTREAM_SENDER2_STATUS_AU_CANCELLED, nalu.auUserPtr, sender->custom);
             }
             else
             {
@@ -271,19 +269,6 @@ static int ARSTREAM_Sender2_FlushNaluFifo(ARSTREAM_Sender2_t *sender)
             }
         }
     }
-
-    for (i = 0; i < sender->naluFifoSize; i++)
-    {
-        cur = &sender->fifoPool[i];
-        cur->prev = NULL;
-        cur->next = NULL;
-        cur->used = 0;
-    }
-    sender->fifoCount = 0;
-    sender->fifoHead = NULL;
-    sender->fifoTail = NULL;
-
-    ARSAL_Mutex_Unlock(&(sender->fifoMutex));
 
     return 0;
 }
@@ -293,46 +278,6 @@ eARNETWORK_MANAGER_CALLBACK_RETURN ARSTREAM_Sender2_NetworkCallback(int IoBuffer
 {
     eARNETWORK_MANAGER_CALLBACK_RETURN retVal = ARNETWORK_MANAGER_CALLBACK_RETURN_DEFAULT;
 
-    if (!customData)
-    {
-        return retVal;
-    }
-
-    /* Get params */
-    ARSTREAM_Sender2_NetworkCallbackParam_t *cbParams = (ARSTREAM_Sender2_NetworkCallbackParam_t*)customData;
-
-    /* Get Sender */
-    ARSTREAM_Sender2_t *sender = cbParams->sender;
-
-    /* Remove "unused parameter" warnings */
-    (void)IoBufferId;
-    (void)dataPtr;
-
-    switch (status)
-    {
-    case ARNETWORK_MANAGER_CALLBACK_STATUS_SENT:
-        ARSAL_Mutex_Lock(&(sender->streamMutex));
-        if ((cbParams->isLastInAu) && (cbParams->auTimestamp != sender->lastAuTimestamp))
-        {
-            sender->lastAuTimestamp = cbParams->auTimestamp;
-            ARSAL_Mutex_Unlock(&(sender->streamMutex));
-            ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_SENDER2_TAG, "Time %llu: all packets were sent -> auCallback", cbParams->auTimestamp);
-            sender->auCallback(ARSTREAM_SENDER2_STATUS_AU_SENT, cbParams->auUserPtr, sender->custom);
-        }
-        else
-        {
-            ARSAL_Mutex_Unlock(&(sender->streamMutex));
-        }
-        /* Free cbParams */
-        free(cbParams);
-        break;
-    case ARNETWORK_MANAGER_CALLBACK_STATUS_CANCEL:
-        /* Free cbParams */
-        free(cbParams);
-        break;
-    default:
-        break;
-    }
     return retVal;
 }
 
@@ -667,16 +612,29 @@ void* ARSTREAM_Sender2_RunDataThread (void *ARSTREAM_Sender2_t_Param)
             header->ssrc = htonl(ARSTREAM_SENDER2_SSRC);
 
             /* send to the network layer */
-            ARSTREAM_Sender2_NetworkCallbackParam_t *cbParams = malloc(sizeof(ARSTREAM_Sender2_NetworkCallbackParam_t));
-            //TODO: avoid malloc
-            cbParams->sender = sender;
-            cbParams->auTimestamp = nalu.auTimestamp;
-            cbParams->isLastInAu = nalu.isLastInAu;
-            cbParams->auUserPtr = nalu.auUserPtr;
-            netError = ARNETWORK_Manager_SendData(sender->manager, sender->dataBufferID, sendBuffer, sendSize, (void*)cbParams, ARSTREAM_Sender2_NetworkCallback, 1); //TODO: nocopy
+            netError = ARNETWORK_Manager_SendData(sender->manager, sender->dataBufferID, sendBuffer, sendSize, NULL, ARSTREAM_Sender2_NetworkCallback, 1); //TODO: nocopy
             if (netError != ARNETWORK_OK)
             {
                 ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Error occurred during sending of the fragment ; error: %d : %s", netError, ARNETWORK_Error_ToString(netError));
+            }
+
+            /* last NALU in the Access Unit: call the auCallback */
+            if (nalu.isLastInAu)
+            {
+                ARSAL_Mutex_Lock(&(sender->streamMutex));
+                if (nalu.auTimestamp != sender->lastAuTimestamp)
+                {
+                    sender->lastAuTimestamp = nalu.auTimestamp;
+                    ARSAL_Mutex_Unlock(&(sender->streamMutex));
+
+                    /* call the auCallback */
+                    ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_SENDER2_TAG, "Time %llu: all packets were sent -> auCallback", nalu.auTimestamp);
+                    sender->auCallback(ARSTREAM_SENDER2_STATUS_AU_SENT, nalu.auUserPtr, sender->custom);
+                }
+                else
+                {
+                    ARSAL_Mutex_Unlock(&(sender->streamMutex));
+                }
             }
 
             previousTimestamp = nalu.auTimestamp;
