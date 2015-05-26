@@ -175,9 +175,10 @@ ARSTREAM_Reader2_t* ARSTREAM_Reader2_New(ARNETWORK_Manager_t *manager, int dataB
         internalError = ARSTREAM_ERROR_ALLOC;
     }
 
-    /* Copy parameters */
+    /* Initialize the reader and copy parameters */
     if (internalError == ARSTREAM_OK)
     {
+        memset(retReader, 0, sizeof(ARSTREAM_Reader2_t));
         retReader->manager = manager;
         retReader->dataBufferID = dataBufferID;
         retReader->ackBufferID = ackBufferID;
@@ -201,19 +202,6 @@ ARSTREAM_Reader2_t* ARSTREAM_Reader2_New(ARNETWORK_Manager_t *manager, int dataB
         {
             streamMutexWasInit = 1;
         }
-    }
-
-    /* Setup internal variables */
-    if (internalError == ARSTREAM_OK)
-    {
-        int i;
-        retReader->currentAuSize = 0;
-        retReader->threadsShouldStop = 0;
-        retReader->dataThreadStarted = 0;
-        retReader->ackThreadStarted = 0;
-#ifdef ARSTREAM_VIDEO_OUTPUT_DUMP
-        retReader->outputDumpFile = NULL;
-#endif
     }
 
     if ((internalError != ARSTREAM_OK) &&

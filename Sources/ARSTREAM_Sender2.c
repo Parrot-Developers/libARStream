@@ -319,9 +319,10 @@ ARSTREAM_Sender2_t* ARSTREAM_Sender2_New(ARNETWORK_Manager_t *manager, int dataB
         internalError = ARSTREAM_ERROR_ALLOC;
     }
 
-    /* Copy parameters */
+    /* Initialize the sender and copy parameters */
     if (internalError == ARSTREAM_OK)
     {
+        memset(retSender, 0, sizeof(ARSTREAM_Sender2_t));
         retSender->manager = manager;
         retSender->dataBufferID = dataBufferID;
         retSender->ackBufferID = ackBufferID;
@@ -382,15 +383,6 @@ ARSTREAM_Sender2_t* ARSTREAM_Sender2_New(ARNETWORK_Manager_t *manager, int dataB
         {
             fifoCondWasInit = 1;
         }
-    }
-
-    /* Setup internal variables */
-    if (internalError == ARSTREAM_OK)
-    {
-        retSender->threadsShouldStop = 0;
-        retSender->dataThreadStarted = 0;
-        retSender->ackThreadStarted = 0;
-        retSender->fifoCount = 0;
     }
 
     if ((internalError != ARSTREAM_OK) &&
