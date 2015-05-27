@@ -109,6 +109,7 @@ uint8_t* ARSTREAM_Reader_Reader2AuCallback(eARSTREAM_READER2_CAUSE cause2, uint8
 {
     ARSTREAM_Reader_t *reader = (ARSTREAM_Reader_t *)custom;
     eARSTREAM_READER_CAUSE cause;
+    int iFrame = 0;
 
     switch (cause2)
     {
@@ -128,7 +129,13 @@ uint8_t* ARSTREAM_Reader_Reader2AuCallback(eARSTREAM_READER2_CAUSE cause2, uint8
             break;
     }
 
-    return reader->callback (cause, auBuffer, auSize, 0, numberOfMissingPackets, 0, 0, newAuBufferSize, reader->custom);
+    /* Hack to declare an I-Frame if the AU starts with an SPS NALU */
+    if (cause == ARSTREAM_READER_CAUSE_FRAME_COMPLETE)
+    {
+        iFrame = (*(auBuffer+4) == 0x27) ? 1 : 0;
+    }
+
+    return reader->callback (cause, auBuffer, auSize, 0, iFrame, newAuBufferSize, reader->custom);
 }
 
 void ARSTREAM_Reader_InitStreamDataBuffer (ARNETWORK_IOBufferParam_t *bufferParams, int bufferID, int maxFragmentSize, uint32_t maxNumberOfFragment)
