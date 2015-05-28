@@ -105,7 +105,7 @@ struct ARSTREAM_Reader_t {
  * Implementation
  */
 
-uint8_t* ARSTREAM_Reader_Reader2AuCallback(eARSTREAM_READER2_CAUSE cause2, uint8_t *auBuffer, int auSize, uint64_t auTimestamp, int numberOfMissingPackets, int *newAuBufferSize, void *custom)
+uint8_t* ARSTREAM_Reader_Reader2AuCallback(eARSTREAM_READER2_CAUSE cause2, uint8_t *auBuffer, int auSize, uint64_t auTimestamp, int missingPackets, int totalPackets, int *newAuBufferSize, void *custom)
 {
     ARSTREAM_Reader_t *reader = (ARSTREAM_Reader_t *)custom;
     eARSTREAM_READER_CAUSE cause;
