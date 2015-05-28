@@ -89,7 +89,7 @@ typedef enum {
  * @warning If the cause is ARSTREAM_READER2_CAUSE_FRAME_TOO_SMALL, returning a buffer shorter than 'frameSize' will cause the library to skip the current frame
  * @warning In any case, returning a NULL buffer is not supported.
  */
-typedef uint8_t* (*ARSTREAM_Reader2_AuCallback_t) (eARSTREAM_READER2_CAUSE cause, uint8_t *auBuffer, int auSize, uint64_t auTimestamp, int numberOfMissingPackets, int *newAuBufferSize, void *custom);
+typedef uint8_t* (*ARSTREAM_Reader2_AuCallback_t) (eARSTREAM_READER2_CAUSE cause, uint8_t *auBuffer, int auSize, uint64_t auTimestamp, int missingPackets, int totalPackets, int *newAuBufferSize, void *custom);
 
 /**
  * @brief An ARSTREAM_Reader2_t instance allow reading streamed frames from a network
