@@ -73,6 +73,11 @@
 #define ARSTREAM_H264_STARTCODE 0x00000001
 #define ARSTREAM_H264_STARTCODE_LENGTH 4
 
+//#define ARSTREAM_READER2_DEBUG
+#ifdef ARSTREAM_READER2_DEBUG
+    #include "ARSTREAM_Reader2Debug.h"
+#endif
+
 
 /**
  * Sets *PTR to VAL if PTR is not null
@@ -111,6 +116,11 @@ struct ARSTREAM_Reader2_t {
     int threadsShouldStop;
     int dataThreadStarted;
     int ackThreadStarted;
+
+#ifdef ARSTREAM_READER2_DEBUG
+    /* Debug */
+    ARSTREAM_Reader2Debug_t* rdbg;
+#endif
 };
 
 
@@ -179,6 +189,18 @@ ARSTREAM_Reader2_t* ARSTREAM_Reader2_New(ARNETWORK_Manager_t *manager, int dataB
         }
     }
 
+#ifdef ARSTREAM_READER2_DEBUG
+    /* Setup debug */
+    if (internalError == ARSTREAM_OK)
+    {
+        retReader->rdbg = ARSTREAM_Reader2Debug_New(1, 1);
+        if (!retReader->rdbg)
+        {
+            internalError = ARSTREAM_ERROR_ALLOC;
+        }
+    }
+#endif
+
     if ((internalError != ARSTREAM_OK) &&
         (retReader != NULL))
     {
@@ -223,6 +245,9 @@ eARSTREAM_ERROR ARSTREAM_Reader2_Delete(ARSTREAM_Reader2_t **reader)
 
         if (canDelete == 1)
         {
+#ifdef ARSTREAM_READER2_DEBUG
+            ARSTREAM_Reader2Debug_Delete(&(*reader)->rdbg);
+#endif
             ARSAL_Mutex_Destroy(&((*reader)->streamMutex));
             free(*reader);
             *reader = NULL;
@@ -317,6 +342,9 @@ void* ARSTREAM_Reader2_RunDataThread(void *ARSTREAM_Reader2_t_Param)
                         ARSAL_Time_GetLocalTime(&res, NULL);
                         receptionTs = (uint64_t)res.tv_sec * 1000000 + (uint64_t)res.tv_nsec / 1000;
                         ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Output incomplete access unit before seqNum %d, size %d bytes (missing %d packets)", currentSeqNum, reader->currentAuSize, gapsInSeqNum);
+#ifdef ARSTREAM_READER2_DEBUG
+                        ARSTREAM_Reader2Debug_ProcessAu(reader->rdbg, reader->currentAuBuffer, reader->currentAuSize, previousTimestamp, receptionTs, gapsInSeqNum, previousSeqNum - startSeqNum + 1);
+#endif
                         reader->currentAuBuffer = reader->auCallback(ARSTREAM_READER2_CAUSE_AU_INCOMPLETE, reader->currentAuBuffer, reader->currentAuSize, previousTimestamp, gapsInSeqNum, previousSeqNum - startSeqNum + 1, &(reader->currentAuBufferSize), reader->custom);
                     }
                     else
@@ -358,6 +386,9 @@ void* ARSTREAM_Reader2_RunDataThread(void *ARSTREAM_Reader2_t_Param)
                     ARSAL_Time_GetLocalTime(&res, NULL);
                     receptionTs = (uint64_t)res.tv_sec * 1000000 + (uint64_t)res.tv_nsec / 1000;
                     ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Output access unit at seqNum %d, size %d bytes (missing %d packets)", currentSeqNum, reader->currentAuSize, gapsInSeqNum);
+#ifdef ARSTREAM_READER2_DEBUG
+                    ARSTREAM_Reader2Debug_ProcessAu(reader->rdbg, reader->currentAuBuffer, reader->currentAuSize, currentTimestamp, receptionTs, gapsInSeqNum, currentSeqNum - startSeqNum + 1);
+#endif
                     reader->currentAuBuffer = reader->auCallback(ARSTREAM_READER2_CAUSE_AU_COMPLETE, reader->currentAuBuffer, reader->currentAuSize, currentTimestamp, gapsInSeqNum, currentSeqNum - startSeqNum + 1, &(reader->currentAuBufferSize), reader->custom);
                     gapsInSeqNum = 0;
                     reader->currentAuSize = 0;
