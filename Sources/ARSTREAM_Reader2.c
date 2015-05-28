@@ -73,8 +73,6 @@
 #define ARSTREAM_H264_STARTCODE 0x00000001
 #define ARSTREAM_H264_STARTCODE_LENGTH 4
 
-#define ARSTREAM_VIDEO_OUTPUT_INCOMPLETE_FRAMES
-
 //#define ARSTREAM_VIDEO_OUTPUT_DUMP
 #ifdef ARSTREAM_VIDEO_OUTPUT_DUMP
     const char* ARSTREAM_VIDEO_OUTPUT_DUMP_PATH_NAP_USB = "/tmp/mnt/STREAMDUMP";
@@ -105,7 +103,8 @@ struct ARSTREAM_Reader2_t {
     int dataBufferID;
     int ackBufferID;
     int maxPacketSize;
-    int insertStartCode;
+    int insertStartCodes;
+    int outputIncompleteAu;
     ARSTREAM_Reader2_AuCallback_t auCallback;
     void *custom;
 
@@ -126,20 +125,6 @@ struct ARSTREAM_Reader2_t {
 };
 
 
-//TODO: Network, NULL callback should be ok ?
-eARNETWORK_MANAGER_CALLBACK_RETURN ARSTREAM_Reader2_NetworkCallback(int IoBufferId, uint8_t *dataPtr, void *customData, eARNETWORK_MANAGER_CALLBACK_STATUS status)
-{
-    /* Avoid "unused parameters" warnings */
-    (void)IoBufferId;
-    (void)dataPtr;
-    (void)customData;
-    (void)status;
-
-    /* Dummy return value */
-    return ARNETWORK_MANAGER_CALLBACK_RETURN_DEFAULT;
-}
-
-
 void ARSTREAM_Reader2_InitStreamDataBuffer(ARNETWORK_IOBufferParam_t *bufferParams, int bufferID, int maxPacketSize)
 {
     ARSTREAM_Buffers_InitStreamDataBuffer(bufferParams, bufferID, maxPacketSize, ARSTREAM_BUFFERS_DATA_BUFFER_NUMBER_OF_CELLS);
@@ -152,7 +137,7 @@ void ARSTREAM_Reader2_InitStreamAckBuffer(ARNETWORK_IOBufferParam_t *bufferParam
 }
 
 
-ARSTREAM_Reader2_t* ARSTREAM_Reader2_New(ARNETWORK_Manager_t *manager, int dataBufferID, int ackBufferID, ARSTREAM_Reader2_AuCallback_t auCallback, uint8_t *auBuffer, int auBufferSize, int maxPacketSize, int insertStartCode, void *custom, eARSTREAM_ERROR *error)
+ARSTREAM_Reader2_t* ARSTREAM_Reader2_New(ARNETWORK_Manager_t *manager, int dataBufferID, int ackBufferID, ARSTREAM_Reader2_AuCallback_t auCallback, uint8_t *auBuffer, int auBufferSize, int maxPacketSize, int insertStartCodes, int outputIncompleteAu, void *custom, eARSTREAM_ERROR *error)
 {
     ARSTREAM_Reader2_t *retReader = NULL;
     int streamMutexWasInit = 0;
@@ -183,7 +168,8 @@ ARSTREAM_Reader2_t* ARSTREAM_Reader2_New(ARNETWORK_Manager_t *manager, int dataB
         retReader->dataBufferID = dataBufferID;
         retReader->ackBufferID = ackBufferID;
         retReader->maxPacketSize = maxPacketSize;
-        retReader->insertStartCode = insertStartCode;
+        retReader->insertStartCodes = insertStartCodes;
+        retReader->outputIncompleteAu = outputIncompleteAu;
         retReader->auCallback = auCallback;
         retReader->custom = custom;
         retReader->currentAuBufferSize = auBufferSize;
@@ -286,7 +272,7 @@ void* ARSTREAM_Reader2_RunDataThread(void *ARSTREAM_Reader2_t_Param)
     }
 
     recvBufferSize = reader->maxPacketSize;
-    if (reader->insertStartCode)
+    if (reader->insertStartCodes)
     {
         startCode = htonl(ARSTREAM_H264_STARTCODE);
         startCodeLength = ARSTREAM_H264_STARTCODE_LENGTH;
@@ -369,18 +355,21 @@ void* ARSTREAM_Reader2_RunDataThread(void *ARSTREAM_Reader2_t_Param)
             {
                 if (gapsInSeqNum)
                 {
-#ifdef ARSTREAM_VIDEO_OUTPUT_INCOMPLETE_FRAMES
-                    ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Output incomplete access unit before seqNum %d, size %d bytes (missing %d packets)", currentSeqNum, reader->currentAuSize, gapsInSeqNum);
-#ifdef ARSTREAM_VIDEO_OUTPUT_DUMP
-                    if (reader->outputDumpFile)
+                    if (reader->outputIncompleteAu)
                     {
-                        fwrite(reader->currentAuBuffer, reader->currentAuSize, 1, reader->outputDumpFile);
+                        ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Output incomplete access unit before seqNum %d, size %d bytes (missing %d packets)", currentSeqNum, reader->currentAuSize, gapsInSeqNum);
+#ifdef ARSTREAM_VIDEO_OUTPUT_DUMP
+                        if (reader->outputDumpFile)
+                        {
+                            fwrite(reader->currentAuBuffer, reader->currentAuSize, 1, reader->outputDumpFile);
+                        }
+#endif
+                        reader->currentAuBuffer = reader->auCallback(ARSTREAM_READER2_CAUSE_AU_INCOMPLETE, reader->currentAuBuffer, reader->currentAuSize, previousTimestamp, gapsInSeqNum, &(reader->currentAuBufferSize), reader->custom);
                     }
-#endif
-                    reader->currentAuBuffer = reader->auCallback(ARSTREAM_READER2_CAUSE_AU_INCOMPLETE, reader->currentAuBuffer, reader->currentAuSize, previousTimestamp, gapsInSeqNum, &(reader->currentAuBufferSize), reader->custom);
-#else
-                    ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Dropping incomplete access unit before seqNum %d, size %d bytes (missing %d packets)", currentSeqNum, reader->currentAuSize, gapsInSeqNum);
-#endif
+                    else
+                    {
+                        ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Dropping incomplete access unit before seqNum %d, size %d bytes (missing %d packets)", currentSeqNum, reader->currentAuSize, gapsInSeqNum);
+                    }
                 }
                 gapsInSeqNum = 0;
                 reader->currentAuSize = 0;

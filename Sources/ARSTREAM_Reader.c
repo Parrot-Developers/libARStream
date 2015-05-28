@@ -187,7 +187,7 @@ ARSTREAM_Reader_t* ARSTREAM_Reader_New (ARNETWORK_Manager_t *manager, int dataBu
     if (internalError == ARSTREAM_OK)
     {
         eARSTREAM_ERROR error2;
-        retReader->reader2 = ARSTREAM_Reader2_New (manager, dataBufferID, ackBufferID, ARSTREAM_Reader_Reader2AuCallback, frameBuffer, frameBufferSize, maxFragmentSize, 1, (void*)retReader, &error2);
+        retReader->reader2 = ARSTREAM_Reader2_New (manager, dataBufferID, ackBufferID, ARSTREAM_Reader_Reader2AuCallback, frameBuffer, frameBufferSize, maxFragmentSize, 1, 1, (void*)retReader, &error2);
         if (error2 != ARSTREAM_OK)
         {
             internalError = error2;

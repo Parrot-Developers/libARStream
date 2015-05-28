@@ -135,7 +135,7 @@ void ARSTREAM_Reader2_InitStreamAckBuffer (ARNETWORK_IOBufferParam_t *bufferPara
  * @see ARSTREAM_Reader2_StopReader()
  * @see ARSTREAM_Reader2_Delete()
  */
-ARSTREAM_Reader2_t* ARSTREAM_Reader2_New (ARNETWORK_Manager_t *manager, int dataBufferID, int ackBufferID, ARSTREAM_Reader2_AuCallback_t auCallback, uint8_t *auBuffer, int auBufferSize, int maxPacketSize, int insertStartCode, void *custom, eARSTREAM_ERROR *error);
+ARSTREAM_Reader2_t* ARSTREAM_Reader2_New (ARNETWORK_Manager_t *manager, int dataBufferID, int ackBufferID, ARSTREAM_Reader2_AuCallback_t auCallback, uint8_t *auBuffer, int auBufferSize, int maxPacketSize, int insertStartCodes, int outputIncompleteAu, void *custom, eARSTREAM_ERROR *error);
 
 /**
  * @brief Stops a running ARSTREAM_Reader2_t
@@ -184,4 +184,4 @@ void* ARSTREAM_Reader2_RunAckThread (void *ARSTREAM_Reader2_t_Param);
  */
 void* ARSTREAM_Reader2_GetCustom (ARSTREAM_Reader2_t *reader);
 
-#endif /* _ARSTREAM_READER_H_ */
+#endif /* _ARSTREAM_READER2_H_ */
