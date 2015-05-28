@@ -73,13 +73,6 @@
 #define ARSTREAM_H264_STARTCODE 0x00000001
 #define ARSTREAM_H264_STARTCODE_LENGTH 4
 
-//#define ARSTREAM_VIDEO_OUTPUT_DUMP
-#ifdef ARSTREAM_VIDEO_OUTPUT_DUMP
-    const char* ARSTREAM_VIDEO_OUTPUT_DUMP_PATH_NAP_USB = "/tmp/mnt/STREAMDUMP";
-    const char* ARSTREAM_VIDEO_OUTPUT_DUMP_PATH_NAP_INTERNAL = "/data/skycontroller/streams";
-    const char* ARSTREAM_VIDEO_OUTPUT_DUMP_PATH_ANDROID_INTERNAL = "/storage/emulated/legacy/FF";
-#endif
-
 
 /**
  * Sets *PTR to VAL if PTR is not null
@@ -118,10 +111,6 @@ struct ARSTREAM_Reader2_t {
     int threadsShouldStop;
     int dataThreadStarted;
     int ackThreadStarted;
-
-#ifdef ARSTREAM_VIDEO_OUTPUT_DUMP
-    FILE* outputDumpFile;
-#endif
 };
 
 
@@ -287,43 +276,6 @@ void* ARSTREAM_Reader2_RunDataThread(void *ARSTREAM_Reader2_t_Param)
     }
     header = (ARSTREAM_NetworkHeaders_DataHeader2_t *)recvBuffer;
 
-#ifdef ARSTREAM_VIDEO_OUTPUT_DUMP
-    int i;
-    char szFilename[128];
-    const char* pszFilePath = NULL;
-    szFilename[0] = '\0';
-
-    if ((access(ARSTREAM_VIDEO_OUTPUT_DUMP_PATH_NAP_USB, F_OK) == 0) && (access(ARSTREAM_VIDEO_OUTPUT_DUMP_PATH_NAP_USB, W_OK) == 0))
-    {
-        pszFilePath = ARSTREAM_VIDEO_OUTPUT_DUMP_PATH_NAP_USB;
-    }
-    else if ((access(ARSTREAM_VIDEO_OUTPUT_DUMP_PATH_NAP_INTERNAL, F_OK) == 0) && (access(ARSTREAM_VIDEO_OUTPUT_DUMP_PATH_NAP_INTERNAL, W_OK) == 0))
-    {
-        pszFilePath = ARSTREAM_VIDEO_OUTPUT_DUMP_PATH_NAP_INTERNAL;
-    }
-    else if ((access(ARSTREAM_VIDEO_OUTPUT_DUMP_PATH_ANDROID_INTERNAL, F_OK) == 0) && (access(ARSTREAM_VIDEO_OUTPUT_DUMP_PATH_ANDROID_INTERNAL, W_OK) == 0))
-    {
-        pszFilePath = ARSTREAM_VIDEO_OUTPUT_DUMP_PATH_ANDROID_INTERNAL;
-    }
-    if (pszFilePath)
-    {
-        for (i = 0; i < 100; i++)
-        {
-            snprintf(szFilename, 128, "%s/stream_%02d.264", pszFilePath, i);
-            if (access(szFilename, F_OK) == -1)
-            {
-                // file does not exist
-                break;
-            }
-            szFilename[0] = '\0';
-        }
-        if (strlen(szFilename))
-        {
-            reader->outputDumpFile = fopen(szFilename, "wb");
-        }
-    }
-#endif
-
     ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Stream reader thread running");
     ARSAL_Mutex_Lock(&(reader->streamMutex));
     reader->dataThreadStarted = 1;
@@ -358,12 +310,6 @@ void* ARSTREAM_Reader2_RunDataThread(void *ARSTREAM_Reader2_t_Param)
                     if (reader->outputIncompleteAu)
                     {
                         ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Output incomplete access unit before seqNum %d, size %d bytes (missing %d packets)", currentSeqNum, reader->currentAuSize, gapsInSeqNum);
-#ifdef ARSTREAM_VIDEO_OUTPUT_DUMP
-                        if (reader->outputDumpFile)
-                        {
-                            fwrite(reader->currentAuBuffer, reader->currentAuSize, 1, reader->outputDumpFile);
-                        }
-#endif
                         reader->currentAuBuffer = reader->auCallback(ARSTREAM_READER2_CAUSE_AU_INCOMPLETE, reader->currentAuBuffer, reader->currentAuSize, previousTimestamp, gapsInSeqNum, &(reader->currentAuBufferSize), reader->custom);
                     }
                     else
@@ -402,13 +348,6 @@ void* ARSTREAM_Reader2_RunDataThread(void *ARSTREAM_Reader2_t_Param)
                 {
                     /* the marker bit is set: output the access unit */
                     ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Output access unit at seqNum %d, size %d bytes (missing %d packets)", currentSeqNum, reader->currentAuSize, gapsInSeqNum);
-
-#ifdef ARSTREAM_VIDEO_OUTPUT_DUMP
-                    if (reader->outputDumpFile)
-                    {
-                        fwrite(reader->currentAuBuffer, reader->currentAuSize, 1, reader->outputDumpFile);
-                    }
-#endif
                     reader->currentAuBuffer = reader->auCallback(ARSTREAM_READER2_CAUSE_AU_COMPLETE, reader->currentAuBuffer, reader->currentAuSize, currentTimestamp, gapsInSeqNum, &(reader->currentAuBufferSize), reader->custom);
                     gapsInSeqNum = 0;
                     reader->currentAuSize = 0;
@@ -425,14 +364,6 @@ void* ARSTREAM_Reader2_RunDataThread(void *ARSTREAM_Reader2_t_Param)
     }
 
     reader->auCallback(ARSTREAM_READER2_CAUSE_CANCEL, reader->currentAuBuffer, 0, 0, 0, &(reader->currentAuBufferSize), reader->custom);
-
-#ifdef ARSTREAM_VIDEO_OUTPUT_DUMP
-    if (reader->outputDumpFile)
-    {
-        fclose(reader->outputDumpFile);
-        reader->outputDumpFile = NULL;
-    }
-#endif
 
     ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Stream reader thread ended");
     ARSAL_Mutex_Lock(&(reader->streamMutex));
