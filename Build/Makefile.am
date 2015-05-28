@@ -20,8 +20,14 @@ SOURCE_FILES                                                =   $(HEADER_FILES) 
                                                                 ../Sources/ARSTREAM_Sender2.c            \
                                                                 ../Sources/ARSTREAM_Reader.c             \
                                                                 ../Sources/ARSTREAM_Reader2.c            \
+                                                                ../Sources/ARSTREAM_Reader2Debug.c       \
+                                                                ../Sources/ARSTREAM_Reader2Debug.h       \
                                                                 ../Sources/ARSTREAM_NetworkHeaders.c     \
-                                                                ../Sources/ARSTREAM_Buffers.c
+                                                                ../Sources/ARSTREAM_Buffers.c            \
+                                                                ../Sources/h264p.c                       \
+                                                                ../Sources/h264p.h                       \
+                                                                ../Sources/h264p_parrot.c                \
+                                                                ../Sources/h264p_parrot.h
 
 
 # The library names to build (note we are building static and shared libs)
