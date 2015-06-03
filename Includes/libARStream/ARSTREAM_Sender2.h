@@ -128,7 +128,7 @@ void ARSTREAM_Sender2_InitStreamAckBuffer (ARNETWORK_IOBufferParam_t *bufferPara
  * @see ARSTREAM_Sender2_StopSender()
  * @see ARSTREAM_Sender2_Delete()
  */
-ARSTREAM_Sender2_t* ARSTREAM_Sender2_New (ARNETWORK_Manager_t *manager, int dataBufferID, int ackBufferID, ARSTREAM_Sender2_AuCallback_t auCallback, int naluFifoSize, int maxPacketSize, void *custom, eARSTREAM_ERROR *error);
+ARSTREAM_Sender2_t* ARSTREAM_Sender2_New (ARNETWORK_Manager_t *manager, int dataBufferID, int ackBufferID, ARSTREAM_Sender2_AuCallback_t auCallback, int naluFifoSize, int maxPacketSize, int targetPacketSize, int maxBitrate, int maxLatencyMs, void *custom, eARSTREAM_ERROR *error);
 
 /**
  * @brief Stops a running ARSTREAM_Sender2_t

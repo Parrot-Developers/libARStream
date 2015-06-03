@@ -70,7 +70,7 @@
 /*
  * Implementation
  */
-void ARSTREAM_Buffers_InitStreamDataBuffer (ARNETWORK_IOBufferParam_t *bufferParams, int bufferID, int maxFragmentSize, uint32_t maxFragmentPerFrame)
+void ARSTREAM_Buffers_InitStreamDataBuffer (ARNETWORK_IOBufferParam_t *bufferParams, int bufferID, int headerSize, int maxFragmentSize, uint32_t maxFragmentPerFrame)
 {
     if (bufferParams != NULL)
     {
@@ -79,7 +79,7 @@ void ARSTREAM_Buffers_InitStreamDataBuffer (ARNETWORK_IOBufferParam_t *bufferPar
         bufferParams->dataType = ARSTREAM_BUFFERS_DATA_BUFFER_TYPE;
         bufferParams->sendingWaitTimeMs = ARSTREAM_BUFFERS_DATA_BUFFER_SEND_EVERY_MS;
         bufferParams->numberOfCell = maxFragmentPerFrame;
-        bufferParams->dataCopyMaxSize = maxFragmentSize + sizeof (ARSTREAM_NetworkHeaders_DataHeader_t);
+        bufferParams->dataCopyMaxSize = maxFragmentSize + headerSize;
         bufferParams->isOverwriting = ARSTREAM_BUFFERS_DATA_BUFFER_OVERWRITE;
     }
 }

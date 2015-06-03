@@ -74,7 +74,7 @@
 /*
  * Functions declarations
  */
-void ARSTREAM_Buffers_InitStreamDataBuffer (ARNETWORK_IOBufferParam_t *bufferParams, int bufferID, int maxFragmentSize, uint32_t maxFragmentPerFrame);
+void ARSTREAM_Buffers_InitStreamDataBuffer (ARNETWORK_IOBufferParam_t *bufferParams, int bufferID, int headerSize, int maxFragmentSize, uint32_t maxFragmentPerFrame);
 
 void ARSTREAM_Buffers_InitStreamAckBuffer (ARNETWORK_IOBufferParam_t *bufferParams, int bufferID);
 

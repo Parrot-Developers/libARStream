@@ -126,7 +126,7 @@ struct ARSTREAM_Reader2_t {
 
 void ARSTREAM_Reader2_InitStreamDataBuffer(ARNETWORK_IOBufferParam_t *bufferParams, int bufferID, int maxPacketSize)
 {
-    ARSTREAM_Buffers_InitStreamDataBuffer(bufferParams, bufferID, maxPacketSize, ARSTREAM_BUFFERS_DATA_BUFFER_NUMBER_OF_CELLS);
+    ARSTREAM_Buffers_InitStreamDataBuffer(bufferParams, bufferID, sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t), maxPacketSize, ARSTREAM_BUFFERS_DATA_BUFFER_NUMBER_OF_CELLS);
 }
 
 
@@ -146,7 +146,7 @@ ARSTREAM_Reader2_t* ARSTREAM_Reader2_New(ARNETWORK_Manager_t *manager, int dataB
         (auCallback == NULL) ||
         (auBuffer == NULL) ||
         (auBufferSize == 0) ||
-        (maxPacketSize == 0))
+        (maxPacketSize < 100))
     {
         SET_WITH_CHECK(error, ARSTREAM_ERROR_BAD_PARAMETERS);
         return retReader;
@@ -166,7 +166,7 @@ ARSTREAM_Reader2_t* ARSTREAM_Reader2_New(ARNETWORK_Manager_t *manager, int dataB
         retReader->manager = manager;
         retReader->dataBufferID = dataBufferID;
         retReader->ackBufferID = ackBufferID;
-        retReader->maxPacketSize = maxPacketSize;
+        retReader->maxPacketSize = maxPacketSize - sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t);           //TODO: include all headers size
         retReader->insertStartCodes = insertStartCodes;
         retReader->outputIncompleteAu = outputIncompleteAu;
         retReader->auCallback = auCallback;
@@ -263,12 +263,36 @@ eARSTREAM_ERROR ARSTREAM_Reader2_Delete(ARSTREAM_Reader2_t **reader)
 }
 
 
+static int ARSTREAM_Reader2_CheckBufferSize(ARSTREAM_Reader2_t *reader, int payloadSize)
+{
+    int ret = 0;
+
+    if (reader->currentAuSize + payloadSize > reader->currentAuBufferSize)
+    {
+        uint32_t nextAuBufferSize = reader->currentAuSize + payloadSize, dummy = 0;
+        uint8_t *nextAuBuffer = reader->auCallback(ARSTREAM_READER2_CAUSE_AU_BUFFER_TOO_SMALL, reader->currentAuBuffer, 0, 0, 0, 0, &nextAuBufferSize, reader->custom);
+        ret = -1;
+        if ((nextAuBufferSize > 0) && (nextAuBufferSize >= reader->currentAuSize + payloadSize))
+        {
+            memcpy(nextAuBuffer, reader->currentAuBuffer, reader->currentAuSize);
+            reader->auCallback(ARSTREAM_READER2_CAUSE_AU_COPY_COMPLETE, reader->currentAuBuffer, 0, 0, 0, 0, &dummy, reader->custom);
+            ret = 0;
+        }
+        reader->currentAuBuffer = nextAuBuffer;
+        reader->currentAuBufferSize = nextAuBufferSize;
+    }
+
+    return ret;
+}
+
+
 void* ARSTREAM_Reader2_RunDataThread(void *ARSTREAM_Reader2_t_Param)
 {
     ARSTREAM_Reader2_t *reader = (ARSTREAM_Reader2_t *)ARSTREAM_Reader2_t_Param;
     uint8_t *recvBuffer = NULL;
     int recvBufferSize;
     int recvSize, payloadSize;
+    int fuPending = 0;
     ARSTREAM_NetworkHeaders_DataHeader2_t *header = NULL;
     uint64_t currentTimestamp = 0, previousTimestamp = 0, receptionTs = 0;
     uint16_t currentFlags;
@@ -285,7 +309,7 @@ void* ARSTREAM_Reader2_RunDataThread(void *ARSTREAM_Reader2_t_Param)
         return (void *)0;
     }
 
-    recvBufferSize = reader->maxPacketSize;
+    recvBufferSize = reader->maxPacketSize + sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t);
     if (reader->insertStartCodes)
     {
         startCode = htonl(ARSTREAM_H264_STARTCODE);
@@ -301,7 +325,7 @@ void* ARSTREAM_Reader2_RunDataThread(void *ARSTREAM_Reader2_t_Param)
     }
     header = (ARSTREAM_NetworkHeaders_DataHeader2_t *)recvBuffer;
 
-    ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Stream reader thread running");
+    ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Stream reader thread running (recvBufferSize=%d)", recvBufferSize); //TODO: debug
     ARSAL_Mutex_Lock(&(reader->streamMutex));
     reader->dataThreadStarted = 1;
     shouldStop = reader->threadsShouldStop;
@@ -314,10 +338,10 @@ void* ARSTREAM_Reader2_RunDataThread(void *ARSTREAM_Reader2_t_Param)
         {
             if (ARNETWORK_ERROR_BUFFER_EMPTY != err)
             {
-                ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Error while reading stream data: %s", ARNETWORK_Error_ToString (err));
+                ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Error while reading stream data: %s (recvSize = %d)", ARNETWORK_Error_ToString (err), recvSize);
             }
         }
-        else
+        else if (recvSize >= sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t))
         {
             currentTimestamp = (((uint64_t)ntohl(header->timestamp) * 1000) + 45) / 90; /* 90000 Hz clock to microseconds */
             currentSeqNum = (int)ntohs(header->seqNum);
@@ -357,42 +381,123 @@ void* ARSTREAM_Reader2_RunDataThread(void *ARSTREAM_Reader2_t_Param)
             }
 
             payloadSize = recvSize - sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t);
-            if (reader->currentAuSize + payloadSize + startCodeLength > reader->currentAuBufferSize)
+
+            if (payloadSize >= 1)
             {
-                uint32_t nextAuBufferSize = reader->currentAuSize + payloadSize + startCodeLength, dummy = 0;
-                uint8_t *nextAuBuffer = reader->auCallback(ARSTREAM_READER2_CAUSE_AU_BUFFER_TOO_SMALL, reader->currentAuBuffer, 0, 0, 0, 0, &nextAuBufferSize, reader->custom);
-                if ((nextAuBufferSize > 0) && (nextAuBufferSize >= reader->currentAuSize + payloadSize + startCodeLength))
+                uint8_t headByte = *(recvBuffer + sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t));
+
+                if ((headByte & 0x1F) == ARSTREAM_NETWORK_HEADERS2_NALU_TYPE_FUA)
                 {
-                    memcpy(nextAuBuffer, reader->currentAuBuffer, reader->currentAuSize);
-                    reader->auCallback(ARSTREAM_READER2_CAUSE_AU_COPY_COMPLETE, reader->currentAuBuffer, 0, 0, 0, 0, &dummy, reader->custom);
+                    /* Fragmentation (FU-A) */
+                    if (payloadSize >= 2)
+                    {
+                        uint8_t fuIndicator, fuHeader, startBit, endBit;
+                        int outputSize = payloadSize - 2;
+                        fuIndicator = headByte;
+                        fuHeader = *(recvBuffer + sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t) + 1);
+                        startBit = fuHeader & 0x80;
+                        endBit = fuHeader & 0x40;
+
+                        if ((fuPending) && (startBit))
+                        {
+                            //TODO: drop the previous incomplete FU-A?
+                            fuPending = 0;
+                            ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Incomplete FU-A packet before FU-A at seqNum %d ((fuPending) && (startBit))", currentSeqNum); //TODO: debug
+                        }
+                        if (startBit)
+                        {
+                            fuPending = 1;
+                        }
+                        if (fuPending)
+                        {
+                            outputSize += (startBit) ? startCodeLength + 1 : 0;
+                            if (!ARSTREAM_Reader2_CheckBufferSize(reader, outputSize))
+                            {
+                                if ((startCodeLength > 0) && (startBit))
+                                {
+                                    memcpy(reader->currentAuBuffer + reader->currentAuSize, &startCode, startCodeLength);
+                                    reader->currentAuSize += startCodeLength;
+                                }
+                                memcpy(reader->currentAuBuffer + reader->currentAuSize + ((startBit) ? 1 : 0), recvBuffer + sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t) + 2, payloadSize - 2);
+                                if (startBit)
+                                {
+                                    /* restore the NALU header byte */
+                                    *(reader->currentAuBuffer + reader->currentAuSize) = (fuIndicator & 0xE0) | (fuHeader & 0x1F);
+                                    reader->currentAuSize++;
+                                }
+                                reader->currentAuSize += payloadSize - 2;
+                            }
+                            else
+                            {
+                                ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Failed to realloc auBuffer for output size (%d) for FU-A packet at seqNum %d", outputSize, currentSeqNum); //TODO: debug
+                            }
+                        }
+                        if (endBit)
+                        {
+                            fuPending = 0;
+                        }
+                    }
+                    else
+                    {
+                        ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Invalid payload size (%d) for FU-A packet at seqNum %d", payloadSize, currentSeqNum); //TODO: debug
+                    }
                 }
-                reader->currentAuBuffer = nextAuBuffer;
-                reader->currentAuBufferSize = nextAuBufferSize;
+                else if ((headByte & 0x31) == ARSTREAM_NETWORK_HEADERS2_NALU_TYPE_STAPA)
+                {
+                    /* Aggregation (STAP-A) */
+                    if (fuPending)
+                    {
+                        //TODO: drop the previous incomplete FU-A?
+                        fuPending = 0;
+                        ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Incomplete FU-A packet before STAP-A at seqNum %d (fuPending)", currentSeqNum); //TODO: debug
+                    }
+
+                    //TODO
+                }
+                else
+                {
+                    /* Single NAL unit */
+                    if (fuPending)
+                    {
+                        //TODO: drop the previous incomplete FU-A?
+                        fuPending = 0;
+                        ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Incomplete FU-A packet before single NALU at seqNum %d (fuPending)", currentSeqNum); //TODO: debug
+                    }
+                    
+                    if (!ARSTREAM_Reader2_CheckBufferSize(reader, payloadSize + startCodeLength))
+                    {
+                        if (startCodeLength > 0)
+                        {
+                            memcpy(reader->currentAuBuffer + reader->currentAuSize, &startCode, startCodeLength);
+                            reader->currentAuSize += startCodeLength;
+                        }
+                        memcpy(reader->currentAuBuffer + reader->currentAuSize, recvBuffer + sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t), payloadSize);
+                        reader->currentAuSize += payloadSize;
+                    }
+                    else
+                    {
+                        ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Failed to realloc auBuffer for output size (%d) for single NALU packet at seqNum %d", payloadSize + startCodeLength, currentSeqNum); //TODO: debug
+                    }
+                }
+            }
+            else
+            {
+                ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Invalid payload size (%d) for packet at seqNum %d", payloadSize, currentSeqNum); //TODO: debug
             }
 
-            if (reader->currentAuSize + payloadSize + startCodeLength <= reader->currentAuBufferSize)
+            if (currentFlags & (1 << 7))
             {
-                if (startCodeLength > 0)
-                {
-                    memcpy(reader->currentAuBuffer + reader->currentAuSize, &startCode, startCodeLength);
-                }
-                memcpy(reader->currentAuBuffer + reader->currentAuSize + startCodeLength, recvBuffer + sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t), payloadSize);
-                reader->currentAuSize += payloadSize + startCodeLength;
-
-                if (currentFlags & (1 << 7))
-                {
-                    /* the marker bit is set: output the access unit */
-                    struct timespec res;
-                    ARSAL_Time_GetLocalTime(&res, NULL);
-                    receptionTs = (uint64_t)res.tv_sec * 1000000 + (uint64_t)res.tv_nsec / 1000;
-                    ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Output access unit at seqNum %d, size %d bytes (missing %d packets)", currentSeqNum, reader->currentAuSize, gapsInSeqNum);
+                /* the marker bit is set: output the access unit */
+                struct timespec res;
+                ARSAL_Time_GetLocalTime(&res, NULL);
+                receptionTs = (uint64_t)res.tv_sec * 1000000 + (uint64_t)res.tv_nsec / 1000;
+                ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Output access unit at seqNum %d, size %d bytes (missing %d packets)", currentSeqNum, reader->currentAuSize, gapsInSeqNum);
 #ifdef ARSTREAM_READER2_DEBUG
-                    ARSTREAM_Reader2Debug_ProcessAu(reader->rdbg, reader->currentAuBuffer, reader->currentAuSize, currentTimestamp, receptionTs, gapsInSeqNum, currentSeqNum - startSeqNum + 1);
+                ARSTREAM_Reader2Debug_ProcessAu(reader->rdbg, reader->currentAuBuffer, reader->currentAuSize, currentTimestamp, receptionTs, gapsInSeqNum, currentSeqNum - startSeqNum + 1);
 #endif
-                    reader->currentAuBuffer = reader->auCallback(ARSTREAM_READER2_CAUSE_AU_COMPLETE, reader->currentAuBuffer, reader->currentAuSize, currentTimestamp, gapsInSeqNum, currentSeqNum - startSeqNum + 1, &(reader->currentAuBufferSize), reader->custom);
-                    gapsInSeqNum = 0;
-                    reader->currentAuSize = 0;
-                }
+                reader->currentAuBuffer = reader->auCallback(ARSTREAM_READER2_CAUSE_AU_COMPLETE, reader->currentAuBuffer, reader->currentAuSize, currentTimestamp, gapsInSeqNum, currentSeqNum - startSeqNum + 1, &(reader->currentAuBufferSize), reader->custom);
+                gapsInSeqNum = 0;
+                reader->currentAuSize = 0;
             }
 
             previousSeqNum = currentSeqNum;
