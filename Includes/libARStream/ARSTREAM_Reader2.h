@@ -65,6 +65,11 @@ typedef enum {
     ARSTREAM_READER2_CAUSE_MAX,
 } eARSTREAM_READER2_CAUSE;
 
+typedef enum {
+    ARSTREAM_READER2_NETWORK_MODE_ARNETWORK = 0,
+    ARSTREAM_READER2_NETWORK_MODE_SOCKET,
+} ARSTREAM_Reader2_NetworkMode_t;
+
 /**
  * @brief Callback called when a new frame is ready in a buffer
  *
@@ -90,6 +95,20 @@ typedef enum {
  * @warning In any case, returning a NULL buffer is not supported.
  */
 typedef uint8_t* (*ARSTREAM_Reader2_AuCallback_t) (eARSTREAM_READER2_CAUSE cause, uint8_t *auBuffer, int auSize, uint64_t auTimestamp, int missingPackets, int totalPackets, int *newAuBufferSize, void *custom);
+
+typedef struct ARSTREAM_Reader2_Config_t {
+    ARSTREAM_Reader2_NetworkMode_t networkMode;
+    ARNETWORK_Manager_t *manager;
+    int dataBufferID;
+    int ackBufferID;
+    const char *recvAddr;
+    int recvPort;
+    int recvTimeoutSec;
+    ARSTREAM_Reader2_AuCallback_t auCallback;
+    int maxPacketSize;
+    int insertStartCodes;
+    int outputIncompleteAu;
+} ARSTREAM_Reader2_Config_t;
 
 /**
  * @brief An ARSTREAM_Reader2_t instance allow reading streamed frames from a network
@@ -135,7 +154,7 @@ void ARSTREAM_Reader2_InitStreamAckBuffer (ARNETWORK_IOBufferParam_t *bufferPara
  * @see ARSTREAM_Reader2_StopReader()
  * @see ARSTREAM_Reader2_Delete()
  */
-ARSTREAM_Reader2_t* ARSTREAM_Reader2_New (ARNETWORK_Manager_t *manager, int dataBufferID, int ackBufferID, ARSTREAM_Reader2_AuCallback_t auCallback, uint8_t *auBuffer, int auBufferSize, int maxPacketSize, int insertStartCodes, int outputIncompleteAu, void *custom, eARSTREAM_ERROR *error);
+ARSTREAM_Reader2_t* ARSTREAM_Reader2_New (ARSTREAM_Reader2_Config_t *config, uint8_t *auBuffer, int auBufferSize, void *custom, eARSTREAM_ERROR *error);
 
 /**
  * @brief Stops a running ARSTREAM_Reader2_t

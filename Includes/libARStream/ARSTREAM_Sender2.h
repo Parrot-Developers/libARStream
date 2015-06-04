@@ -66,6 +66,11 @@ typedef enum {
     ARSTREAM_SENDER2_STATUS_MAX,
 } eARSTREAM_SENDER2_STATUS;
 
+typedef enum {
+    ARSTREAM_SENDER2_NETWORK_MODE_ARNETWORK = 0,
+    ARSTREAM_SENDER2_NETWORK_MODE_SOCKET,
+} ARSTREAM_Sender2_NetworkMode_t;
+
 /**
  * @brief Callback type for sender informations
  * This callback is called when a frame pointer is no longer needed by the library.
@@ -78,6 +83,21 @@ typedef enum {
  * @see eARSTREAM_SENDER2_STATUS
  */
 typedef void (*ARSTREAM_Sender2_AuCallback_t)(eARSTREAM_SENDER2_STATUS status, void *auUserPtr, void *custom);
+
+typedef struct ARSTREAM_Sender2_Config_t {
+    ARSTREAM_Sender2_NetworkMode_t networkMode;
+    ARNETWORK_Manager_t *manager;
+    int dataBufferID;
+    int ackBufferID;
+    const char *sendAddr;
+    int sendPort;
+    ARSTREAM_Sender2_AuCallback_t auCallback;
+    int naluFifoSize;
+    int maxPacketSize;
+    int targetPacketSize;
+    int maxBitrate;
+    int maxLatencyMs;
+} ARSTREAM_Sender2_Config_t;
 
 /**
  * @brief An ARSTREAM_Sender2_t instance allow streaming frames over a network
@@ -128,7 +148,7 @@ void ARSTREAM_Sender2_InitStreamAckBuffer (ARNETWORK_IOBufferParam_t *bufferPara
  * @see ARSTREAM_Sender2_StopSender()
  * @see ARSTREAM_Sender2_Delete()
  */
-ARSTREAM_Sender2_t* ARSTREAM_Sender2_New (ARNETWORK_Manager_t *manager, int dataBufferID, int ackBufferID, ARSTREAM_Sender2_AuCallback_t auCallback, int naluFifoSize, int maxPacketSize, int targetPacketSize, int maxBitrate, int maxLatencyMs, void *custom, eARSTREAM_ERROR *error);
+ARSTREAM_Sender2_t* ARSTREAM_Sender2_New (ARSTREAM_Sender2_Config_t *config, void *custom, eARSTREAM_ERROR *error);
 
 /**
  * @brief Stops a running ARSTREAM_Sender2_t
