@@ -449,7 +449,6 @@ eARSTREAM_ERROR ARSTREAM_Sender2_Delete(ARSTREAM_Sender2_t **sender)
 
         if (canDelete == 1)
         {
-            ARSTREAM_Sender2_FlushNaluFifo(*sender);
             ARSAL_Mutex_Destroy(&((*sender)->streamMutex));
             free((*sender)->fifoPool);
             ARSAL_Mutex_Destroy(&((*sender)->fifoMutex));
@@ -479,6 +478,13 @@ eARSTREAM_ERROR ARSTREAM_Sender2_SendNewNalu(ARSTREAM_Sender2_t *sender, uint8_t
     {
         retVal = ARSTREAM_ERROR_BAD_PARAMETERS;
     }
+
+    ARSAL_Mutex_Lock(&(sender->streamMutex));
+    if (!sender->dataThreadStarted)
+    {
+        retVal = ARSTREAM_ERROR_BAD_PARAMETERS;
+    }
+    ARSAL_Mutex_Unlock(&(sender->streamMutex));
 
     if (retVal == ARSTREAM_OK)
     {
@@ -717,6 +723,10 @@ void* ARSTREAM_Sender2_RunDataThread (void *ARSTREAM_Sender2_t_Param)
         }
     }
 
+    ARSAL_Mutex_Lock(&(sender->streamMutex));
+    sender->dataThreadStarted = 0;
+    ARSAL_Mutex_Unlock(&(sender->streamMutex));
+
     /* cancel the last Access Unit */
     ARSAL_Mutex_Lock(&(sender->streamMutex));
     if (previousTimestamp != sender->lastAuTimestamp)
@@ -733,10 +743,10 @@ void* ARSTREAM_Sender2_RunDataThread (void *ARSTREAM_Sender2_t_Param)
         ARSAL_Mutex_Unlock(&(sender->streamMutex));
     }
 
+    /* flush the NALU FIFO */
+    ARSTREAM_Sender2_FlushNaluFifo(sender);
+
     ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_SENDER2_TAG, "Sender thread ended");
-    ARSAL_Mutex_Lock(&(sender->streamMutex));
-    sender->dataThreadStarted = 0;
-    ARSAL_Mutex_Unlock(&(sender->streamMutex));
 
     if (sendBuffer)
     {
