@@ -101,6 +101,7 @@ typedef struct ARSTREAM_Reader2_Config_t {
     ARNETWORK_Manager_t *manager;
     int dataBufferID;
     int ackBufferID;
+    const char *ifaceAddr;
     const char *recvAddr;
     int recvPort;
     int recvTimeoutSec;

@@ -104,6 +104,7 @@ struct ARSTREAM_Reader2_t {
     ARNETWORK_Manager_t *manager;
     int dataBufferID;
     int ackBufferID;
+    char *ifaceAddr;
     char *recvAddr;
     int recvPort;
     int recvTimeoutSec;
@@ -127,6 +128,7 @@ struct ARSTREAM_Reader2_t {
     /* Sockets */
     int sendSocket;
     int recvSocket;
+    int recvMulticast;
 
 #ifdef ARSTREAM_READER2_DEBUG
     /* Debug */
@@ -178,15 +180,23 @@ ARSTREAM_Reader2_t* ARSTREAM_Reader2_New(ARSTREAM_Reader2_Config_t *config, uint
     if (internalError == ARSTREAM_OK)
     {
         memset(retReader, 0, sizeof(ARSTREAM_Reader2_t));
+        retReader->recvMulticast = 0;
         retReader->sendSocket = -1;
         retReader->recvSocket = -1;
         retReader->networkMode = config->networkMode;
         retReader->manager = config->manager;
         retReader->dataBufferID = config->dataBufferID;
         retReader->ackBufferID = config->ackBufferID;
-        if ((config->networkMode == ARSTREAM_READER2_NETWORK_MODE_SOCKET) && (config->recvAddr))
+        if (config->networkMode == ARSTREAM_READER2_NETWORK_MODE_SOCKET)
         {
-            retReader->recvAddr = strndup(config->recvAddr, 16);
+            if (config->recvAddr)
+            {
+                retReader->recvAddr = strndup(config->recvAddr, 16);
+            }
+            if (config->ifaceAddr)
+            {
+                retReader->ifaceAddr = strndup(config->ifaceAddr, 16);
+            }
         }
         retReader->recvPort = config->recvPort;
         retReader->maxPacketSize = config->maxPacketSize - sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t);           //TODO: include all headers size
@@ -234,6 +244,10 @@ ARSTREAM_Reader2_t* ARSTREAM_Reader2_New(ARSTREAM_Reader2_Config_t *config, uint
         if ((retReader) && (retReader->recvAddr))
         {
             free(retReader->recvAddr);
+        }
+        if ((retReader) && (retReader->ifaceAddr))
+        {
+            free(retReader->ifaceAddr);
         }
         free(retReader);
         retReader = NULL;
@@ -290,6 +304,10 @@ eARSTREAM_ERROR ARSTREAM_Reader2_Delete(ARSTREAM_Reader2_t **reader)
             {
                 free((*reader)->recvAddr);
             }
+            if ((*reader)->ifaceAddr)
+            {
+                free((*reader)->ifaceAddr);
+            }
             free(*reader);
             *reader = NULL;
             retVal = ARSTREAM_OK;
@@ -321,27 +339,96 @@ static int ARSTREAM_Reader2_Bind(ARSTREAM_Reader2_t *reader)
         reader->recvSocket = ARSAL_Socket_Create(AF_INET, SOCK_DGRAM, 0);
         if (reader->recvSocket < 0)
         {
+            ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Failed to create socket");
             ret = -1;
         }
+        ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Socket OK"); //TODO: debug
 
         if (ret == 0)
         {
             /* initialize socket */
+
+            /* set to non-blocking */
+            int flags = fcntl(reader->recvSocket, F_GETFL, 0);
+            fcntl(reader->recvSocket, F_SETFL, flags | O_NONBLOCK);
+
             memset(&recvSin, 0, sizeof(struct sockaddr_in));
             recvSin.sin_family = AF_INET;
             recvSin.sin_port = htons(reader->recvPort);
-            if (reader->recvAddr)
+            recvSin.sin_addr.s_addr = htonl(INADDR_ANY);
+
+            if ((reader->recvAddr) && (strlen(reader->recvAddr)))
             {
-                err = inet_pton(AF_INET, reader->recvAddr, &(recvSin.sin_addr));
-                if (err <= 0)
+                int addrFirst = atoi(reader->recvAddr);
+                if ((addrFirst >= 224) && (addrFirst <= 239))
                 {
-                    ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Failed to convert address '%s'", reader->recvAddr);
-                    ret = -1;
+                    /* multicast */
+                    struct ip_mreq mreq;
+                    memset(&mreq, 0, sizeof(mreq));
+                    err = inet_pton(AF_INET, reader->recvAddr, &(mreq.imr_multiaddr.s_addr));
+                    if (err <= 0)
+                    {
+                        ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Failed to convert address '%s'", reader->recvAddr);
+                        ret = -1;
+                    }
+
+                    if (ret == 0)
+                    {
+                        if ((reader->ifaceAddr) && (strlen(reader->ifaceAddr) > 0))
+                        {
+                            err = inet_pton(AF_INET, reader->ifaceAddr, &(mreq.imr_interface.s_addr));
+                            if (err <= 0)
+                            {
+                                ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Failed to convert address '%s'", reader->ifaceAddr);
+                                ret = -1;
+                            }
+                        }
+                        else
+                        {
+                            mreq.imr_interface.s_addr = htonl(INADDR_ANY);
+                        }
+                    }
+
+                    if (ret == 0)
+                    {
+                        /* join the multicast group */
+                        err = ARSAL_Socket_Setsockopt(reader->recvSocket, IPPROTO_IP, IP_ADD_MEMBERSHIP, (char*)&mreq, sizeof(mreq));
+                        if (err != 0)
+                        {
+                            ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Failed to join multacast group: error=%d (%s)", errno, strerror(errno));
+                            ret = -1;
+                        }
+                        ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Multicast join OK"); //TODO: debug
+                    }
+
+                    reader->recvMulticast = 1;
+                }
+                else
+                {
+                    /* unicast */
+                    if ((reader->ifaceAddr) && (strlen(reader->ifaceAddr) > 0))
+                    {
+                        err = inet_pton(AF_INET, reader->ifaceAddr, &(recvSin.sin_addr));
+                        if (err <= 0)
+                        {
+                            ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Failed to convert address '%s'", reader->ifaceAddr);
+                            ret = -1;
+                        }
+                    }
                 }
             }
             else
             {
-                recvSin.sin_addr.s_addr = htonl(INADDR_ANY);
+                /* unicast */
+                if ((reader->ifaceAddr) && (strlen(reader->ifaceAddr) > 0))
+                {
+                    err = inet_pton(AF_INET, reader->ifaceAddr, &(recvSin.sin_addr));
+                    if (err <= 0)
+                    {
+                        ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Failed to convert address '%s'", reader->ifaceAddr);
+                        ret = -1;
+                    }
+                }
             }
         }
 
@@ -355,6 +442,7 @@ static int ARSTREAM_Reader2_Bind(ARSTREAM_Reader2_t *reader)
                 ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Failed to set socket option SO_REUSEADDR: error=%d (%s)", errno, strerror(errno));
                 ret = -1;
             }
+            ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Reuse address OK"); //TODO: debug
         }
 
         if (ret == 0)
@@ -368,14 +456,11 @@ static int ARSTREAM_Reader2_Bind(ARSTREAM_Reader2_t *reader)
                 ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Failed to set socket receive timeout: error=%d (%s)", errno, strerror(errno));
                 ret = -1;
             }
+            ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Timeout OK"); //TODO: debug
         }
 
         if (ret == 0)
         {
-            /* set to non-blocking */
-            int flags = fcntl(reader->recvSocket, F_GETFL, 0);
-            fcntl(reader->recvSocket, F_SETFL, flags | O_NONBLOCK);
-
             /* bind the socket */
             err = ARSAL_Socket_Bind(reader->recvSocket, (struct sockaddr*)&recvSin, sizeof(recvSin));
             if (err != 0)
@@ -383,6 +468,7 @@ static int ARSTREAM_Reader2_Bind(ARSTREAM_Reader2_t *reader)
                 ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Error on socket bind port=%d: error=%d (%s)", reader->recvPort, errno, strerror(errno));
                 ret = -1;
             }
+            ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Bind OK"); //TODO: debug
         }
 
         if (ret != 0)
@@ -390,6 +476,7 @@ static int ARSTREAM_Reader2_Bind(ARSTREAM_Reader2_t *reader)
             if (reader->recvSocket >= 0)
             {
                 ARSAL_Socket_Close(reader->recvSocket);
+                ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Close!!!"); //TODO: debug
             }
             reader->recvSocket = -1;
         }
@@ -432,7 +519,8 @@ static int ARSTREAM_Reader2_ReadData(ARSTREAM_Reader2_t *reader, uint8_t *recvBu
             /* no read error (timeout or FD ready) */
             if (FD_ISSET(reader->recvSocket, &set))
             {
-                int size = ARSAL_Socket_Recv(reader->recvSocket, recvBuffer, recvBufferSize, 0);
+                int size;
+                size = ARSAL_Socket_Recv(reader->recvSocket, recvBuffer, recvBufferSize, 0);
                 if (size > 0)
                 {
                     /* save the number of bytes read */
@@ -441,11 +529,13 @@ static int ARSTREAM_Reader2_ReadData(ARSTREAM_Reader2_t *reader, uint8_t *recvBu
                 else if (size == 0)
                 {
                     /* this should never happen (if the socket is ready, data must be available) */
+                    ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Socket received size is null");
                     ret = -2;
                     *recvSize = 0;
                 }
                 else
                 {
+                    ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Socket receive error %d ('%s')", errno, strerror(errno));
                     ret = -1;
                     *recvSize = 0;
                 }
@@ -453,6 +543,7 @@ static int ARSTREAM_Reader2_ReadData(ARSTREAM_Reader2_t *reader, uint8_t *recvBu
             else
             {
                 /* read timeout */
+                ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Socket receive timeout");
                 ret = -2;
                 *recvSize = 0;
             }
@@ -561,9 +652,11 @@ void* ARSTREAM_Reader2_RunDataThread(void *ARSTREAM_Reader2_t_Param)
 
     while (shouldStop == 0)
     {
+        ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Calling ReadData"); //TODO: debug
         ret = ARSTREAM_Reader2_ReadData(reader, recvBuffer, recvBufferSize, &recvSize);
         if (ret != 0)
         {
+            ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "ReadData error %d", ret); //TODO: debug
             if (ret != -2)
             {
                 ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Failed to read data (%d)", ret);
@@ -571,6 +664,7 @@ void* ARSTREAM_Reader2_RunDataThread(void *ARSTREAM_Reader2_t_Param)
         }
         else if (recvSize >= sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t))
         {
+            ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Receive size %d", recvSize); //TODO: debug
             currentTimestamp = (((uint64_t)ntohl(header->timestamp) * 1000) + 45) / 90; /* 90000 Hz clock to microseconds */
             currentSeqNum = (int)ntohs(header->seqNum);
             if (reader->currentAuSize == 0)

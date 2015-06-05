@@ -89,6 +89,7 @@ typedef struct ARSTREAM_Sender2_Config_t {
     ARNETWORK_Manager_t *manager;
     int dataBufferID;
     int ackBufferID;
+    const char *ifaceAddr;
     const char *sendAddr;
     int sendPort;
     ARSTREAM_Sender2_AuCallback_t auCallback;

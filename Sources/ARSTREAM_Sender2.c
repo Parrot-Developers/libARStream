@@ -118,6 +118,7 @@ struct ARSTREAM_Sender2_t {
     ARNETWORK_Manager_t *manager;
     int dataBufferID;
     int ackBufferID;
+    char *ifaceAddr;
     char *sendAddr;
     int sendPort;
     ARSTREAM_Sender2_AuCallback_t auCallback;
@@ -139,6 +140,8 @@ struct ARSTREAM_Sender2_t {
     int ackThreadStarted;
 
     /* Sockets */
+    int sendMulticast;
+    struct sockaddr_in sendSin;
     int sendSocket;
     int recvSocket;
     
@@ -340,15 +343,23 @@ ARSTREAM_Sender2_t* ARSTREAM_Sender2_New(ARSTREAM_Sender2_Config_t *config, void
     if (internalError == ARSTREAM_OK)
     {
         memset(retSender, 0, sizeof(ARSTREAM_Sender2_t));
+        retSender->sendMulticast = 0;
         retSender->sendSocket = -1;
         retSender->recvSocket = -1;
         retSender->networkMode = config->networkMode;
         retSender->manager = config->manager;
         retSender->dataBufferID = config->dataBufferID;
         retSender->ackBufferID = config->ackBufferID;
-        if ((config->networkMode == ARSTREAM_SENDER2_NETWORK_MODE_SOCKET) && (config->sendAddr))
+        if (config->networkMode == ARSTREAM_SENDER2_NETWORK_MODE_SOCKET)
         {
-            retSender->sendAddr = strndup(config->sendAddr, 16);
+            if (config->sendAddr)
+            {
+                retSender->sendAddr = strndup(config->sendAddr, 16);
+            }
+            if (config->ifaceAddr)
+            {
+                retSender->ifaceAddr = strndup(config->ifaceAddr, 16);
+            }
         }
         retSender->sendPort = config->sendPort;
         retSender->auCallback = config->auCallback;
@@ -436,6 +447,10 @@ ARSTREAM_Sender2_t* ARSTREAM_Sender2_New(ARSTREAM_Sender2_Config_t *config, void
         {
             free(retSender->sendAddr);
         }
+        if ((retSender) && (retSender->ifaceAddr))
+        {
+            free(retSender->ifaceAddr);
+        }
         free(retSender);
         retSender = NULL;
     }
@@ -492,6 +507,10 @@ eARSTREAM_ERROR ARSTREAM_Sender2_Delete(ARSTREAM_Sender2_t **sender)
             if ((*sender)->sendAddr)
             {
                 free((*sender)->sendAddr);
+            }
+            if ((*sender)->ifaceAddr)
+            {
+                free((*sender)->ifaceAddr);
             }
             free(*sender);
             *sender = NULL;
@@ -574,7 +593,6 @@ static int ARSTREAM_Sender2_Connect(ARSTREAM_Sender2_t *sender)
 
     if (sender->networkMode == ARSTREAM_SENDER2_NETWORK_MODE_SOCKET)
     {
-        struct sockaddr_in sendSin;
         int err;
 
         /* check parameters */
@@ -587,23 +605,27 @@ static int ARSTREAM_Sender2_Connect(ARSTREAM_Sender2_t *sender)
             ret = -1;
         }
 
+        /* initialize socket */
+#if HAVE_DECL_SO_NOSIGPIPE
         if (ret == 0)
         {
-            /* initialize socket */
-#if HAVE_DECL_SO_NOSIGPIPE
-            /* remove SIGPIPE */ //TODO
+            /* remove SIGPIPE */
             int set = 1;
             err = ARSAL_Socket_Setsockopt(sender->sendSocket, SOL_SOCKET, SO_NOSIGPIPE, (void*)&set, sizeof(int));
             if (err != 0)
             {
                 ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Error on setsockopt: error=%d (%s)", errno, strerror(errno));
             }
+        }
 #endif
 
-            memset(&sendSin, 0, sizeof(struct sockaddr_in));
-            sendSin.sin_family = AF_INET;
-            sendSin.sin_port = htons(sender->sendPort);
-            err = inet_pton(AF_INET, sender->sendAddr, &(sendSin.sin_addr));
+        if (ret == 0)
+        {
+            /* send address */
+            memset(&sender->sendSin, 0, sizeof(struct sockaddr_in));
+            sender->sendSin.sin_family = AF_INET;
+            sender->sendSin.sin_port = htons(sender->sendPort);
+            err = inet_pton(AF_INET, sender->sendAddr, &(sender->sendSin.sin_addr));
             if (err <= 0)
             {
                 ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Failed to convert address '%s'", sender->sendAddr);
@@ -617,12 +639,54 @@ static int ARSTREAM_Sender2_Connect(ARSTREAM_Sender2_t *sender)
             int flags = fcntl(sender->sendSocket, F_GETFL, 0);
             fcntl(sender->sendSocket, F_SETFL, flags | O_NONBLOCK);
 
-            /* connect the socket */
-            err = ARSAL_Socket_Connect(sender->sendSocket, (struct sockaddr*)&sendSin, sizeof(sendSin));
-            if (err != 0)
+            int addrFirst = atoi(sender->sendAddr);
+            if ((addrFirst >= 224) && (addrFirst <= 239))
             {
-                ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Error on socket connect to addr='%s' port=%d: error=%d (%s)", sender->sendAddr, sender->sendPort, errno, strerror(errno));
-                ret = -1;
+                /* multicast */
+
+                if ((sender->ifaceAddr) && (strlen(sender->ifaceAddr) > 0))
+                {
+                    /* source address */
+                    struct sockaddr_in addr;
+                    memset(&addr, 0, sizeof(addr));
+                    addr.sin_family = AF_INET;
+                    addr.sin_port = htons(0);
+                    err = inet_pton(AF_INET, sender->ifaceAddr, &(addr.sin_addr));
+                    if (err <= 0)
+                    {
+                        ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Failed to convert address '%s'", sender->ifaceAddr);
+                        ret = -1;
+                    }
+
+                    if (ret == 0)
+                    {
+                        /* bind the socket */
+                        err = ARSAL_Socket_Bind(sender->sendSocket, (struct sockaddr*)&addr, sizeof(addr));
+                        if (err != 0)
+                        {
+                            ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Error on socket bind to addr='%s': error=%d (%s)", sender->ifaceAddr, errno, strerror(errno));
+                            ret = -1;
+                        }
+                        sender->sendMulticast = 1;
+                    }
+                }
+                else
+                {
+                    ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Trying to send multicast to address '%s' without an interface address", sender->sendAddr);
+                    ret = -1;
+                }
+            }
+            else
+            {
+                /* unicast */
+
+                /* connect the socket */
+                err = ARSAL_Socket_Connect(sender->sendSocket, (struct sockaddr*)&sender->sendSin, sizeof(sender->sendSin));
+                if (err != 0)
+                {
+                    ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Error on socket connect to addr='%s' port=%d: error=%d (%s)", sender->sendAddr, sender->sendPort, errno, strerror(errno));
+                    ret = -1;
+                }                
             }
         }
 
@@ -669,7 +733,15 @@ static int ARSTREAM_Sender2_SendData(ARSTREAM_Sender2_t *sender, uint8_t *sendBu
     /* send to the network layer */
     if (sender->networkMode == ARSTREAM_SENDER2_NETWORK_MODE_SOCKET)
     {
-        ssize_t bytes = ARSAL_Socket_Send(sender->sendSocket, sendBuffer, sendSize, 0);
+        ssize_t bytes;
+        if (sender->sendMulticast)
+        {
+            bytes = ARSAL_Socket_Sendto(sender->sendSocket, sendBuffer, sendSize, 0, (struct sockaddr*)&sender->sendSin, sizeof(sender->sendSin));
+        }
+        else
+        {
+            bytes = ARSAL_Socket_Send(sender->sendSocket, sendBuffer, sendSize, 0);
+        }
         if (bytes < 0)
         {
             switch (errno)
@@ -738,7 +810,7 @@ void* ARSTREAM_Sender2_RunDataThread (void *ARSTREAM_Sender2_t_Param)
         return (void*)0;
     }
 
-    ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_SENDER2_TAG, "Sender thread running");
+    ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Sender thread running"); //TODO: debug
     ARSAL_Mutex_Lock(&(sender->streamMutex));
     sender->dataThreadStarted = 1;
     shouldStop = sender->threadsShouldStop;
