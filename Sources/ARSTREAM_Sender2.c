@@ -214,7 +214,7 @@ static int ARSTREAM_Sender2_DequeueNalu(ARSTREAM_Sender2_t *sender, ARSTREAM_Sen
     
     ARSAL_Mutex_Lock(&(sender->fifoMutex));
     
-    if (!sender->fifoHead)
+    if ((!sender->fifoHead) || (!sender->fifoCount))
     {
         ARSAL_Mutex_Unlock(&sender->fifoMutex);
         return -2;
@@ -224,13 +224,15 @@ static int ARSTREAM_Sender2_DequeueNalu(ARSTREAM_Sender2_t *sender, ARSTREAM_Sen
     if (cur->next)
     {
         cur->next->prev = NULL;
+        sender->fifoHead = cur->next;
+        sender->fifoCount--;
     }
-    sender->fifoHead = cur->next;
-    if (!sender->fifoHead)
+    else
     {
+        sender->fifoHead = NULL;
+        sender->fifoCount = 0;
         sender->fifoTail = NULL;
     }
-    sender->fifoCount--;
     
     cur->used = 0;
     cur->prev = NULL;
@@ -265,7 +267,7 @@ static int ARSTREAM_Sender2_FlushNaluFifo(ARSTREAM_Sender2_t *sender)
                 ARSAL_Mutex_Unlock(&(sender->streamMutex));
 
                 /* call the auCallback */
-                ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Time %llu: flushing NALU FIFO -> auCallback", nalu.auTimestamp);
+                ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_SENDER2_TAG, "Time %llu: flushing NALU FIFO -> auCallback", nalu.auTimestamp);
                 sender->auCallback(ARSTREAM_SENDER2_STATUS_AU_CANCELLED, nalu.auUserPtr, sender->custom);
             }
             else
@@ -579,6 +581,35 @@ eARSTREAM_ERROR ARSTREAM_Sender2_FlushNaluQueue(ARSTREAM_Sender2_t *sender)
 }
 
 
+static int ARSTREAM_Sender2_SetSocketBufferSize(ARSTREAM_Sender2_t *sender, int size)
+{
+    int ret = 0, err;
+    int size2 = sizeof(int);
+
+    size /= 2;
+    err = ARSAL_Socket_Setsockopt(sender->sendSocket, SOL_SOCKET, SO_SNDBUF, (void*)&size, sizeof(size));
+    if (err != 0)
+    {
+        ret = -1;
+        ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Failed to set send socket buffer size to 2*%d bytes: error=%d (%s)", size, errno, strerror(errno));
+    }
+
+    size = -1;
+    err = ARSAL_Socket_Getsockopt(sender->sendSocket, SOL_SOCKET, SO_SNDBUF, (void*)&size, &size2);
+    if (err != 0)
+    {
+        ret = -1;
+        ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Failed to get send socket buffer size: error=%d (%s)", errno, strerror(errno));
+    }
+    else
+    {
+        ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_SENDER2_TAG, "Send socket buffer size is %d bytes", size); //TODO: debug
+    }
+
+    return ret;
+}
+
+
 static int ARSTREAM_Sender2_Connect(ARSTREAM_Sender2_t *sender)
 {
     int ret = 0;
@@ -680,6 +711,18 @@ static int ARSTREAM_Sender2_Connect(ARSTREAM_Sender2_t *sender)
                     ret = -1;
                 }                
             }
+        }
+
+        if (ret == 0)
+        {
+            /* set the socket buffer size */
+            int bufSize = sender->maxBitrate * sender->maxLatencyMs / 1000 / 8;
+            err = ARSTREAM_Sender2_SetSocketBufferSize(sender, bufSize);
+            if (err != 0)
+            {
+                ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Failed to set the send socket buffer size");
+                ret = -1;
+            }                
         }
 
         if (ret != 0)
@@ -1021,6 +1064,55 @@ eARSTREAM_ERROR ARSTREAM_Sender2_SetTargetPacketSize(ARSTREAM_Sender2_t *sender,
 
     ARSAL_Mutex_Lock(&(sender->streamMutex));
     sender->targetPacketSize = targetPacketSize - sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t);    //TODO: include all headers size
+    ARSAL_Mutex_Unlock(&(sender->streamMutex));
+
+    return ret;
+}
+
+
+int ARSTREAM_Sender2_GetMaxBitrate(ARSTREAM_Sender2_t *sender)
+{
+    int ret = -1;
+    if (sender != NULL)
+    {
+        ARSAL_Mutex_Lock(&(sender->streamMutex));
+        ret = sender->maxBitrate;
+        ARSAL_Mutex_Unlock(&(sender->streamMutex));
+    }
+    return ret;
+}
+
+
+int ARSTREAM_Sender2_GetMaxLatencyMs(ARSTREAM_Sender2_t *sender)
+{
+    int ret = -1;
+    if (sender != NULL)
+    {
+        ARSAL_Mutex_Lock(&(sender->streamMutex));
+        ret = sender->maxLatencyMs;
+        ARSAL_Mutex_Unlock(&(sender->streamMutex));
+    }
+    return ret;
+}
+
+
+eARSTREAM_ERROR ARSTREAM_Sender2_SetMaxBitrateAndLatencyMs(ARSTREAM_Sender2_t *sender, int maxBitrate, int maxLatencyMs)
+{
+    eARSTREAM_ERROR ret = ARSTREAM_OK;
+    if ((sender == NULL) || (maxBitrate == 0) || (maxLatencyMs == 0))
+    {
+        return ARSTREAM_ERROR_BAD_PARAMETERS;
+    }
+
+    ARSAL_Mutex_Lock(&(sender->streamMutex));
+    sender->maxBitrate = maxBitrate;
+    sender->maxLatencyMs = maxLatencyMs;
+    int bufSize = maxBitrate * 1000 / (8 * maxLatencyMs);
+    int err = ARSTREAM_Sender2_SetSocketBufferSize(sender, bufSize);
+    if (err != 0)
+    {
+        ret = ARSTREAM_ERROR_BAD_PARAMETERS;
+    }
     ARSAL_Mutex_Unlock(&(sender->streamMutex));
 
     return ret;

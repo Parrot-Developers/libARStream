@@ -222,4 +222,14 @@ void* ARSTREAM_Sender2_RunAckThread (void *ARSTREAM_Sender2_t_Param);
  */
 void* ARSTREAM_Sender2_GetCustom (ARSTREAM_Sender2_t *sender);
 
+int ARSTREAM_Sender2_GetTargetPacketSize(ARSTREAM_Sender2_t *sender);
+
+eARSTREAM_ERROR ARSTREAM_Sender2_SetTargetPacketSize(ARSTREAM_Sender2_t *sender, int targetPacketSize);
+
+int ARSTREAM_Sender2_GetMaxBitrate(ARSTREAM_Sender2_t *sender);
+
+int ARSTREAM_Sender2_GetMaxLatencyMs(ARSTREAM_Sender2_t *sender);
+
+eARSTREAM_ERROR ARSTREAM_Sender2_SetMaxBitrateAndLatencyMs(ARSTREAM_Sender2_t *sender, int maxBitrate, int maxLatencyMs);
+
 #endif /* _ARSTREAM_SENDER2_H_ */
