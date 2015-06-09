@@ -104,14 +104,6 @@ typedef struct ARSTREAM_Sender2_Nalu_s {
 } ARSTREAM_Sender2_Nalu_t;
 
 
-typedef struct {
-    ARSTREAM_Sender2_t *sender;
-    uint64_t auTimestamp;
-    int isLastInAu;
-    void *auUserPtr;
-} ARSTREAM_Sender2_NetworkCallbackParam_t;
-
-
 struct ARSTREAM_Sender2_t {
     /* Configuration on New */
     ARSTREAM_Sender2_NetworkMode_t networkMode;
@@ -810,7 +802,7 @@ void* ARSTREAM_Sender2_RunDataThread (void *ARSTREAM_Sender2_t_Param)
         return (void*)0;
     }
 
-    ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Sender thread running"); //TODO: debug
+    ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_SENDER2_TAG, "Sender thread running");
     ARSAL_Mutex_Lock(&(sender->streamMutex));
     sender->dataThreadStarted = 1;
     shouldStop = sender->threadsShouldStop;
@@ -881,7 +873,7 @@ void* ARSTREAM_Sender2_RunDataThread (void *ARSTREAM_Sender2_t_Param)
                         ret = ARSTREAM_Sender2_SendData(sender, sendBuffer, sendSize, nalu.auTimestamp, ((nalu.isLastInAu) && (endBit)) ? 1 : 0);
                         if (ret != 0)
                         {
-                            ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Time %llu: FU-A SendData failed (error %d)", ret); //TODO: debug
+                            ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Time %llu: FU-A SendData failed (error %d)", ret);
                         }
 
                         fragmentOffset += packetSize;
@@ -902,7 +894,7 @@ void* ARSTREAM_Sender2_RunDataThread (void *ARSTREAM_Sender2_t_Param)
                 ret = ARSTREAM_Sender2_SendData(sender, sendBuffer, sendSize, nalu.auTimestamp, nalu.isLastInAu);
                 if (ret != 0)
                 {
-                    ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Time %llu: singleNALU SendData failed (error %d)", ret); //TODO: debug
+                    ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Time %llu: singleNALU SendData failed (error %d)", ret);
                 }
             }
 
