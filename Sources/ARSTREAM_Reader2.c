@@ -199,7 +199,7 @@ ARSTREAM_Reader2_t* ARSTREAM_Reader2_New(ARSTREAM_Reader2_Config_t *config, uint
             }
         }
         retReader->recvPort = config->recvPort;
-        retReader->maxPacketSize = config->maxPacketSize - sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t);           //TODO: include all headers size
+        retReader->maxPacketSize = config->maxPacketSize - sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t) - ARSTREAM_NETWORK_UDP_HEADER_SIZE - ARSTREAM_NETWORK_IP_HEADER_SIZE;
         retReader->insertStartCodes = config->insertStartCodes;
         retReader->outputIncompleteAu = config->outputIncompleteAu;
         retReader->auCallback = config->auCallback;
@@ -226,7 +226,7 @@ ARSTREAM_Reader2_t* ARSTREAM_Reader2_New(ARSTREAM_Reader2_Config_t *config, uint
     /* Setup debug */
     if (internalError == ARSTREAM_OK)
     {
-        retReader->rdbg = ARSTREAM_Reader2Debug_New(1, 1);
+        retReader->rdbg = ARSTREAM_Reader2Debug_New(1, 0);
         if (!retReader->rdbg)
         {
             internalError = ARSTREAM_ERROR_ALLOC;

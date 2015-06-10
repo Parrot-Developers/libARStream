@@ -189,12 +189,13 @@ ARSTREAM_Reader_t* ARSTREAM_Reader_New (ARNETWORK_Manager_t *manager, int dataBu
         eARSTREAM_ERROR error2;
         ARSTREAM_Reader2_Config_t config;
         memset(&config, 0, sizeof(config));
-        config.networkMode = ARSTREAM_READER2_NETWORK_MODE_ARNETWORK;
+        config.networkMode = ARSTREAM_READER2_NETWORK_MODE_SOCKET;
         config.manager = manager;
         config.dataBufferID = dataBufferID;
         config.ackBufferID = ackBufferID;
-        config.recvAddr = NULL;
-        config.recvPort = 0;
+        config.ifaceAddr = NULL;
+        config.recvAddr = "192.168.42.1";
+        config.recvPort = 5004;
         config.recvTimeoutSec = 5;
         config.auCallback = ARSTREAM_Reader_Reader2AuCallback;
         config.maxPacketSize = maxFragmentSize;

@@ -47,6 +47,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <fcntl.h>
+#include <poll.h>
 
 /*
  * Private Headers
@@ -133,6 +134,7 @@ struct ARSTREAM_Sender2_t {
 
     /* Sockets */
     int sendMulticast;
+    int sendSocketBufferSize;
     struct sockaddr_in sendSin;
     int sendSocket;
     int recvSocket;
@@ -141,6 +143,7 @@ struct ARSTREAM_Sender2_t {
     ARSAL_Mutex_t fifoMutex;
     ARSAL_Cond_t fifoCond;
     int fifoCount;
+    int naluFifoBufferSize;
     ARSTREAM_Sender2_Nalu_t *fifoHead;
     ARSTREAM_Sender2_Nalu_t *fifoTail;
     ARSTREAM_Sender2_Nalu_t *fifoPool;
@@ -242,6 +245,100 @@ static int ARSTREAM_Sender2_DequeueNalu(ARSTREAM_Sender2_t *sender, ARSTREAM_Sen
     ARSAL_Mutex_Unlock (&(sender->fifoMutex));
     
     return 0;
+}
+
+
+static int ARSTREAM_Sender2_DropFromFifo(ARSTREAM_Sender2_t *sender, int maxTargetSize)
+{
+    ARSTREAM_Sender2_Nalu_t* cur = NULL;
+    ARSTREAM_Sender2_Nalu_t* cur2 = NULL;
+    int size = 0, dropSize = 0;
+    int lastNaluInAu;
+
+    if (!sender)
+    {
+        return -1;
+    }
+
+    ARSAL_Mutex_Lock(&(sender->fifoMutex));
+
+    if ((!sender->fifoHead) || (!sender->fifoTail) || (!sender->fifoCount))
+    {
+        ARSAL_Mutex_Unlock(&sender->fifoMutex);
+        return 0;
+    }
+
+    /* get the current FIFO size in bytes */
+    for (cur = sender->fifoHead; cur; cur = cur->next)
+    {
+        size += cur->naluSize;
+    }
+
+    //ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Drop from FIFO - initial size = %d bytes, maxTargetSize = %d", size, maxTargetSize); //TODO: debug
+
+    for (cur = sender->fifoTail; cur; cur = sender->fifoTail)
+    {
+        /* stop if the max target size has been reached */
+        if (size <= maxTargetSize)
+        {
+            break;
+        }
+
+        /* is this NALU the last of its AU? */
+        lastNaluInAu = 1;
+        for (cur2 = cur->prev; cur2; cur2 = cur2->prev)
+        {
+            if (cur2->auTimestamp == cur->auTimestamp)
+            {
+                lastNaluInAu = 0;
+                break;
+            }
+        }
+
+        /* dequeue the NALU */
+        if (cur->prev)
+        {
+            cur->prev->next = NULL;
+            sender->fifoTail = cur->prev;
+            sender->fifoCount--;
+        }
+        else
+        {
+            sender->fifoTail = NULL;
+            sender->fifoCount = 0;
+            sender->fifoHead = NULL;
+        }
+        cur->used = 0;
+        cur->prev = NULL;
+        cur->next = NULL;
+        size -= cur->naluSize;
+        dropSize += cur->naluSize;
+
+        /* last NALU in the Access Unit: call the auCallback */
+        if (lastNaluInAu)
+        {
+            ARSAL_Mutex_Lock(&(sender->streamMutex));
+            if (cur->auTimestamp != sender->lastAuTimestamp)
+            {
+                sender->lastAuTimestamp = cur->auTimestamp;
+                ARSAL_Mutex_Unlock(&(sender->streamMutex));
+
+                /* call the auCallback */
+                ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_SENDER2_TAG, "Time %llu: dropping from NALU FIFO -> auCallback", cur->auTimestamp);
+                sender->auCallback(ARSTREAM_SENDER2_STATUS_AU_CANCELLED, cur->auUserPtr, sender->custom);
+            }
+            else
+            {
+                ARSAL_Mutex_Unlock(&(sender->streamMutex));
+            }
+        }
+    }
+
+    ARSAL_Mutex_Unlock (&(sender->fifoMutex));
+    
+    //ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Drop from FIFO - final size = %d bytes", size); //TODO: debug
+
+    return dropSize;
 }
 
 
@@ -358,8 +455,8 @@ ARSTREAM_Sender2_t* ARSTREAM_Sender2_New(ARSTREAM_Sender2_Config_t *config, void
         retSender->sendPort = config->sendPort;
         retSender->auCallback = config->auCallback;
         retSender->naluFifoSize = config->naluFifoSize;
-        retSender->maxPacketSize = config->maxPacketSize - sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t);           //TODO: include all headers size
-        retSender->targetPacketSize = config->targetPacketSize - sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t);     //TODO: include all headers size
+        retSender->maxPacketSize = config->maxPacketSize - sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t) - ARSTREAM_NETWORK_UDP_HEADER_SIZE - ARSTREAM_NETWORK_IP_HEADER_SIZE;
+        retSender->targetPacketSize = config->targetPacketSize - sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t) - ARSTREAM_NETWORK_UDP_HEADER_SIZE - ARSTREAM_NETWORK_IP_HEADER_SIZE;
         retSender->maxBitrate = config->maxBitrate;
         retSender->maxLatencyMs = config->maxLatencyMs;
         retSender->custom = custom;
@@ -715,9 +812,11 @@ static int ARSTREAM_Sender2_Connect(ARSTREAM_Sender2_t *sender)
 
         if (ret == 0)
         {
-            /* set the socket buffer size */
-            int bufSize = sender->maxBitrate * sender->maxLatencyMs / 1000 / 8;
-            err = ARSTREAM_Sender2_SetSocketBufferSize(sender, bufSize);
+            /* set the socket buffer size and NALU FIFO buffer size */
+            int totalBufSize = sender->maxBitrate * sender->maxLatencyMs / 1000 / 8;
+            sender->sendSocketBufferSize = totalBufSize / 2;
+            sender->naluFifoBufferSize = totalBufSize / 2;
+            err = ARSTREAM_Sender2_SetSocketBufferSize(sender, sender->sendSocketBufferSize);
             if (err != 0)
             {
                 ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Failed to set the send socket buffer size");
@@ -763,7 +862,7 @@ static int ARSTREAM_Sender2_SendData(ARSTREAM_Sender2_t *sender, uint8_t *sendBu
         sender->firstTimestamp = auTimestamp;
     }
     header->timestamp = htonl((uint32_t)(((((auTimestamp - sender->firstTimestamp) * 90) + 500) / 1000) & 0xFFFFFFFF)); /* microseconds to 90000 Hz clock */
-    header->ssrc = htonl(ARSTREAM_NETWORK_HEADERS2_SSRC);
+    header->ssrc = htonl(ARSTREAM_NETWORK_HEADERS2_RTP_SSRC);
 
     /* send to the network layer */
     if (sender->networkMode == ARSTREAM_SENDER2_NETWORK_MODE_SOCKET)
@@ -782,15 +881,62 @@ static int ARSTREAM_Sender2_SendData(ARSTREAM_Sender2_t *sender, uint8_t *sendBu
             switch (errno)
             {
             case EAGAIN:
-                ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Socket buffer full: error=%d (%s)", errno, strerror(errno));
-                //TODO
+                /* the socket buffer is full - drop some NALUs */
+                ret = ARSTREAM_Sender2_DropFromFifo(sender, sender->naluFifoBufferSize);
+                if (ret < 0)
+                {
+                    ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Failed to drop NALUs from FIFO (%d)", ret);
+                }
+                else
+                {
+                    ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Socket buffer full - dropped %d bytes -> polling", ret);
+
+                    struct pollfd p;
+                    p.fd = sender->sendSocket;
+                    p.events = POLLOUT;
+                    p.revents = 0;
+                    int pollTimeMs = sender->naluFifoBufferSize * 8 * 1000 / sender->maxBitrate;
+                    ret = poll(&p, 1, pollTimeMs);
+                    if (ret == 0)
+                    {
+                        ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Polling timed out");
+                    }
+                    else if (ret < 0)
+                    {
+                        ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Poll error: error=%d (%s)", errno, strerror(errno));
+                    }
+                    else if (p.revents & POLLOUT)
+                    {
+                        if (sender->sendMulticast)
+                        {
+                            bytes = ARSAL_Socket_Sendto(sender->sendSocket, sendBuffer, sendSize, 0, (struct sockaddr*)&sender->sendSin, sizeof(sender->sendSin));
+                        }
+                        else
+                        {
+                            bytes = ARSAL_Socket_Send(sender->sendSocket, sendBuffer, sendSize, 0);
+                        }
+                        if (bytes > -1)
+                        {
+                            ret = 0;
+                        }
+                        else if (errno == EAGAIN)
+                        {
+                            ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Socket buffer full #2 - current packet dropped");
+                            ret = -2;
+                        }
+                        else
+                        {
+                            ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Socket send error #2 error=%d (%s)", errno, strerror(errno));
+                            ret = -1;
+                        }
+                    }
+                }
                 break;
             default:
                 ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Socket send error: error=%d (%s)", errno, strerror(errno));
-                //TODO
+                ret = -1;
                 break;
             }
-            ret = -1;
         }
     }
     else if (sender->networkMode == ARSTREAM_SENDER2_NETWORK_MODE_ARNETWORK)
@@ -884,7 +1030,7 @@ void* ARSTREAM_Sender2_RunDataThread (void *ARSTREAM_Sender2_t_Param)
             fragmentCount = (nalu.naluSize + targetPacketSize / 2) / targetPacketSize;
             if (fragmentCount < 1) fragmentCount = 1;
 
-            if ((fragmentCount != 1) || (nalu.naluSize > maxPacketSize))
+            if ((fragmentCount > 1) || (nalu.naluSize > maxPacketSize))
             {
                 /* Fragmentation (FU-A) */
                 int i;
@@ -902,21 +1048,28 @@ void* ARSTREAM_Sender2_RunDataThread (void *ARSTREAM_Sender2_t_Param)
                     fragmentOffset = 0;
                     do
                     {
-                        packetSize = (fragmentSize - fragmentOffset + 2 > maxPacketSize) ? maxPacketSize : fragmentSize - fragmentOffset;
+                        packetSize = (fragmentSize - fragmentOffset > maxPacketSize - 2) ? maxPacketSize - 2 : fragmentSize - fragmentOffset;
 //ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "-- Time %llu: FU-A, packetSize=%d", nalu.auTimestamp, packetSize); //TODO: debug
 
-                        memcpy(sendBuffer + sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t) + 2, nalu.naluBuffer + offset, packetSize);
-                        sendSize = packetSize + 2 + sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t);
-                        *(sendBuffer + sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t)) = fuIndicator;
-                        startBit = (offset == 1) ? 0x80 : 0;
-                        endBit = ((i == fragmentCount - 1) && (fragmentOffset + packetSize == fragmentSize)) ? 0x40 : 0;
-                        *(sendBuffer + sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t) + 1) = fuHeader | startBit | endBit;
+                        if (packetSize + 2 <= maxPacketSize)
+                        {
+                            memcpy(sendBuffer + sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t) + 2, nalu.naluBuffer + offset, packetSize);
+                            sendSize = packetSize + 2 + sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t);
+                            *(sendBuffer + sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t)) = fuIndicator;
+                            startBit = (offset == 1) ? 0x80 : 0;
+                            endBit = ((i == fragmentCount - 1) && (fragmentOffset + packetSize == fragmentSize)) ? 0x40 : 0;
+                            *(sendBuffer + sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t) + 1) = fuHeader | startBit | endBit;
 
 //ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "-- Time %llu: FU-A, sendSize=%d, startBit=%d, endBit=%d, markerBit=%d", nalu.auTimestamp, sendSize, startBit, endBit, ((nalu.isLastInAu) && (endBit)) ? 1 : 0); //TODO: debug
-                        ret = ARSTREAM_Sender2_SendData(sender, sendBuffer, sendSize, nalu.auTimestamp, ((nalu.isLastInAu) && (endBit)) ? 1 : 0);
-                        if (ret != 0)
+                            ret = ARSTREAM_Sender2_SendData(sender, sendBuffer, sendSize, nalu.auTimestamp, ((nalu.isLastInAu) && (endBit)) ? 1 : 0);
+                            if (ret != 0)
+                            {
+                                ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Time %llu: FU-A SendData failed (error %d)", ret);
+                            }
+                        }
+                        else
                         {
-                            ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Time %llu: FU-A SendData failed (error %d)", ret);
+                            ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "-- Time %llu: FU-A, packetSize + 2 > maxPacketSize (packetSize=%d)", nalu.auTimestamp, packetSize); //TODO: debug
                         }
 
                         fragmentOffset += packetSize;
@@ -1000,13 +1153,9 @@ void* ARSTREAM_Sender2_RunDataThread (void *ARSTREAM_Sender2_t_Param)
     /* flush the NALU FIFO */
     ARSTREAM_Sender2_FlushNaluFifo(sender);
 
-    ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_SENDER2_TAG, "Sender thread ended");
+    free(sendBuffer);
 
-    if (sendBuffer)
-    {
-        free(sendBuffer);
-        sendBuffer = NULL;
-    }
+    ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_SENDER2_TAG, "Sender thread ended");
 
     return (void*)0;
 }
@@ -1047,7 +1196,7 @@ int ARSTREAM_Sender2_GetTargetPacketSize(ARSTREAM_Sender2_t *sender)
     if (sender != NULL)
     {
         ARSAL_Mutex_Lock(&(sender->streamMutex));
-        ret = sender->targetPacketSize + sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t);             //TODO: include all headers size
+        ret = sender->targetPacketSize + sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t) + ARSTREAM_NETWORK_UDP_HEADER_SIZE + ARSTREAM_NETWORK_IP_HEADER_SIZE;
         ARSAL_Mutex_Unlock(&(sender->streamMutex));
     }
     return ret;
@@ -1063,7 +1212,7 @@ eARSTREAM_ERROR ARSTREAM_Sender2_SetTargetPacketSize(ARSTREAM_Sender2_t *sender,
     }
 
     ARSAL_Mutex_Lock(&(sender->streamMutex));
-    sender->targetPacketSize = targetPacketSize - sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t);    //TODO: include all headers size
+    sender->targetPacketSize = targetPacketSize - sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t) - ARSTREAM_NETWORK_UDP_HEADER_SIZE - ARSTREAM_NETWORK_IP_HEADER_SIZE;
     ARSAL_Mutex_Unlock(&(sender->streamMutex));
 
     return ret;
@@ -1107,8 +1256,10 @@ eARSTREAM_ERROR ARSTREAM_Sender2_SetMaxBitrateAndLatencyMs(ARSTREAM_Sender2_t *s
     ARSAL_Mutex_Lock(&(sender->streamMutex));
     sender->maxBitrate = maxBitrate;
     sender->maxLatencyMs = maxLatencyMs;
-    int bufSize = maxBitrate * 1000 / (8 * maxLatencyMs);
-    int err = ARSTREAM_Sender2_SetSocketBufferSize(sender, bufSize);
+    int totalBufSize = maxBitrate * maxLatencyMs / 1000 / 8;
+    sender->sendSocketBufferSize = totalBufSize / 2;
+    sender->naluFifoBufferSize = totalBufSize / 2;
+    int err = ARSTREAM_Sender2_SetSocketBufferSize(sender, sender->sendSocketBufferSize);
     if (err != 0)
     {
         ret = ARSTREAM_ERROR_BAD_PARAMETERS;
