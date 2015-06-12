@@ -132,7 +132,7 @@ uint8_t* ARSTREAM_Reader_Reader2AuCallback(eARSTREAM_READER2_CAUSE cause2, uint8
     /* Hack to declare an I-Frame if the AU starts with an SPS NALU */
     if (cause == ARSTREAM_READER_CAUSE_FRAME_COMPLETE)
     {
-        iFrame = (*(auBuffer+4) == 0x27) ? 1 : 0;
+        iFrame = (((*(auBuffer+4)) & 0x1F) == 7) ? 1 : 0;
     }
 
     return reader->callback (cause, auBuffer, auSize, 0, iFrame, newAuBufferSize, reader->custom);
