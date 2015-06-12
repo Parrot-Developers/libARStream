@@ -48,6 +48,7 @@
 #include <netinet/in.h>
 #include <fcntl.h>
 #include <poll.h>
+#include <math.h>
 
 /*
  * Private Headers
@@ -91,6 +92,12 @@
         }                                       \
     } while (0)
 
+//#define ARSTREAM_SENDER2_MONITORING_OUTPUT
+#ifdef ARSTREAM_SENDER2_MONITORING_OUTPUT
+    #include <stdio.h>
+    #define ARSTREAM_SENDER2_MONITORING_OUTPUT_PATH "/data/ftp/internal_000/stream_monitor"
+#endif
+
 
 typedef struct ARSTREAM_Sender2_Nalu_s {
     uint8_t *naluBuffer;
@@ -104,6 +111,15 @@ typedef struct ARSTREAM_Sender2_Nalu_s {
     struct ARSTREAM_Sender2_Nalu_s* next;
     int used;
 } ARSTREAM_Sender2_Nalu_t;
+
+
+#define ARSTREAM_SENDER2_MONITORING_MAX_POINTS (2048)
+
+typedef struct ARSTREAM_Sender2_MonitoringPoint_s {
+    uint32_t bytes;
+    uint64_t auTimestamp;
+    uint64_t sendTimestamp;
+} ARSTREAM_Sender2_MonitoringPoint_t;
 
 
 struct ARSTREAM_Sender2_t {
@@ -148,6 +164,15 @@ struct ARSTREAM_Sender2_t {
     ARSTREAM_Sender2_Nalu_t *fifoHead;
     ARSTREAM_Sender2_Nalu_t *fifoTail;
     ARSTREAM_Sender2_Nalu_t *fifoPool;
+
+    /* Monitoring */
+    ARSAL_Mutex_t monitoringMutex;
+    int monitoringCount;
+    int monitoringIndex;
+    ARSTREAM_Sender2_MonitoringPoint_t monitoringPoint[ARSTREAM_SENDER2_MONITORING_MAX_POINTS];
+#ifdef ARSTREAM_SENDER2_MONITORING_OUTPUT
+    FILE* fMonitorOut;
+#endif
 };
 
 
@@ -397,6 +422,7 @@ ARSTREAM_Sender2_t* ARSTREAM_Sender2_New(ARSTREAM_Sender2_Config_t *config, void
 {
     ARSTREAM_Sender2_t *retSender = NULL;
     int streamMutexWasInit = 0;
+    int monitoringMutexWasInit = 0;
     int fifoWasCreated = 0;
     int fifoMutexWasInit = 0;
     int fifoCondWasInit = 0;
@@ -470,6 +496,18 @@ ARSTREAM_Sender2_t* ARSTREAM_Sender2_New(ARSTREAM_Sender2_Config_t *config, void
             streamMutexWasInit = 1;
         }
     }
+    if (internalError == ARSTREAM_OK)
+    {
+        int mutexInitRet = ARSAL_Mutex_Init(&(retSender->monitoringMutex));
+        if (mutexInitRet != 0)
+        {
+            internalError = ARSTREAM_ERROR_ALLOC;
+        }
+        else
+        {
+            monitoringMutexWasInit = 1;
+        }
+    }
 
     /* Setup the NAL unit FIFO */
     if (internalError == ARSTREAM_OK)
@@ -510,12 +548,44 @@ ARSTREAM_Sender2_t* ARSTREAM_Sender2_New(ARSTREAM_Sender2_Config_t *config, void
         }
     }
 
+#ifdef ARSTREAM_SENDER2_MONITORING_OUTPUT
+    if (internalError == ARSTREAM_OK)
+    {
+        int i;
+        char szOutputFileName[128];
+        szOutputFileName[0] = '\0';
+        for (i = 0; i < 100; i++)
+        {
+            snprintf(szOutputFileName, 128, "%s/monitor_%02d.dat", ARSTREAM_SENDER2_MONITORING_OUTPUT_PATH, i);
+            if (access(szOutputFileName, F_OK) == -1)
+            {
+                // file does not exist
+                break;
+            }
+            szOutputFileName[0] = '\0';
+        }
+
+        if (strlen(szOutputFileName))
+        {
+            retSender->fMonitorOut = fopen(szOutputFileName, "w");
+            if (!retSender->fMonitorOut)
+            {
+                ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Unable to open monitor output file '%s'", szOutputFileName);
+            }
+        }
+    }
+#endif
+
     if ((internalError != ARSTREAM_OK) &&
         (retSender != NULL))
     {
         if (streamMutexWasInit == 1)
         {
             ARSAL_Mutex_Destroy(&(retSender->streamMutex));
+        }
+        if (monitoringMutexWasInit == 1)
+        {
+            ARSAL_Mutex_Destroy(&(retSender->monitoringMutex));
         }
         if (fifoWasCreated == 1)
         {
@@ -577,6 +647,7 @@ eARSTREAM_ERROR ARSTREAM_Sender2_Delete(ARSTREAM_Sender2_t **sender)
         if (canDelete == 1)
         {
             ARSAL_Mutex_Destroy(&((*sender)->streamMutex));
+            ARSAL_Mutex_Destroy(&((*sender)->monitoringMutex));
             free((*sender)->fifoPool);
             ARSAL_Mutex_Destroy(&((*sender)->fifoMutex));
             ARSAL_Cond_Destroy(&((*sender)->fifoCond));
@@ -598,6 +669,12 @@ eARSTREAM_ERROR ARSTREAM_Sender2_Delete(ARSTREAM_Sender2_t **sender)
             {
                 free((*sender)->ifaceAddr);
             }
+#ifdef ARSTREAM_SENDER2_MONITORING_OUTPUT
+            if ((*sender)->fMonitorOut)
+            {
+                fclose((*sender)->fMonitorOut);
+            }
+#endif
             free(*sender);
             *sender = NULL;
             retVal = ARSTREAM_OK;
@@ -670,6 +747,37 @@ eARSTREAM_ERROR ARSTREAM_Sender2_FlushNaluQueue(ARSTREAM_Sender2_t *sender)
     }
 
     return retVal;
+}
+
+
+static void ARSTREAM_Sender2_UpdateMonitoring(ARSTREAM_Sender2_t *sender, uint64_t auTimestamp, uint32_t bytes)
+{
+    uint64_t curTime;
+    struct timespec t1;
+    clock_gettime(CLOCK_MONOTONIC, &t1);
+    curTime = (uint64_t)t1.tv_sec * 1000000 + (uint64_t)t1.tv_nsec / 1000;
+
+    ARSAL_Mutex_Lock(&(sender->monitoringMutex));
+
+    if (sender->monitoringCount < ARSTREAM_SENDER2_MONITORING_MAX_POINTS)
+    {
+        sender->monitoringCount++;
+    }
+    sender->monitoringIndex = (sender->monitoringIndex + 1) % ARSTREAM_SENDER2_MONITORING_MAX_POINTS;
+    sender->monitoringPoint[sender->monitoringIndex].bytes = bytes;
+    sender->monitoringPoint[sender->monitoringIndex].auTimestamp = auTimestamp;
+    sender->monitoringPoint[sender->monitoringIndex].sendTimestamp = curTime;
+
+    ARSAL_Mutex_Unlock(&(sender->monitoringMutex));
+
+#ifdef ARSTREAM_SENDER2_MONITORING_OUTPUT
+    if (sender->fMonitorOut)
+    {
+        fprintf(sender->fMonitorOut, "%llu ", curTime);
+        fprintf(sender->fMonitorOut, "%llu ", auTimestamp);
+        fprintf(sender->fMonitorOut, "%lu\n", bytes);
+    }
+#endif
 }
 
 
@@ -917,6 +1025,7 @@ static int ARSTREAM_Sender2_SendData(ARSTREAM_Sender2_t *sender, uint8_t *sendBu
                         }
                         if (bytes > -1)
                         {
+                            ARSTREAM_Sender2_UpdateMonitoring(sender, auTimestamp, (uint32_t)bytes);
                             ret = 0;
                         }
                         else if (errno == EAGAIN)
@@ -937,6 +1046,10 @@ static int ARSTREAM_Sender2_SendData(ARSTREAM_Sender2_t *sender, uint8_t *sendBu
                 ret = -1;
                 break;
             }
+        }
+        else
+        {
+            ARSTREAM_Sender2_UpdateMonitoring(sender, auTimestamp, (uint32_t)bytes);
         }
     }
     else if (sender->networkMode == ARSTREAM_SENDER2_NETWORK_MODE_ARNETWORK)
@@ -1269,6 +1382,92 @@ eARSTREAM_ERROR ARSTREAM_Sender2_SetMaxBitrateAndLatencyMs(ARSTREAM_Sender2_t *s
         ret = ARSTREAM_ERROR_BAD_PARAMETERS;
     }
     ARSAL_Mutex_Unlock(&(sender->streamMutex));
+
+    return ret;
+}
+
+
+eARSTREAM_ERROR ARSTREAM_Sender2_GetMonitoring(ARSTREAM_Sender2_t *sender, uint32_t timeIntervalUs, uint32_t *realTimeIntervalUs, uint32_t *meanAcqToNetworkTime,
+                                               uint32_t *acqToNetworkJitter, uint32_t *bytesSent, uint32_t *meanPacketSize, uint32_t *packetSizeStdDev)
+{
+    eARSTREAM_ERROR ret = ARSTREAM_OK;
+    uint64_t startTime, endTime, curTime, acqToNetworkSum = 0, acqToNetworkVarSum = 0, packetSizeVarSum = 0;
+    uint32_t bytes, bytesSum = 0, _meanPacketSize, acqToNetwork, _meanAcqToNetworkTime;
+    int points = 0, idx, i;
+
+    if ((sender == NULL) || (timeIntervalUs == 0))
+    {
+        return ARSTREAM_ERROR_BAD_PARAMETERS;
+    }
+
+    ARSAL_Mutex_Lock(&(sender->monitoringMutex));
+
+    if (sender->monitoringCount == 0)
+    {
+        ARSAL_Mutex_Unlock(&(sender->monitoringMutex));
+        return ARSTREAM_ERROR_BAD_PARAMETERS;
+    }
+
+    idx = sender->monitoringIndex;
+    startTime = curTime = sender->monitoringPoint[idx].sendTimestamp;
+    bytesSum += sender->monitoringPoint[idx].bytes;
+    acqToNetworkSum += (curTime - sender->monitoringPoint[idx].auTimestamp);
+    points++;
+
+    while ((startTime - curTime < timeIntervalUs) && (points < sender->monitoringCount))
+    {
+        idx = (idx - 1 >= 0) ? idx - 1 : ARSTREAM_SENDER2_MONITORING_MAX_POINTS - 1;
+        curTime = sender->monitoringPoint[idx].sendTimestamp;
+        bytes = sender->monitoringPoint[idx].bytes;
+        bytesSum += bytes;
+        acqToNetwork = curTime - sender->monitoringPoint[idx].auTimestamp;
+        acqToNetworkSum += acqToNetwork;
+        points++;
+    }
+
+    endTime = curTime;
+    _meanPacketSize = bytesSum / points;
+    _meanAcqToNetworkTime = (uint32_t)(acqToNetworkSum / points);
+
+    if ((acqToNetworkJitter) || (packetSizeStdDev))
+    {
+        for (i = 0, idx = sender->monitoringIndex; i < points; i++)
+        {
+            idx = (idx - 1 >= 0) ? idx - 1 : ARSTREAM_SENDER2_MONITORING_MAX_POINTS - 1;
+            curTime = sender->monitoringPoint[idx].sendTimestamp;
+            bytes = sender->monitoringPoint[idx].bytes;
+            acqToNetwork = curTime - sender->monitoringPoint[idx].auTimestamp;
+            packetSizeVarSum += ((bytes - _meanPacketSize) * (bytes - _meanPacketSize));
+            acqToNetworkVarSum += ((acqToNetwork - _meanAcqToNetworkTime) * (acqToNetwork - _meanAcqToNetworkTime));
+        }
+    }
+
+    ARSAL_Mutex_Unlock(&(sender->monitoringMutex));
+
+    if (realTimeIntervalUs)
+    {
+        *realTimeIntervalUs = (startTime - endTime);
+    }
+    if (meanAcqToNetworkTime)
+    {
+        *meanAcqToNetworkTime = _meanAcqToNetworkTime;
+    }
+    if (acqToNetworkJitter)
+    {
+        *acqToNetworkJitter = (uint32_t)(sqrt((double)acqToNetworkVarSum / points));
+    }
+    if (bytesSent)
+    {
+        *bytesSent = bytesSum;
+    }
+    if (meanPacketSize)
+    {
+        *meanPacketSize = _meanPacketSize;
+    }
+    if (packetSizeStdDev)
+    {
+        *packetSizeStdDev = (uint32_t)(sqrt((double)packetSizeVarSum / points));
+    }
 
     return ret;
 }
