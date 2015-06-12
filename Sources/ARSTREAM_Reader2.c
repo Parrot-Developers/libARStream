@@ -322,6 +322,35 @@ eARSTREAM_ERROR ARSTREAM_Reader2_Delete(ARSTREAM_Reader2_t **reader)
 }
 
 
+static int ARSTREAM_Reader2_SetSocketReceiveBufferSize(ARSTREAM_Reader2_t *reader, int size)
+{
+    int ret = 0, err;
+    int size2 = sizeof(int);
+
+    size /= 2;
+    err = ARSAL_Socket_Setsockopt(reader->recvSocket, SOL_SOCKET, SO_RCVBUF, (void*)&size, sizeof(size));
+    if (err != 0)
+    {
+        ret = -1;
+        ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Failed to set receive socket buffer size to 2*%d bytes: error=%d (%s)", size, errno, strerror(errno));
+    }
+
+    size = -1;
+    err = ARSAL_Socket_Getsockopt(reader->recvSocket, SOL_SOCKET, SO_RCVBUF, (void*)&size, &size2);
+    if (err != 0)
+    {
+        ret = -1;
+        ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Failed to get receive socket buffer size: error=%d (%s)", errno, strerror(errno));
+    }
+    else
+    {
+        ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Receive socket buffer size is %d bytes", size); //TODO: debug
+    }
+
+    return ret;
+}
+
+
 static int ARSTREAM_Reader2_Bind(ARSTREAM_Reader2_t *reader)
 {
     int ret = 0;
@@ -469,6 +498,17 @@ static int ARSTREAM_Reader2_Bind(ARSTREAM_Reader2_t *reader)
                 ret = -1;
             }
             ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Bind OK"); //TODO: debug
+        }
+
+        if (ret == 0)
+        {
+            /* set the socket buffer size */
+            err = ARSTREAM_Reader2_SetSocketReceiveBufferSize(reader, 600 * 1024); //TODO
+            if (err != 0)
+            {
+                ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Failed to set the socket buffer size (%d)", err);
+                ret = -1;
+            }
         }
 
         if (ret != 0)
