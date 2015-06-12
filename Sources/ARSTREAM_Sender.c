@@ -422,10 +422,10 @@ eARNETWORK_MANAGER_CALLBACK_RETURN ARSTREAM_Sender_NetworkCallback (int IoBuffer
         // Modify packetsToSend only if it refers to the frame we're sending
         if (frameNumber == sender->packetsToSend.frameNumber)
         {
-            ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARSTREAM_SENDER_TAG, "Sent packet %d", packetIndex);
+            ARSAL_PRINT (ARSAL_PRINT_VERBOSE, ARSTREAM_SENDER_TAG, "Sent packet %d", packetIndex);
             if (1 == ARSTREAM_NetworkHeaders_AckPacketUnsetFlag (&(sender->packetsToSend), packetIndex))
             {
-                ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARSTREAM_SENDER_TAG, "All packets were sent");
+                ARSAL_PRINT (ARSAL_PRINT_VERBOSE, ARSTREAM_SENDER_TAG, "All packets were sent");
             }
         }
         else
@@ -853,12 +853,11 @@ void* ARSTREAM_Sender_RunDataThread (void *ARSTREAM_Sender_t_Param)
         if (waitRes == 1)
         {
             int previousWasAck = 1;
-            ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARSTREAM_SENDER_TAG, "Previous frame was sent in %d packets. Frame size was %d packets", numbersOfFragmentsSentForCurrentFrame, nbPackets);
+            ARSAL_PRINT (ARSAL_PRINT_VERBOSE, ARSTREAM_SENDER_TAG, "Previous frame was sent in %d packets. Frame size was %d packets", numbersOfFragmentsSentForCurrentFrame, nbPackets);
             sender->efficiency_nbFragments [sender->efficiency_index ] = nbPackets;
             sender->efficiency_nbSent [sender->efficiency_index] = numbersOfFragmentsSentForCurrentFrame;
             numbersOfFragmentsSentForCurrentFrame = 0;
             /* We have a new frame to send */
-            ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARSTREAM_SENDER_TAG, "New frame needs to be sent");
             sender->efficiency_index ++;
             sender->efficiency_index %= ARSTREAM_SENDER_EFFICIENCY_AVERAGE_NB_FRAMES;
             sender->efficiency_nbSent [sender->efficiency_index] = 0;
@@ -871,7 +870,7 @@ void* ARSTREAM_Sender_RunDataThread (void *ARSTREAM_Sender_t_Param)
             {
 #ifdef DEBUG
                 ARSTREAM_NetworkHeaders_AckPacketDump ("Cancel frame:", &(sender->ackPacket));
-                ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARSTREAM_SENDER_TAG, "Receiver acknowledged %d of %d packets", ARSTREAM_NetworkHeaders_AckPacketCountSet (&(sender->ackPacket), nbPackets), nbPackets);
+                ARSAL_PRINT (ARSAL_PRINT_VERBOSE, ARSTREAM_SENDER_TAG, "Receiver acknowledged %d of %d packets", ARSTREAM_NetworkHeaders_AckPacketCountSet (&(sender->ackPacket), nbPackets), nbPackets);
 #endif
 
                 previousWasAck = 0;
@@ -922,7 +921,7 @@ void* ARSTREAM_Sender_RunDataThread (void *ARSTREAM_Sender_t_Param)
             }
             sender->currentFrameNbFragments = nbPackets;
 
-            ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARSTREAM_SENDER_TAG, "New frame has size %d (=%d packets)", sendSize, nbPackets);
+            ARSAL_PRINT (ARSAL_PRINT_VERBOSE, ARSTREAM_SENDER_TAG, "New frame has size %d (=%d packets)", sendSize, nbPackets);
         }
         ARSAL_Mutex_Unlock (&(sender->ackMutex));
         /* END OF NEW FRAME BLOCK */
@@ -985,7 +984,7 @@ void* ARSTREAM_Sender_RunDataThread (void *ARSTREAM_Sender_t_Param)
     {
 #ifdef DEBUG
         ARSTREAM_NetworkHeaders_AckPacketDump ("Cancel frame:", &(sender->ackPacket));
-        ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARSTREAM_SENDER_TAG, "Receiver acknowledged %d of %d packets", ARSTREAM_NetworkHeaders_AckPacketCountSet (&(sender->ackPacket), nbPackets), nbPackets);
+        ARSAL_PRINT (ARSAL_PRINT_VERBOSE, ARSTREAM_SENDER_TAG, "Receiver acknowledged %d of %d packets", ARSTREAM_NetworkHeaders_AckPacketCountSet (&(sender->ackPacket), nbPackets), nbPackets);
 #endif
         ARSTREAM_Sender_CallCallback (sender, ARSTREAM_SENDER_STATUS_FRAME_CANCEL, sender->currentFrame.frameBuffer, sender->currentFrame.frameSize);
     }
