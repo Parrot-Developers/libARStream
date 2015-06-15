@@ -160,7 +160,8 @@ ARSTREAM_Reader2Debug_t* ARSTREAM_Reader2Debug_New(int outputStatFile, int outpu
         fprintf(rdbg->statsFile, "batteryPercentage latitude longitude altitude absoluteHeight relativeHeight xSpeed ySpeed zSpeed distance heading yaw pitch roll cameraPan cameraTilt ");
         fprintf(rdbg->statsFile, "targetLiveVideoBitrate wifiRssi wifiMcsRate wifiTxRate wifiRxRate wifiTxFailRate wifiTxErrorRate ");
         fprintf(rdbg->statsFile, "postReprojTimestampDelta postEeTimestampDelta postScalingTimestampDelta postLiveEncodingTimestampDelta postNetworkTimestampDelta ");
-        fprintf(rdbg->statsFile, "sdkMissingPackets sdkTotalPackets\n");
+        fprintf(rdbg->statsFile, "streamingSrcMeanAcqToNetworkTime streamingSrcAcqToNetworkJitter streamingSrcBytesSent streamingSrcMeanPacketSize streamingSrcPacketSizeStdDev ");
+        fprintf(rdbg->statsFile, "streamingSinkMissingPackets streamingSinkTotalPackets\n");
     }
 
     if (outputVideoFile)
@@ -368,7 +369,30 @@ void ARSTREAM_Reader2Debug_ProcessAu(ARSTREAM_Reader2Debug_t *rdbg, uint8_t* pAu
             {
                 fprintf(rdbg->statsFile, "%lu ", (long unsigned int)parrotDragonBasicUserData.frameIndex);
                 fprintf(rdbg->statsFile, "%llu ", (long long unsigned int)acquisitionTs);
-                fprintf(rdbg->statsFile, "%.3f\n", psnr);
+                fprintf(rdbg->statsFile, "%llu ", (long long unsigned int)timestamp);
+                fprintf(rdbg->statsFile, "%llu ", (long long unsigned int)receptionTs);
+                fprintf(rdbg->statsFile, "%llu ", (long long unsigned int)0);
+                fprintf(rdbg->statsFile, "%lu %.3f %d %d %d ", 
+                        (long unsigned int)auSize, 
+                        psnr, 
+                        estimatedLostFrames,
+                        sliceInfo.idrPicFlag,
+                        sliceInfo.sliceTypeMod5);
+                fprintf(rdbg->statsFile, "%lu %.8f %.8f %.3f ", 
+                        (long unsigned int)0, 0., 0., 0.);
+                fprintf(rdbg->statsFile, "%.3f %.3f %.3f %.3f %.3f %.3f %.3f ", 
+                        0., 0., 0., 0., 0., 0., 0.);
+                fprintf(rdbg->statsFile, "%.3f %.3f %.3f %.3f %.3f ", 
+                        0., 0., 0., 0., 0.);
+                fprintf(rdbg->statsFile, "%d %d %d %d %d %d %d ", 
+                        0, 0, 0, 0, 0, 0, 0);
+                fprintf(rdbg->statsFile, "%lu %lu %lu %lu %lu ", 
+                        (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0);
+                fprintf(rdbg->statsFile, "%lu %lu %lu %lu %lu\n", 
+                        (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0);
+                fprintf(rdbg->statsFile, "%d %d\n", 
+                        missingPackets, 
+                        totalPackets);
                 fflush(rdbg->statsFile);
             }
             break;
@@ -419,6 +443,12 @@ void ARSTREAM_Reader2Debug_ProcessAu(ARSTREAM_Reader2Debug_t *rdbg, uint8_t* pAu
                         (long unsigned int)parrotDragonExtendedUserData.postScalingTimestampDelta, 
                         (long unsigned int)parrotDragonExtendedUserData.postLiveEncodingTimestampDelta, 
                         (long unsigned int)parrotDragonExtendedUserData.postNetworkTimestampDelta);
+                fprintf(rdbg->statsFile, "%lu %lu %lu %lu %lu ", 
+                        (long unsigned int)(((float)parrotDragonExtendedUserData.streamingMeanAcqToNetworkTime / (float)parrotDragonExtendedUserData.streamingMonitorTimeInterval) * 1000000.), 
+                        (long unsigned int)(((float)parrotDragonExtendedUserData.streamingAcqToNetworkJitter / (float)parrotDragonExtendedUserData.streamingMonitorTimeInterval) * 1000000.), 
+                        (long unsigned int)(((float)parrotDragonExtendedUserData.streamingBytesSent / (float)parrotDragonExtendedUserData.streamingMonitorTimeInterval) * 1000000.), 
+                        (long unsigned int)(((float)parrotDragonExtendedUserData.streamingMeanPacketSize / (float)parrotDragonExtendedUserData.streamingMonitorTimeInterval) * 1000000.), 
+                        (long unsigned int)(((float)parrotDragonExtendedUserData.streamingPacketSizeStdDev / (float)parrotDragonExtendedUserData.streamingMonitorTimeInterval) * 1000000.));
                 fprintf(rdbg->statsFile, "%d %d\n", 
                         missingPackets, 
                         totalPackets);
@@ -426,6 +456,36 @@ void ARSTREAM_Reader2Debug_ProcessAu(ARSTREAM_Reader2Debug_t *rdbg, uint8_t* pAu
             }
             break;
         default:
+            if (rdbg->statsFile)
+            {
+                fprintf(rdbg->statsFile, "%lu ", (long unsigned int)0);
+                fprintf(rdbg->statsFile, "%llu ", (long long unsigned int)0);
+                fprintf(rdbg->statsFile, "%llu ", (long long unsigned int)timestamp);
+                fprintf(rdbg->statsFile, "%llu ", (long long unsigned int)receptionTs);
+                fprintf(rdbg->statsFile, "%llu ", (long long unsigned int)0);
+                fprintf(rdbg->statsFile, "%lu %.3f %d %d %d ", 
+                        (long unsigned int)auSize, 
+                        0., 
+                        0,
+                        sliceInfo.idrPicFlag,
+                        sliceInfo.sliceTypeMod5);
+                fprintf(rdbg->statsFile, "%lu %.8f %.8f %.3f ", 
+                        (long unsigned int)0, 0., 0., 0.);
+                fprintf(rdbg->statsFile, "%.3f %.3f %.3f %.3f %.3f %.3f %.3f ", 
+                        0., 0., 0., 0., 0., 0., 0.);
+                fprintf(rdbg->statsFile, "%.3f %.3f %.3f %.3f %.3f ", 
+                        0., 0., 0., 0., 0.);
+                fprintf(rdbg->statsFile, "%d %d %d %d %d %d %d ", 
+                        0, 0, 0, 0, 0, 0, 0);
+                fprintf(rdbg->statsFile, "%lu %lu %lu %lu %lu ", 
+                        (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0);
+                fprintf(rdbg->statsFile, "%lu %lu %lu %lu %lu\n", 
+                        (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0);
+                fprintf(rdbg->statsFile, "%d %d\n", 
+                        missingPackets, 
+                        totalPackets);
+                fflush(rdbg->statsFile);
+            }
             break;
     }
     setlocale(LC_ALL, "");

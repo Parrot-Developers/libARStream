@@ -91,6 +91,12 @@ typedef struct
     uint32_t postNetworkTimestampDelta;                                     /**< Post-network time */
     uint32_t systemTsH;                                                     /**< Frame acquisition timestamp (high 32 bits) */
     uint32_t systemTsL;                                                     /**< Frame acquisition timestamp (low 32 bits) */
+    uint32_t streamingMonitorTimeInterval;                                  /**< Streaming monitoring time interval in microseconds */
+    uint32_t streamingMeanAcqToNetworkTime;                                 /**< Streaming mean acquisition to network time */
+    uint32_t streamingAcqToNetworkJitter;                                   /**< Streaming acquisition to network time jitter */
+    uint32_t streamingBytesSent;                                            /**< Streaming bytes sent during the interval */
+    uint32_t streamingMeanPacketSize;                                       /**< Streaming mean packet size */
+    uint32_t streamingPacketSizeStdDev;                                     /**< Streaming packet size standard deviation */
     char serialNumberH[H264P_PARROT_DRAGON_SERIAL_NUMBER_PART_LENGTH + 1];  /**< Serial number high part */
     char serialNumberL[H264P_PARROT_DRAGON_SERIAL_NUMBER_PART_LENGTH + 1];  /**< Serial number low part */
 
