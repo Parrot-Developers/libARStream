@@ -107,6 +107,8 @@ int H264P_parseParrotDragonExtendedUserDataSei(const void* pBuf, unsigned int bu
     userDataSei->streamingMeanPacketSize = ntohl(*(pdwBuf++));
     userDataSei->streamingPacketSizeStdDev = ntohl(*(pdwBuf++));
     userDataSei->streamingPacketsSent = ntohl(*(pdwBuf++));
+    userDataSei->streamingBytesDropped = ntohl(*(pdwBuf++));
+    userDataSei->streamingNaluDropped = ntohl(*(pdwBuf++));
 
     pszBuf = (char*)pdwBuf;
     strncpy(userDataSei->serialNumberH, pszBuf, H264P_PARROT_DRAGON_SERIAL_NUMBER_PART_LENGTH + 1);

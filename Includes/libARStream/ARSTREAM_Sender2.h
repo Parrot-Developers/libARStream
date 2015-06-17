@@ -233,6 +233,7 @@ int ARSTREAM_Sender2_GetMaxLatencyMs(ARSTREAM_Sender2_t *sender);
 eARSTREAM_ERROR ARSTREAM_Sender2_SetMaxBitrateAndLatencyMs(ARSTREAM_Sender2_t *sender, int maxBitrate, int maxLatencyMs);
 
 eARSTREAM_ERROR ARSTREAM_Sender2_GetMonitoring(ARSTREAM_Sender2_t *sender, uint32_t timeIntervalUs, uint32_t *realTimeIntervalUs, uint32_t *meanAcqToNetworkTime,
-                                               uint32_t *acqToNetworkJitter, uint32_t *bytesSent, uint32_t *meanPacketSize, uint32_t *packetSizeStdDev, uint32_t *packetsSent);
+                                               uint32_t *acqToNetworkJitter, uint32_t *bytesSent, uint32_t *meanPacketSize, uint32_t *packetSizeStdDev, uint32_t *packetsSent,
+                                               uint32_t *bytesDropped, uint32_t *naluDropped);
 
 #endif /* _ARSTREAM_SENDER2_H_ */

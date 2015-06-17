@@ -116,9 +116,10 @@ typedef struct ARSTREAM_Sender2_Nalu_s {
 #define ARSTREAM_SENDER2_MONITORING_MAX_POINTS (2048)
 
 typedef struct ARSTREAM_Sender2_MonitoringPoint_s {
-    uint32_t bytes;
     uint64_t auTimestamp;
     uint64_t sendTimestamp;
+    uint32_t bytesSent;
+    uint32_t bytesDropped;
 } ARSTREAM_Sender2_MonitoringPoint_t;
 
 
@@ -343,19 +344,19 @@ static int ARSTREAM_Sender2_DropFromFifo(ARSTREAM_Sender2_t *sender, int maxTarg
 
     if (dropSize[0])
     {
-        ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Drop from FIFO - dropSize[0] = %d bytes", dropSize[0]); //TODO: debug
+        ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_SENDER2_TAG, "Drop from FIFO - dropSize[0] = %d bytes", dropSize[0]); //TODO: debug
     }
     if (dropSize[1])
     {
-        ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Drop from FIFO - dropSize[1] = %d bytes", dropSize[1]); //TODO: debug
+        ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_SENDER2_TAG, "Drop from FIFO - dropSize[1] = %d bytes", dropSize[1]); //TODO: debug
     }
     if (dropSize[2])
     {
-        ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Drop from FIFO - dropSize[2] = %d bytes", dropSize[2]); //TODO: debug
+        ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_SENDER2_TAG, "Drop from FIFO - dropSize[2] = %d bytes", dropSize[2]); //TODO: debug
     }
     if (dropSize[3])
     {
-        ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Drop from FIFO - dropSize[3] = %d bytes", dropSize[3]); //TODO: debug
+        ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_SENDER2_TAG, "Drop from FIFO - dropSize[3] = %d bytes", dropSize[3]); //TODO: debug
     }
 
     return dropSize[0] + dropSize[1] + dropSize[2] + dropSize[3];
@@ -750,7 +751,7 @@ eARSTREAM_ERROR ARSTREAM_Sender2_FlushNaluQueue(ARSTREAM_Sender2_t *sender)
 }
 
 
-static void ARSTREAM_Sender2_UpdateMonitoring(ARSTREAM_Sender2_t *sender, uint64_t auTimestamp, uint32_t bytes)
+static void ARSTREAM_Sender2_UpdateMonitoring(ARSTREAM_Sender2_t *sender, uint64_t auTimestamp, uint32_t bytesSent, uint32_t bytesDropped)
 {
     uint64_t curTime;
     struct timespec t1;
@@ -764,9 +765,10 @@ static void ARSTREAM_Sender2_UpdateMonitoring(ARSTREAM_Sender2_t *sender, uint64
         sender->monitoringCount++;
     }
     sender->monitoringIndex = (sender->monitoringIndex + 1) % ARSTREAM_SENDER2_MONITORING_MAX_POINTS;
-    sender->monitoringPoint[sender->monitoringIndex].bytes = bytes;
     sender->monitoringPoint[sender->monitoringIndex].auTimestamp = auTimestamp;
     sender->monitoringPoint[sender->monitoringIndex].sendTimestamp = curTime;
+    sender->monitoringPoint[sender->monitoringIndex].bytesSent = bytesSent;
+    sender->monitoringPoint[sender->monitoringIndex].bytesDropped = bytesDropped;
 
     ARSAL_Mutex_Unlock(&(sender->monitoringMutex));
 
@@ -775,7 +777,7 @@ static void ARSTREAM_Sender2_UpdateMonitoring(ARSTREAM_Sender2_t *sender, uint64
     {
         fprintf(sender->fMonitorOut, "%llu ", curTime);
         fprintf(sender->fMonitorOut, "%llu ", auTimestamp);
-        fprintf(sender->fMonitorOut, "%lu\n", bytes);
+        fprintf(sender->fMonitorOut, "%lu %lu\n", bytesSent, bytesDropped);
     }
 #endif
 }
@@ -1025,7 +1027,7 @@ static int ARSTREAM_Sender2_SendData(ARSTREAM_Sender2_t *sender, uint8_t *sendBu
                         }
                         if (bytes > -1)
                         {
-                            ARSTREAM_Sender2_UpdateMonitoring(sender, auTimestamp, (uint32_t)bytes);
+                            ARSTREAM_Sender2_UpdateMonitoring(sender, auTimestamp, (uint32_t)bytes, 0);
                             ret = 0;
                         }
                         else if (errno == EAGAIN)
@@ -1049,7 +1051,7 @@ static int ARSTREAM_Sender2_SendData(ARSTREAM_Sender2_t *sender, uint8_t *sendBu
         }
         else
         {
-            ARSTREAM_Sender2_UpdateMonitoring(sender, auTimestamp, (uint32_t)bytes);
+            ARSTREAM_Sender2_UpdateMonitoring(sender, auTimestamp, (uint32_t)bytes, 0);
         }
     }
     else if (sender->networkMode == ARSTREAM_SENDER2_NETWORK_MODE_ARNETWORK)
@@ -1061,6 +1063,7 @@ static int ARSTREAM_Sender2_SendData(ARSTREAM_Sender2_t *sender, uint8_t *sendBu
             ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Error occurred during sending of the packet; error: %d (%s)", netError, ARNETWORK_Error_ToString(netError));
             ret = -1;
         }
+        //TODO: monitoring
     }
 
     return ret;
@@ -1209,6 +1212,10 @@ void* ARSTREAM_Sender2_RunDataThread (void *ARSTREAM_Sender2_t_Param)
                         ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Time %llu: singleNALU SendData failed (error %d)", nalu.auTimestamp, ret);
                     }
                 }
+            }
+            else
+            {
+                ARSTREAM_Sender2_UpdateMonitoring(sender, nalu.auTimestamp, 0, nalu.naluSize);
             }
 
             /* last NALU in the Access Unit: call the auCallback */
@@ -1388,12 +1395,15 @@ eARSTREAM_ERROR ARSTREAM_Sender2_SetMaxBitrateAndLatencyMs(ARSTREAM_Sender2_t *s
 
 
 eARSTREAM_ERROR ARSTREAM_Sender2_GetMonitoring(ARSTREAM_Sender2_t *sender, uint32_t timeIntervalUs, uint32_t *realTimeIntervalUs, uint32_t *meanAcqToNetworkTime,
-                                               uint32_t *acqToNetworkJitter, uint32_t *bytesSent, uint32_t *meanPacketSize, uint32_t *packetSizeStdDev, uint32_t *packetsSent)
+                                               uint32_t *acqToNetworkJitter, uint32_t *bytesSent, uint32_t *meanPacketSize, uint32_t *packetSizeStdDev, uint32_t *packetsSent,
+                                               uint32_t *bytesDropped, uint32_t *naluDropped)
 {
     eARSTREAM_ERROR ret = ARSTREAM_OK;
     uint64_t startTime, endTime, curTime, acqToNetworkSum = 0, acqToNetworkVarSum = 0, packetSizeVarSum = 0;
-    uint32_t bytes, bytesSum = 0, _meanPacketSize, acqToNetwork, _meanAcqToNetworkTime;
-    int points = 0, idx, i;
+    uint32_t _bytesSent, _bytesDropped, bytesSentSum = 0, bytesDroppedSum = 0, _meanPacketSize, acqToNetwork, _meanAcqToNetworkTime;
+    int points = 0, _packetsSent = 0, _packetsDropped = 0, idx, i;
+
+    //TODO: code review
 
     if ((sender == NULL) || (timeIntervalUs == 0))
     {
@@ -1410,24 +1420,45 @@ eARSTREAM_ERROR ARSTREAM_Sender2_GetMonitoring(ARSTREAM_Sender2_t *sender, uint3
 
     idx = sender->monitoringIndex;
     startTime = curTime = sender->monitoringPoint[idx].sendTimestamp;
-    bytesSum += sender->monitoringPoint[idx].bytes;
-    acqToNetworkSum += (curTime - sender->monitoringPoint[idx].auTimestamp);
+    _bytesSent = sender->monitoringPoint[idx].bytesSent;
+    bytesSentSum += _bytesSent;
+    if (_bytesSent)
+    {
+        _packetsSent++;
+        acqToNetworkSum += (curTime - sender->monitoringPoint[idx].auTimestamp);
+    }
+    _bytesDropped = sender->monitoringPoint[idx].bytesDropped;
+    bytesDroppedSum += _bytesDropped;
+    if (_bytesDropped)
+    {
+        _packetsDropped++;
+    }
     points++;
 
     while ((startTime - curTime < timeIntervalUs) && (points < sender->monitoringCount))
     {
         idx = (idx - 1 >= 0) ? idx - 1 : ARSTREAM_SENDER2_MONITORING_MAX_POINTS - 1;
         curTime = sender->monitoringPoint[idx].sendTimestamp;
-        bytes = sender->monitoringPoint[idx].bytes;
-        bytesSum += bytes;
-        acqToNetwork = curTime - sender->monitoringPoint[idx].auTimestamp;
-        acqToNetworkSum += acqToNetwork;
+        _bytesSent = sender->monitoringPoint[idx].bytesSent;
+        bytesSentSum += _bytesSent;
+        if (_bytesSent)
+        {
+            _packetsSent++;
+            acqToNetwork = curTime - sender->monitoringPoint[idx].auTimestamp;
+            acqToNetworkSum += acqToNetwork;
+        }
+        _bytesDropped = sender->monitoringPoint[idx].bytesDropped;
+        bytesDroppedSum += _bytesDropped;
+        if (_bytesDropped)
+        {
+            _packetsDropped++;
+        }
         points++;
     }
 
     endTime = curTime;
-    _meanPacketSize = bytesSum / points;
-    _meanAcqToNetworkTime = (uint32_t)(acqToNetworkSum / points);
+    _meanPacketSize = bytesSentSum / _packetsSent;
+    _meanAcqToNetworkTime = (uint32_t)(acqToNetworkSum / _packetsSent);
 
     if ((acqToNetworkJitter) || (packetSizeStdDev))
     {
@@ -1435,10 +1466,13 @@ eARSTREAM_ERROR ARSTREAM_Sender2_GetMonitoring(ARSTREAM_Sender2_t *sender, uint3
         {
             idx = (idx - 1 >= 0) ? idx - 1 : ARSTREAM_SENDER2_MONITORING_MAX_POINTS - 1;
             curTime = sender->monitoringPoint[idx].sendTimestamp;
-            bytes = sender->monitoringPoint[idx].bytes;
-            acqToNetwork = curTime - sender->monitoringPoint[idx].auTimestamp;
-            packetSizeVarSum += ((bytes - _meanPacketSize) * (bytes - _meanPacketSize));
-            acqToNetworkVarSum += ((acqToNetwork - _meanAcqToNetworkTime) * (acqToNetwork - _meanAcqToNetworkTime));
+            _bytesSent = sender->monitoringPoint[idx].bytesSent;
+            if (_bytesSent)
+            {
+                acqToNetwork = curTime - sender->monitoringPoint[idx].auTimestamp;
+                packetSizeVarSum += ((_bytesSent - _meanPacketSize) * (_bytesSent - _meanPacketSize));
+                acqToNetworkVarSum += ((acqToNetwork - _meanAcqToNetworkTime) * (acqToNetwork - _meanAcqToNetworkTime));
+            }
         }
     }
 
@@ -1454,11 +1488,11 @@ eARSTREAM_ERROR ARSTREAM_Sender2_GetMonitoring(ARSTREAM_Sender2_t *sender, uint3
     }
     if (acqToNetworkJitter)
     {
-        *acqToNetworkJitter = (uint32_t)(sqrt((double)acqToNetworkVarSum / points));
+        *acqToNetworkJitter = (uint32_t)(sqrt((double)acqToNetworkVarSum / _packetsSent));
     }
     if (bytesSent)
     {
-        *bytesSent = bytesSum;
+        *bytesSent = bytesSentSum;
     }
     if (meanPacketSize)
     {
@@ -1466,11 +1500,19 @@ eARSTREAM_ERROR ARSTREAM_Sender2_GetMonitoring(ARSTREAM_Sender2_t *sender, uint3
     }
     if (packetSizeStdDev)
     {
-        *packetSizeStdDev = (uint32_t)(sqrt((double)packetSizeVarSum / points));
+        *packetSizeStdDev = (uint32_t)(sqrt((double)packetSizeVarSum / _packetsSent));
     }
     if (packetsSent)
     {
-        *packetsSent = points;
+        *packetsSent = _packetsSent;
+    }
+    if (bytesDropped)
+    {
+        *bytesDropped = bytesDroppedSum;
+    }
+    if (naluDropped)
+    {
+        *naluDropped = _packetsDropped;
     }
 
     return ret;
