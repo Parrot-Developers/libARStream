@@ -1388,7 +1388,7 @@ eARSTREAM_ERROR ARSTREAM_Sender2_SetMaxBitrateAndLatencyMs(ARSTREAM_Sender2_t *s
 
 
 eARSTREAM_ERROR ARSTREAM_Sender2_GetMonitoring(ARSTREAM_Sender2_t *sender, uint32_t timeIntervalUs, uint32_t *realTimeIntervalUs, uint32_t *meanAcqToNetworkTime,
-                                               uint32_t *acqToNetworkJitter, uint32_t *bytesSent, uint32_t *meanPacketSize, uint32_t *packetSizeStdDev)
+                                               uint32_t *acqToNetworkJitter, uint32_t *bytesSent, uint32_t *meanPacketSize, uint32_t *packetSizeStdDev, uint32_t *packetsSent)
 {
     eARSTREAM_ERROR ret = ARSTREAM_OK;
     uint64_t startTime, endTime, curTime, acqToNetworkSum = 0, acqToNetworkVarSum = 0, packetSizeVarSum = 0;
@@ -1467,6 +1467,10 @@ eARSTREAM_ERROR ARSTREAM_Sender2_GetMonitoring(ARSTREAM_Sender2_t *sender, uint3
     if (packetSizeStdDev)
     {
         *packetSizeStdDev = (uint32_t)(sqrt((double)packetSizeVarSum / points));
+    }
+    if (packetsSent)
+    {
+        *packetsSent = points;
     }
 
     return ret;

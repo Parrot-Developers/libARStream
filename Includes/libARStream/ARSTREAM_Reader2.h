@@ -204,4 +204,7 @@ void* ARSTREAM_Reader2_RunAckThread (void *ARSTREAM_Reader2_t_Param);
  */
 void* ARSTREAM_Reader2_GetCustom (ARSTREAM_Reader2_t *reader);
 
+eARSTREAM_ERROR ARSTREAM_Reader2_GetMonitoring(ARSTREAM_Reader2_t *reader, uint32_t timeIntervalUs, uint32_t *realTimeIntervalUs, uint32_t *receptionTimeJitter,
+                                               uint32_t *bytesReceived, uint32_t *meanPacketSize, uint32_t *packetSizeStdDev, uint32_t *packetsReceived, uint32_t *packetsMissed);
+
 #endif /* _ARSTREAM_READER2_H_ */

@@ -8,6 +8,11 @@
 #include "h264p.h"
 
 
+#define printf(...)
+#define fprintf(...)
+#define log2(x) (log(x) / log(2))
+
+
 #define BYTE_STREAM_NALU_START_CODE 0x00000001
 
 #define SEI_PAYLOAD_TYPE_BUFFERING_PERIOD 0
@@ -3156,7 +3161,7 @@ int H264P_ReadNextNalu_file(H264P_Handle parserHandle, FILE* fp, unsigned int fi
 {
     parser_t* parser = (parser_t*)parserHandle;
     int ret = 0;
-    int naluStart, naluEnd, naluSize;
+    int naluStart, naluEnd, naluSize = 0;
 
     if (!parserHandle)
     {
@@ -3245,7 +3250,7 @@ int H264P_ReadNextNalu_file(H264P_Handle parserHandle, FILE* fp, unsigned int fi
         return ret;
     }
 
-    return 0;
+    return naluSize;
 }
 
 
@@ -3342,7 +3347,7 @@ int H264P_ReadNextNalu_buffer(H264P_Handle parserHandle, void* pBuf, unsigned in
         }
         else
         {
-            fprintf(stderr, "Error: invalid NALU size (naluStart=%d, naluEnd=%d)\n", naluStart, naluEnd);
+            fprintf(stderr, "Error: invalid NALU size\n");
             return -1;
         }
         

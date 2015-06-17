@@ -97,6 +97,7 @@ typedef struct
     uint32_t streamingBytesSent;                                            /**< Streaming bytes sent during the interval */
     uint32_t streamingMeanPacketSize;                                       /**< Streaming mean packet size */
     uint32_t streamingPacketSizeStdDev;                                     /**< Streaming packet size standard deviation */
+    uint32_t streamingPacketsSent;                                          /**< Streaming packets sent during the interval */
     char serialNumberH[H264P_PARROT_DRAGON_SERIAL_NUMBER_PART_LENGTH + 1];  /**< Serial number high part */
     char serialNumberL[H264P_PARROT_DRAGON_SERIAL_NUMBER_PART_LENGTH + 1];  /**< Serial number low part */
 

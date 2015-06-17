@@ -63,7 +63,6 @@ int H264P_parseParrotDragonExtendedUserDataSei(const void* pBuf, unsigned int bu
     if ((userDataSei->uuid[0] != H264P_PARROT_DRAGON_EXTENDED_USER_DATA_SEI_UUID_0) || (userDataSei->uuid[1] != H264P_PARROT_DRAGON_EXTENDED_USER_DATA_SEI_UUID_1) 
             || (userDataSei->uuid[2] != H264P_PARROT_DRAGON_EXTENDED_USER_DATA_SEI_UUID_2) || (userDataSei->uuid[3] != H264P_PARROT_DRAGON_EXTENDED_USER_DATA_SEI_UUID_3))
     {
-        printf("UUID\n");
         return -1;
     }
     
@@ -107,6 +106,7 @@ int H264P_parseParrotDragonExtendedUserDataSei(const void* pBuf, unsigned int bu
     userDataSei->streamingBytesSent = ntohl(*(pdwBuf++));
     userDataSei->streamingMeanPacketSize = ntohl(*(pdwBuf++));
     userDataSei->streamingPacketSizeStdDev = ntohl(*(pdwBuf++));
+    userDataSei->streamingPacketsSent = ntohl(*(pdwBuf++));
 
     pszBuf = (char*)pdwBuf;
     strncpy(userDataSei->serialNumberH, pszBuf, H264P_PARROT_DRAGON_SERIAL_NUMBER_PART_LENGTH + 1);

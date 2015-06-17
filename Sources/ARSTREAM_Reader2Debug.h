@@ -60,11 +60,12 @@ typedef struct ARSTREAM_Reader2Debug_t ARSTREAM_Reader2Debug_t;
  * @brief Creates a new ARSTREAM_Reader2Debug_t
  * @warning This function allocates memory. An ARSTREAM_Reader2Debug_t muse be deleted by a call to ARSTREAM_Reader2Debug_Delete
  *
- * @param outputStatFile if not null, output stats to a stat file
+ * @param outputRtpStatFile if not null, output RTP stats to a stat file
+ * @param outputH264StatFile if not null, output H.264 video stats to a stat file
  * @param outputVideoFile if not null, output the video stream to a stat file
  * @return A pointer to the new ARSTREAM_Reader2Debug_t, or NULL if an error occured
  */
-ARSTREAM_Reader2Debug_t* ARSTREAM_Reader2Debug_New (int outputStatFile, int outputVideoFile);
+ARSTREAM_Reader2Debug_t* ARSTREAM_Reader2Debug_New (int outputRtpStatFile, int outputH264StatFile, int outputVideoFile);
 
 /**
  * @brief Deletes an ARSTREAM_Reader2Debug_t
@@ -86,9 +87,21 @@ void ARSTREAM_Reader2Debug_Delete (ARSTREAM_Reader2Debug_t **rdbg);
  * @param missingPackets number of missing packets in the access unit
  * @param totalPackets total number of packets in the access unit
  *
- * @note The library use a double pointer, so it can set *reader to NULL after freeing it
  */
 void ARSTREAM_Reader2Debug_ProcessAu (ARSTREAM_Reader2Debug_t *rdbg, uint8_t* pAu, uint32_t auSize, uint64_t timestamp, uint64_t receptionTs, int missingPackets, int totalPackets);
+
+/**
+ * @brief Process a packet
+ *
+ * @param rdbg Pointer to the ARSTREAM_Reader2Debug_t
+ * @param recvTimestamp packet reception timestamp
+ * @param timestamp RTP timestamp
+ * @param seqNum RTP sequence number
+ * @param markerBit RTP M marker bit
+ * @param bytes packet size
+ *
+ */
+void ARSTREAM_Reader2Debug_ProcessPacket(ARSTREAM_Reader2Debug_t *rdbg, uint64_t recvTimestamp, uint32_t timestamp, uint16_t seqNum, uint16_t markerBit, uint32_t bytes);
 
 #endif /* _ARSTREAM_READER2DEBUG_H_ */
 

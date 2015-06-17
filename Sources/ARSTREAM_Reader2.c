@@ -49,6 +49,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <fcntl.h>
+#include <math.h>
 
 /*
  * Private Headers
@@ -98,6 +99,17 @@
  * Types
  */
 
+#define ARSTREAM_READER2_MONITORING_MAX_POINTS (2048)
+
+typedef struct ARSTREAM_Reader2_MonitoringPoint_s {
+    uint64_t recvTimestamp;
+    uint32_t timestamp;
+    uint16_t seqNum;
+    uint16_t markerBit;
+    uint32_t bytes;
+} ARSTREAM_Reader2_MonitoringPoint_t;
+
+
 struct ARSTREAM_Reader2_t {
     /* Configuration on New */
     ARSTREAM_Reader2_NetworkMode_t networkMode;
@@ -118,6 +130,7 @@ struct ARSTREAM_Reader2_t {
     int currentAuBufferSize; // Usable length of the buffer
     int currentAuSize;       // Actual data length
     uint8_t *currentAuBuffer;
+    uint32_t firstTimestamp;
 
     /* Thread status */
     ARSAL_Mutex_t streamMutex;
@@ -129,6 +142,12 @@ struct ARSTREAM_Reader2_t {
     int sendSocket;
     int recvSocket;
     int recvMulticast;
+
+    /* Monitoring */
+    ARSAL_Mutex_t monitoringMutex;
+    int monitoringCount;
+    int monitoringIndex;
+    ARSTREAM_Reader2_MonitoringPoint_t monitoringPoint[ARSTREAM_READER2_MONITORING_MAX_POINTS];
 
 #ifdef ARSTREAM_READER2_DEBUG
     /* Debug */
@@ -153,6 +172,7 @@ ARSTREAM_Reader2_t* ARSTREAM_Reader2_New(ARSTREAM_Reader2_Config_t *config, uint
 {
     ARSTREAM_Reader2_t *retReader = NULL;
     int streamMutexWasInit = 0;
+    int monitoringMutexWasInit = 0;
     eARSTREAM_ERROR internalError = ARSTREAM_OK;
     /* ARGS Check */
     if ((config == NULL) ||
@@ -221,12 +241,24 @@ ARSTREAM_Reader2_t* ARSTREAM_Reader2_New(ARSTREAM_Reader2_Config_t *config, uint
             streamMutexWasInit = 1;
         }
     }
+    if (internalError == ARSTREAM_OK)
+    {
+        int mutexInitRet = ARSAL_Mutex_Init(&(retReader->monitoringMutex));
+        if (mutexInitRet != 0)
+        {
+            internalError = ARSTREAM_ERROR_ALLOC;
+        }
+        else
+        {
+            monitoringMutexWasInit = 1;
+        }
+    }
 
 #ifdef ARSTREAM_READER2_DEBUG
     /* Setup debug */
     if (internalError == ARSTREAM_OK)
     {
-        retReader->rdbg = ARSTREAM_Reader2Debug_New(1, 0);
+        retReader->rdbg = ARSTREAM_Reader2Debug_New(1, 1, 0);
         if (!retReader->rdbg)
         {
             internalError = ARSTREAM_ERROR_ALLOC;
@@ -240,6 +272,10 @@ ARSTREAM_Reader2_t* ARSTREAM_Reader2_New(ARSTREAM_Reader2_Config_t *config, uint
         if (streamMutexWasInit == 1)
         {
             ARSAL_Mutex_Destroy(&(retReader->streamMutex));
+        }
+        if (monitoringMutexWasInit == 1)
+        {
+            ARSAL_Mutex_Destroy(&(retReader->monitoringMutex));
         }
         if ((retReader) && (retReader->recvAddr))
         {
@@ -290,6 +326,7 @@ eARSTREAM_ERROR ARSTREAM_Reader2_Delete(ARSTREAM_Reader2_t **reader)
             ARSTREAM_Reader2Debug_Delete(&(*reader)->rdbg);
 #endif
             ARSAL_Mutex_Destroy(&((*reader)->streamMutex));
+            ARSAL_Mutex_Destroy(&((*reader)->monitoringMutex));
             if ((*reader)->sendSocket != -1)
             {
                 ARSAL_Socket_Close((*reader)->sendSocket);
@@ -530,6 +567,34 @@ static int ARSTREAM_Reader2_Bind(ARSTREAM_Reader2_t *reader)
 }
 
 
+static void ARSTREAM_Reader2_UpdateMonitoring(ARSTREAM_Reader2_t *reader, uint32_t timestamp, uint16_t seqNum, uint16_t markerBit, uint32_t bytes)
+{
+    uint64_t curTime;
+    struct timespec t1;
+    clock_gettime(CLOCK_MONOTONIC, &t1);
+    curTime = (uint64_t)t1.tv_sec * 1000000 + (uint64_t)t1.tv_nsec / 1000;
+
+    ARSAL_Mutex_Lock(&(reader->monitoringMutex));
+
+    if (reader->monitoringCount < ARSTREAM_READER2_MONITORING_MAX_POINTS)
+    {
+        reader->monitoringCount++;
+    }
+    reader->monitoringIndex = (reader->monitoringIndex + 1) % ARSTREAM_READER2_MONITORING_MAX_POINTS;
+    reader->monitoringPoint[reader->monitoringIndex].bytes = bytes;
+    reader->monitoringPoint[reader->monitoringIndex].timestamp = timestamp;
+    reader->monitoringPoint[reader->monitoringIndex].seqNum = seqNum;
+    reader->monitoringPoint[reader->monitoringIndex].markerBit = markerBit;
+    reader->monitoringPoint[reader->monitoringIndex].recvTimestamp = curTime;
+
+    ARSAL_Mutex_Unlock(&(reader->monitoringMutex));
+
+#ifdef ARSTREAM_READER2_DEBUG
+    ARSTREAM_Reader2Debug_ProcessPacket(reader->rdbg, curTime, timestamp, seqNum, markerBit, bytes);
+#endif
+}
+
+
 static int ARSTREAM_Reader2_ReadData(ARSTREAM_Reader2_t *reader, uint8_t *recvBuffer, int recvBufferSize, int *recvSize)
 {
     int ret = 0;
@@ -643,6 +708,7 @@ void* ARSTREAM_Reader2_RunDataThread(void *ARSTREAM_Reader2_t_Param)
     int recvSize, payloadSize;
     int fuPending = 0;
     ARSTREAM_NetworkHeaders_DataHeader2_t *header = NULL;
+    uint32_t rtpTimestamp = 0;
     uint64_t currentTimestamp = 0, previousTimestamp = 0, receptionTs = 0;
     uint16_t currentFlags;
     int startSeqNum = -1, previousSeqNum = -1, currentSeqNum, seqNumDelta;
@@ -702,13 +768,20 @@ void* ARSTREAM_Reader2_RunDataThread(void *ARSTREAM_Reader2_t_Param)
         }
         else if (recvSize >= sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t))
         {
-            currentTimestamp = (((uint64_t)ntohl(header->timestamp) * 1000) + 45) / 90; /* 90000 Hz clock to microseconds */
+            rtpTimestamp = ntohl(header->timestamp);
+            currentTimestamp = (((uint64_t)rtpTimestamp * 1000) + 45) / 90; /* 90000 Hz clock to microseconds */
+            //TODO: handle the timestamp 32 bits loopback
+            if (reader->firstTimestamp == 0)
+            {
+                reader->firstTimestamp = rtpTimestamp;
+            }
             currentSeqNum = (int)ntohs(header->seqNum);
             if (reader->currentAuSize == 0)
             {
                 startSeqNum = currentSeqNum;
             }
             currentFlags = ntohs(header->flags);
+            ARSTREAM_Reader2_UpdateMonitoring(reader, rtpTimestamp, currentSeqNum, (currentFlags & (1 << 7)) ? 1 : 0, (uint32_t)recvSize);
 
             if (previousSeqNum != -1)
             {
@@ -925,6 +998,107 @@ void* ARSTREAM_Reader2_GetCustom(ARSTREAM_Reader2_t *reader)
     {
         ret = reader->custom;
     }
+    return ret;
+}
+
+
+eARSTREAM_ERROR ARSTREAM_Reader2_GetMonitoring(ARSTREAM_Reader2_t *reader, uint32_t timeIntervalUs, uint32_t *realTimeIntervalUs, uint32_t *receptionTimeJitter,
+                                               uint32_t *bytesReceived, uint32_t *meanPacketSize, uint32_t *packetSizeStdDev, uint32_t *packetsReceived, uint32_t *packetsMissed)
+{
+    eARSTREAM_ERROR ret = ARSTREAM_OK;
+    uint64_t startTime, endTime, curTime, auTimestamp, receptionTimeSum = 0, receptionTimeVarSum = 0, packetSizeVarSum = 0;
+    uint32_t bytes, bytesSum = 0, _meanPacketSize, receptionTime, meanReceptionTime;
+    int currentSeqNum, previousSeqNum, seqNumDelta, gapsInSeqNum;
+    int points = 0, idx, i;
+
+    if ((reader == NULL) || (timeIntervalUs == 0))
+    {
+        return ARSTREAM_ERROR_BAD_PARAMETERS;
+    }
+
+    ARSAL_Mutex_Lock(&(reader->monitoringMutex));
+
+    if (reader->monitoringCount == 0)
+    {
+        ARSAL_Mutex_Unlock(&(reader->monitoringMutex));
+        return ARSTREAM_ERROR_BAD_PARAMETERS;
+    }
+
+    idx = reader->monitoringIndex;
+    startTime = curTime = reader->monitoringPoint[idx].recvTimestamp;
+    bytesSum += reader->monitoringPoint[idx].bytes;
+    auTimestamp = (((uint64_t)(reader->monitoringPoint[idx].timestamp - reader->firstTimestamp) * 1000) + 45) / 90; /* 90000 Hz clock to microseconds */
+    receptionTimeSum += (curTime - auTimestamp);
+    previousSeqNum = reader->monitoringPoint[idx].seqNum;
+    gapsInSeqNum = 0;
+    points++;
+
+    while ((startTime - curTime < timeIntervalUs) && (points < reader->monitoringCount))
+    {
+        idx = (idx - 1 >= 0) ? idx - 1 : ARSTREAM_READER2_MONITORING_MAX_POINTS - 1;
+        curTime = reader->monitoringPoint[idx].recvTimestamp;
+        bytes = reader->monitoringPoint[idx].bytes;
+        bytesSum += bytes;
+        auTimestamp = (((uint64_t)(reader->monitoringPoint[idx].timestamp - reader->firstTimestamp) * 1000) + 45) / 90; /* 90000 Hz clock to microseconds */
+        receptionTime = curTime - auTimestamp;
+        receptionTimeSum += receptionTime;
+        currentSeqNum = reader->monitoringPoint[idx].seqNum;
+        seqNumDelta = previousSeqNum - currentSeqNum;
+        if (seqNumDelta < -32768) seqNumDelta += 65536; /* handle seqNum 16 bits loopback */
+        gapsInSeqNum += seqNumDelta - 1;
+        previousSeqNum = currentSeqNum;
+        points++;
+    }
+
+    endTime = curTime;
+    _meanPacketSize = bytesSum / points;
+    meanReceptionTime = (uint32_t)(receptionTimeSum / points);
+
+    if ((receptionTimeJitter) || (packetSizeStdDev))
+    {
+        for (i = 0, idx = reader->monitoringIndex; i < points; i++)
+        {
+            idx = (idx - 1 >= 0) ? idx - 1 : ARSTREAM_READER2_MONITORING_MAX_POINTS - 1;
+            curTime = reader->monitoringPoint[idx].recvTimestamp;
+            bytes = reader->monitoringPoint[idx].bytes;
+            auTimestamp = (((uint64_t)(reader->monitoringPoint[idx].timestamp - reader->firstTimestamp) * 1000) + 45) / 90; /* 90000 Hz clock to microseconds */
+            receptionTime = curTime - auTimestamp;
+            packetSizeVarSum += ((bytes - _meanPacketSize) * (bytes - _meanPacketSize));
+            receptionTimeVarSum += ((receptionTime - meanReceptionTime) * (receptionTime - meanReceptionTime));
+        }
+    }
+
+    ARSAL_Mutex_Unlock(&(reader->monitoringMutex));
+
+    if (realTimeIntervalUs)
+    {
+        *realTimeIntervalUs = (startTime - endTime);
+    }
+    if (receptionTimeJitter)
+    {
+        *receptionTimeJitter = (uint32_t)(sqrt((double)receptionTimeVarSum / points));
+    }
+    if (bytesReceived)
+    {
+        *bytesReceived = bytesSum;
+    }
+    if (meanPacketSize)
+    {
+        *meanPacketSize = _meanPacketSize;
+    }
+    if (packetSizeStdDev)
+    {
+        *packetSizeStdDev = (uint32_t)(sqrt((double)packetSizeVarSum / points));
+    }
+    if (packetsReceived)
+    {
+        *packetsReceived = points;
+    }
+    if (packetsMissed)
+    {
+        *packetsMissed = gapsInSeqNum;
+    }
+
     return ret;
 }
 
