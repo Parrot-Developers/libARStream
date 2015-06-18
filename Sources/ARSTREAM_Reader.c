@@ -98,6 +98,7 @@ struct ARSTREAM_Reader_t {
 
     /* ARStream_Reader2 */
     ARSTREAM_Reader2_t *reader2;
+    int reader2running;
 };
 
 
@@ -174,6 +175,7 @@ ARSTREAM_Reader_t* ARSTREAM_Reader_New (ARNETWORK_Manager_t *manager, int dataBu
     /* Copy parameters */
     if (internalError == ARSTREAM_OK)
     {
+        memset (retReader, 0, sizeof (ARSTREAM_Reader_t));
         retReader->manager = manager;
         retReader->dataBufferID = dataBufferID;
         retReader->ackBufferID = ackBufferID;
@@ -209,15 +211,21 @@ ARSTREAM_Reader_t* ARSTREAM_Reader_New (ARNETWORK_Manager_t *manager, int dataBu
         }
     }
 
+    if (internalError == ARSTREAM_OK)
+    {
+        retReader->reader2running = 1;
+    }
+
     SET_WITH_CHECK (error, internalError);
     return retReader;
 }
 
 void ARSTREAM_Reader_StopReader (ARSTREAM_Reader_t *reader)
 {
-    if (reader != NULL)
+    if ((reader != NULL) && (reader->reader2running))
     {
         ARSTREAM_Reader2_StopReader (reader->reader2);
+        reader->reader2running = 0;
     }
 }
 
@@ -227,11 +235,22 @@ eARSTREAM_ERROR ARSTREAM_Reader_Delete (ARSTREAM_Reader_t **reader)
     if ((reader != NULL) &&
         (*reader != NULL))
     {
-        retVal = ARSTREAM_Reader2_Delete (&((*reader)->reader2));
-        if (retVal == ARSTREAM_OK)
+        if (!(*reader)->reader2running)
         {
-            free (*reader);
-            *reader = NULL;
+            retVal = ARSTREAM_Reader2_Delete (&((*reader)->reader2));
+            if (retVal == ARSTREAM_OK)
+            {
+                free (*reader);
+                *reader = NULL;
+            }
+            else
+            {
+                ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER_TAG, "Failed to delete Reader2");
+            }
+        }
+        else
+        {
+            ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER_TAG, "Reader2 is still running");
         }
     }
     return retVal;
@@ -263,7 +282,7 @@ float ARSTREAM_Reader_GetEstimatedEfficiency (ARSTREAM_Reader_t *reader)
 void* ARSTREAM_Reader_GetCustom (ARSTREAM_Reader_t *reader)
 {
     void *ret = NULL;
-    if (reader != NULL)
+    if ((reader != NULL) && (reader->reader2running))
     {
         ret = ARSTREAM_Reader2_GetCustom (reader->reader2);
     }

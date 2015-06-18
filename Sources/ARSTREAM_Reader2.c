@@ -298,6 +298,7 @@ void ARSTREAM_Reader2_StopReader(ARSTREAM_Reader2_t *reader)
 {
     if (reader != NULL)
     {
+        ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Stopping reader...");
         ARSAL_Mutex_Lock(&(reader->streamMutex));
         reader->threadsShouldStop = 1;
         ARSAL_Mutex_Unlock(&(reader->streamMutex));
@@ -316,6 +317,7 @@ eARSTREAM_ERROR ARSTREAM_Reader2_Delete(ARSTREAM_Reader2_t **reader)
         if (((*reader)->dataThreadStarted == 0) &&
             ((*reader)->ackThreadStarted == 0))
         {
+            ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "All threads stopped");
             canDelete = 1;
         }
         ARSAL_Mutex_Unlock(&((*reader)->streamMutex));
@@ -381,7 +383,7 @@ static int ARSTREAM_Reader2_SetSocketReceiveBufferSize(ARSTREAM_Reader2_t *reade
     }
     else
     {
-        ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Receive socket buffer size is %d bytes", size); //TODO: debug
+        ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_READER2_TAG, "Receive socket buffer size is %d bytes", size); //TODO: debug
     }
 
     return ret;
@@ -408,7 +410,6 @@ static int ARSTREAM_Reader2_Bind(ARSTREAM_Reader2_t *reader)
             ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Failed to create socket");
             ret = -1;
         }
-        ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Socket OK"); //TODO: debug
 
         if (ret == 0)
         {
@@ -464,7 +465,6 @@ static int ARSTREAM_Reader2_Bind(ARSTREAM_Reader2_t *reader)
                             ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Failed to join multacast group: error=%d (%s)", errno, strerror(errno));
                             ret = -1;
                         }
-                        ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Multicast join OK"); //TODO: debug
                     }
 
                     reader->recvMulticast = 1;
@@ -508,7 +508,6 @@ static int ARSTREAM_Reader2_Bind(ARSTREAM_Reader2_t *reader)
                 ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Failed to set socket option SO_REUSEADDR: error=%d (%s)", errno, strerror(errno));
                 ret = -1;
             }
-            ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Reuse address OK"); //TODO: debug
         }
 
         if (ret == 0)
@@ -522,7 +521,6 @@ static int ARSTREAM_Reader2_Bind(ARSTREAM_Reader2_t *reader)
                 ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Failed to set socket receive timeout: error=%d (%s)", errno, strerror(errno));
                 ret = -1;
             }
-            ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Timeout OK"); //TODO: debug
         }
 
         if (ret == 0)
@@ -534,7 +532,6 @@ static int ARSTREAM_Reader2_Bind(ARSTREAM_Reader2_t *reader)
                 ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Error on socket bind port=%d: error=%d (%s)", reader->recvPort, errno, strerror(errno));
                 ret = -1;
             }
-            ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Bind OK"); //TODO: debug
         }
 
         if (ret == 0)
@@ -553,7 +550,6 @@ static int ARSTREAM_Reader2_Bind(ARSTREAM_Reader2_t *reader)
             if (reader->recvSocket >= 0)
             {
                 ARSAL_Socket_Close(reader->recvSocket);
-                ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Close!!!"); //TODO: debug
             }
             reader->recvSocket = -1;
         }
