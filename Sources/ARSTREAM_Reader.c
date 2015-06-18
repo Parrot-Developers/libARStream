@@ -452,7 +452,7 @@ void* ARSTREAM_Reader_RunDataThread (void *ARSTREAM_Reader_t_Param)
                         if (header->frameNumber != previousFNum + 1)
                         {
                             nbMissedFrame = header->frameNumber - previousFNum - 1;
-                            ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARSTREAM_READER_TAG, "Missed %d frames !", nbMissedFrame);
+                            ARSAL_PRINT (ARSAL_PRINT_INFO, ARSTREAM_READER_TAG, "Missed %d frames !", nbMissedFrame);
                         }
                         previousFNum = header->frameNumber;
                         skipCurrentFrame = 1;
