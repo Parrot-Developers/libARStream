@@ -215,23 +215,6 @@ eARSTREAM_ERROR ARSTREAM_Sender_Delete (ARSTREAM_Sender_t **sender);
 eARSTREAM_ERROR ARSTREAM_Sender_SendNewFrame (ARSTREAM_Sender_t *sender, uint8_t *frameBuffer, uint32_t frameSize, int flushPreviousFrames, int *nbPreviousFrames);
 
 /**
- * @brief Sends a new frame fragment
- *
- * @param[in] sender The ARSTREAM_Sender_t which will try to send the fragment
- * @param[in] fragmentBuffer pointer to the fragment in memory
- * @param[in] fragmentSize size of the fragment in memory
- * @param[in] frameUserPtr optional pointer to the frame user data (must be the same for all fragments of a frame)
- * @param[in] isLast Boolean-like flag (0/1). If active, tells the sender that the fragment is the last fragment of the frame.
- * @param[in] flushPreviousFrames Boolean-like flag (0/1). If active, tells the sender to flush the frame queue when adding this frame.
- * @param[out] nbPreviousFrames Optionnal int pointer which will store the number of frames previously in the buffer (even if the buffer is flushed)
- * @return ARSTREAM_OK if no error happened
- * @return ARSTREAM_ERROR_BAD_PARAMETERS if the sender or fragmentBuffer pointer is invalid, or if fragmentSize is zero
- * @return ARSTREAM_ERROR_FRAME_TOO_LARGE if the fragmentSize is greater that the maximum fragment size of the libARStream (typically 128000 bytes)
- * @return ARSTREAM_ERROR_QUEUE_FULL if the frame can not be added to queue. This value can not happen if flushPreviousFrames is active
- */
-eARSTREAM_ERROR ARSTREAM_Sender_SendNewFragment (ARSTREAM_Sender_t *sender, uint8_t *fragmentBuffer, uint32_t fragmentSize, void *frameUserPtr, int isLast, int flushPreviousFrames, int *nbPreviousFrames);
-
-/**
  * @brief Flushes all currently queued frames
  *
  * @param[in] sender The ARSTREAM_Sender_t to be flushed.

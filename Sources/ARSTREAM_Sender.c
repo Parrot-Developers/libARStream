@@ -111,11 +111,6 @@
 #define ARSTREAM_SENDER_PREVIOUS_FRAME_NB_SAVE (10)
 
 /**
- * Maximum number of pre-fragments per frame
- */
-#define ARSTREAM_SENDER_MAX_PREFRAGMENT_COUNT (128)
-
-/**
  * Sets *PTR to VAL if PTR is not null
  */
 #define SET_WITH_CHECK(PTR,VAL)                 \
@@ -137,9 +132,6 @@ typedef struct {
     uint32_t frameSize;
     uint8_t *frameBuffer;
     int isHighPriority;
-    int fragmentCount;
-    uint32_t fragmentSize[ARSTREAM_SENDER_MAX_PREFRAGMENT_COUNT];
-    uint8_t *fragmentBuffer[ARSTREAM_SENDER_MAX_PREFRAGMENT_COUNT];
 } ARSTREAM_Sender_Frame_t;
 
 struct ARSTREAM_Sender_t {
@@ -176,8 +168,6 @@ struct ARSTREAM_Sender_t {
     uint32_t indexGetNextFrame;
     uint32_t numberOfWaitingFrames;
     ARSTREAM_Sender_Frame_t *nextFrames;
-    int frameInProgress;
-    uint32_t indexFrameInProgress;
 
     /* Previous frame storage (for LATE_ACKs) */
     int *previousFramesStatus;
@@ -220,18 +210,6 @@ static void ARSTREAM_Sender_FlushQueue (ARSTREAM_Sender_t *sender);
  * @return the number of frames previously in queue (-1 if queue is full)
  */
 static int ARSTREAM_Sender_AddToQueue (ARSTREAM_Sender_t *sender, uint32_t size, uint8_t *buffer, int wasFlushFrame);
-
-/**
- * @brief Add a fragment to the frame queue
- * @param sender The sender which should send the fragment
- * @param size The fragment size, in bytes
- * @param buffer Pointer to the buffer which contains the fragment
- * @param frameUserPtr optional pointer to the frame user data (must be the same for all fragments of a frame)
- * @param isLast Boolean-like (0/1) flag, active if the fragment is the last fragment of the frame
- * @param wasFlushFrame Boolean-like (0/1) flag, active if the frame is added after a flush (high priority frame)
- * @return the number of frames previously in queue (-1 if queue is full)
- */
-static int ARSTREAM_Sender_AddFragmentToQueue (ARSTREAM_Sender_t *sender, uint32_t size, uint8_t *buffer, void *frameUserPtr, int isLast, int wasFlushFrame);
 
 /**
  * @brief Pop a frame from the new frame queue
@@ -294,7 +272,6 @@ static void ARSTREAM_Sender_FlushQueue (ARSTREAM_Sender_t *sender)
         sender->indexGetNextFrame %= sender->maxNumberOfNextFrames;
         sender->numberOfWaitingFrames--;
     }
-    sender->frameInProgress = 0;
 }
 
 static int ARSTREAM_Sender_AddToQueue (ARSTREAM_Sender_t *sender, uint32_t size, uint8_t *buffer, int wasFlushFrame)
@@ -318,9 +295,6 @@ static int ARSTREAM_Sender_AddToQueue (ARSTREAM_Sender_t *sender, uint32_t size,
         nextFrame->frameBuffer = buffer;
         nextFrame->frameSize   = size;
         nextFrame->isHighPriority = wasFlushFrame;
-        nextFrame->fragmentCount  = 1;
-        nextFrame->fragmentBuffer[0] = buffer;
-        nextFrame->fragmentSize[0] = size;
 
         sender->indexAddNextFrame++;
         sender->indexAddNextFrame %= sender->maxNumberOfNextFrames;
@@ -332,74 +306,6 @@ static int ARSTREAM_Sender_AddToQueue (ARSTREAM_Sender_t *sender, uint32_t size,
     else
     {
         retVal = -1;
-    }
-    ARSAL_Mutex_Unlock (&(sender->nextFrameMutex));
-    return retVal;
-}
-
-static int ARSTREAM_Sender_AddFragmentToQueue (ARSTREAM_Sender_t *sender, uint32_t size, uint8_t *buffer, void *frameUserPtr, int isLast, int wasFlushFrame)
-{
-    int retVal;
-    ARSTREAM_Sender_Frame_t *nextFrame = NULL;
-    ARSAL_Mutex_Lock (&(sender->nextFrameMutex));
-    retVal = sender->numberOfWaitingFrames;
-    if (sender->currentFrameCbWasCalled == 0)
-    {
-        retVal++;
-    }
-    if (sender->frameInProgress == 0)
-    {
-        if (wasFlushFrame == 1)
-        {
-            ARSTREAM_Sender_FlushQueue (sender);
-        }
-        if (sender->numberOfWaitingFrames < sender->maxNumberOfNextFrames)
-        {
-            sender->frameInProgress = 1;
-            nextFrame = &(sender->nextFrames [sender->indexAddNextFrame]);
-            sender->indexFrameInProgress = sender->indexAddNextFrame;
-            sender->nextFrameNumber++;
-            nextFrame->frameNumber = sender->nextFrameNumber;
-            nextFrame->frameBuffer = frameUserPtr;
-            nextFrame->frameSize   = 0;
-            nextFrame->isHighPriority = wasFlushFrame;
-            nextFrame->fragmentCount  = 0;
-        }
-        else
-        {
-            retVal = -1;
-        }
-    }
-    else
-    {
-        nextFrame = &(sender->nextFrames [sender->indexFrameInProgress]);
-    }
-    if (retVal != -1)
-    {
-        if (nextFrame->fragmentCount < ARSTREAM_SENDER_MAX_PREFRAGMENT_COUNT)
-        {
-            nextFrame->fragmentBuffer[nextFrame->fragmentCount] = buffer;
-            nextFrame->fragmentSize[nextFrame->fragmentCount] = size;
-            nextFrame->fragmentCount++;
-            nextFrame->frameSize += size;
-        }
-        else
-        {
-            // return an error if the max number of fragments has been reached
-            retVal = -2;
-        }
-        if ((isLast) || (nextFrame->fragmentCount >= ARSTREAM_SENDER_MAX_PREFRAGMENT_COUNT))
-        {
-            // signal a new frame on the last fragment or if the max number of fragments has been reached
-            sender->frameInProgress = 0;
-            
-            sender->indexAddNextFrame++;
-            sender->indexAddNextFrame %= sender->maxNumberOfNextFrames;
-
-            sender->numberOfWaitingFrames++;
-
-            ARSAL_Cond_Signal (&(sender->nextFrameCond));
-        }
     }
     ARSAL_Mutex_Unlock (&(sender->nextFrameMutex));
     return retVal;
@@ -484,9 +390,6 @@ static int ARSTREAM_Sender_PopFromQueue (ARSTREAM_Sender_t *sender, ARSTREAM_Sen
         newFrame->frameBuffer = frame->frameBuffer;
         newFrame->frameSize   = frame->frameSize;
         newFrame->isHighPriority = frame->isHighPriority;
-        newFrame->fragmentCount = frame->fragmentCount;
-        memcpy(newFrame->fragmentSize, frame->fragmentSize, frame->fragmentCount * sizeof(uint32_t));
-        memcpy(newFrame->fragmentBuffer, frame->fragmentBuffer, frame->fragmentCount * sizeof(uint8_t*));
     }
     ARSAL_Mutex_Unlock (&(sender->nextFrameMutex));
     return retVal;
@@ -729,15 +632,12 @@ ARSTREAM_Sender_t* ARSTREAM_Sender_New (ARNETWORK_Manager_t *manager, int dataBu
         retSender->currentFrame.frameBuffer = NULL;
         retSender->currentFrame.frameSize   = 0;
         retSender->currentFrame.isHighPriority = 0;
-        retSender->currentFrame.fragmentCount = 0;
         retSender->currentFrameNbFragments = 0;
         retSender->currentFrameCbWasCalled = 0;
         retSender->nextFrameNumber = 0;
         retSender->indexAddNextFrame = 0;
         retSender->indexGetNextFrame = 0;
         retSender->numberOfWaitingFrames = 0;
-        retSender->frameInProgress = 0;
-        retSender->indexFrameInProgress = 0;
         retSender->previousFrameIndex = 0;
         retSender->threadsShouldStop = 0;
         retSender->dataThreadStarted = 0;
@@ -889,40 +789,6 @@ eARSTREAM_ERROR ARSTREAM_Sender_SendNewFrame (ARSTREAM_Sender_t *sender, uint8_t
     return retVal;
 }
 
-eARSTREAM_ERROR ARSTREAM_Sender_SendNewFragment (ARSTREAM_Sender_t *sender, uint8_t *fragmentBuffer, uint32_t fragmentSize, void *frameUserPtr, int isLast, int flushPreviousFrames, int *nbPreviousFrames)
-{
-    eARSTREAM_ERROR retVal = ARSTREAM_OK;
-    // Args check
-    if ((sender == NULL) ||
-        (fragmentBuffer == NULL) ||
-        (fragmentSize == 0) ||
-        ((flushPreviousFrames != 0) &&
-         (flushPreviousFrames != 1)))
-    {
-        retVal = ARSTREAM_ERROR_BAD_PARAMETERS;
-    }
-    if ((retVal == ARSTREAM_OK) &&
-        (fragmentSize > (sender->maxFragmentSize * sender->maxNumberOfFragment)))
-    {
-        retVal = ARSTREAM_ERROR_FRAME_TOO_LARGE;
-    }
-
-    if (retVal == ARSTREAM_OK)
-    {
-        int res = ARSTREAM_Sender_AddFragmentToQueue (sender, fragmentSize, fragmentBuffer, frameUserPtr, isLast, flushPreviousFrames);
-        if (res < 0)
-        {
-            retVal = ARSTREAM_ERROR_QUEUE_FULL;
-        }
-        else if (nbPreviousFrames != NULL)
-        {
-            *nbPreviousFrames = res;
-        }
-        // No else : do nothing if the nbPreviousFrames pointer is not set
-    }
-    return retVal;
-}
-
 eARSTREAM_ERROR ARSTREAM_Sender_FlushFramesQueue (ARSTREAM_Sender_t *sender)
 {
     eARSTREAM_ERROR retVal = ARSTREAM_OK;
@@ -945,8 +811,8 @@ void* ARSTREAM_Sender_RunDataThread (void *ARSTREAM_Sender_t_Param)
     ARSTREAM_Sender_t *sender = (ARSTREAM_Sender_t *)ARSTREAM_Sender_t_Param;
     uint8_t *sendFragment = NULL;
     uint32_t sendSize = 0;
-    uint16_t nbPackets = 0, nbPacketsFragment = 0;
-    int cnt, cntFragment, fragmentIdx;
+    uint16_t nbPackets = 0;
+    int cnt;
     int numbersOfFragmentsSentForCurrentFrame = 0;
     int lastFragmentSize = 0;
     ARSTREAM_NetworkHeaders_DataHeader_t *header = NULL;
@@ -1020,16 +886,7 @@ void* ARSTREAM_Sender_RunDataThread (void *ARSTREAM_Sender_t_Param)
             sender->currentFrame.frameBuffer = nextFrame.frameBuffer;
             sender->currentFrame.frameSize   = nextFrame.frameSize;
             sender->currentFrame.isHighPriority = nextFrame.isHighPriority;
-            sender->currentFrame.fragmentCount = nextFrame.fragmentCount;
-            if (sender->currentFrame.fragmentCount > 0)
-            {
-                memcpy(sender->currentFrame.fragmentSize, nextFrame.fragmentSize, sender->currentFrame.fragmentCount * sizeof(uint32_t));
-                memcpy(sender->currentFrame.fragmentBuffer, nextFrame.fragmentBuffer, sender->currentFrame.fragmentCount * sizeof(uint8_t*));
-            }
-            for (fragmentIdx = 0, sendSize = 0; fragmentIdx < sender->currentFrame.fragmentCount; fragmentIdx++)
-            {
-                sendSize += sender->currentFrame.fragmentSize[fragmentIdx];
-            }
+            sendSize = nextFrame.frameSize;
 
             sender->previousFramesStatus[sender->previousFrameIndex] = previousWasAck;
             sender->previousFrameIndex = (sender->previousFrameIndex + 1) % ARSTREAM_SENDER_PREVIOUS_FRAME_NB_SAVE;
@@ -1050,13 +907,16 @@ void* ARSTREAM_Sender_RunDataThread (void *ARSTREAM_Sender_t_Param)
             header->frameFlags = 0;
             header->frameFlags |= (sender->currentFrame.isHighPriority != 0) ? ARSTREAM_NETWORK_HEADERS_FLAG_FLUSH_FRAME : 0;
 
-            /* Compute total number of fragments (pre-fragments and post-fragments) */
-            for (fragmentIdx = 0, nbPackets = 0; fragmentIdx < sender->currentFrame.fragmentCount; fragmentIdx++)
+            /* Compute number of fragments / size of the last fragment */
+            if (0 < sendSize)
             {
-                nbPackets += sender->currentFrame.fragmentSize[fragmentIdx] / sender->maxFragmentSize;
-                if (sender->currentFrame.fragmentSize[fragmentIdx] % sender->maxFragmentSize)
+                uint32_t maxFragSize = sender->maxFragmentSize;
+                lastFragmentSize = maxFragSize;
+                nbPackets = sendSize / maxFragSize;
+                if (sendSize % maxFragSize)
                 {
                     nbPackets++;
+                    lastFragmentSize = sendSize % maxFragSize;
                 }
             }
             sender->currentFrameNbFragments = nbPackets;
@@ -1079,38 +939,28 @@ void* ARSTREAM_Sender_RunDataThread (void *ARSTREAM_Sender_t_Param)
         }
 
         /* Send all "packets to send" */
-        for (fragmentIdx = 0, cnt = 0; fragmentIdx < sender->currentFrame.fragmentCount; fragmentIdx++)
+        for (cnt = 0; cnt < nbPackets; cnt++)
         {
-            uint32_t maxFragSize = sender->maxFragmentSize;
-            nbPacketsFragment = sender->currentFrame.fragmentSize[fragmentIdx] / maxFragSize;
-            lastFragmentSize = maxFragSize;
-            if (sender->currentFrame.fragmentSize[fragmentIdx] % maxFragSize)
+            if (ARSTREAM_NetworkHeaders_AckPacketFlagIsSet (&(sender->packetsToSend), cnt))
             {
-                nbPacketsFragment++;
-                lastFragmentSize = sender->currentFrame.fragmentSize[fragmentIdx] % sender->maxFragmentSize;
-            }
-            for (cntFragment = 0; cntFragment < nbPacketsFragment; cntFragment++, cnt++)
-            {
-                if (ARSTREAM_NetworkHeaders_AckPacketFlagIsSet (&(sender->packetsToSend), cnt))
+                eARNETWORK_ERROR netError = ARNETWORK_OK;
+                uint32_t maxFragSize = sender->maxFragmentSize;
+                numbersOfFragmentsSentForCurrentFrame ++;
+                int currFragmentSize = (cnt == nbPackets-1) ? lastFragmentSize : maxFragSize;
+                header->fragmentNumber = cnt;
+                header->fragmentsPerFrame = nbPackets;
+                memcpy (&sendFragment[sizeof (ARSTREAM_NetworkHeaders_DataHeader_t)], &(sender->currentFrame.frameBuffer)[maxFragSize*cnt], currFragmentSize);
+                ARSTREAM_Sender_NetworkCallbackParam_t *cbParams = malloc (sizeof (ARSTREAM_Sender_NetworkCallbackParam_t));
+                cbParams->sender = sender;
+                cbParams->fragmentIndex = cnt;
+                cbParams->frameNumber = sender->packetsToSend.frameNumber;
+                ARSAL_Mutex_Unlock (&(sender->packetsToSendMutex));
+                netError = ARNETWORK_Manager_SendData (sender->manager, sender->dataBufferID, sendFragment, currFragmentSize + sizeof (ARSTREAM_NetworkHeaders_DataHeader_t), (void *)cbParams, ARSTREAM_Sender_NetworkCallback, 1);
+                if (netError != ARNETWORK_OK)
                 {
-                    eARNETWORK_ERROR netError = ARNETWORK_OK;
-                    numbersOfFragmentsSentForCurrentFrame ++;
-                    int currFragmentSize = (cntFragment == nbPacketsFragment-1) ? lastFragmentSize : maxFragSize;
-                    header->fragmentNumber = cnt;
-                    header->fragmentsPerFrame = nbPackets;
-                    memcpy (&sendFragment[sizeof (ARSTREAM_NetworkHeaders_DataHeader_t)], &(sender->currentFrame.fragmentBuffer[fragmentIdx])[maxFragSize*cntFragment], currFragmentSize);
-                    ARSTREAM_Sender_NetworkCallbackParam_t *cbParams = malloc (sizeof (ARSTREAM_Sender_NetworkCallbackParam_t));
-                    cbParams->sender = sender;
-                    cbParams->fragmentIndex = cnt;
-                    cbParams->frameNumber = sender->packetsToSend.frameNumber;
-                    ARSAL_Mutex_Unlock (&(sender->packetsToSendMutex));
-                    netError = ARNETWORK_Manager_SendData (sender->manager, sender->dataBufferID, sendFragment, currFragmentSize + sizeof (ARSTREAM_NetworkHeaders_DataHeader_t), (void *)cbParams, ARSTREAM_Sender_NetworkCallback, 1);
-                    if (netError != ARNETWORK_OK)
-                    {
-                        ARSAL_PRINT (ARSAL_PRINT_ERROR, ARSTREAM_SENDER_TAG, "Error occurred during sending of the fragment ; error: %d : %s", netError, ARNETWORK_Error_ToString(netError));
-                    }
-                    ARSAL_Mutex_Lock (&(sender->packetsToSendMutex));
+                    ARSAL_PRINT (ARSAL_PRINT_ERROR, ARSTREAM_SENDER_TAG, "Error occurred during sending of the fragment ; error: %d : %s", netError, ARNETWORK_Error_ToString(netError));
                 }
+                ARSAL_Mutex_Lock (&(sender->packetsToSendMutex));
             }
         }
         ARSAL_Mutex_Unlock (&(sender->ackMutex));
