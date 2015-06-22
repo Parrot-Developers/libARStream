@@ -878,7 +878,7 @@ void* ARSTREAM_Reader2_RunDataThread(void *ARSTREAM_Reader2_t_Param)
                             ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Invalid payload size (%d) for FU-A packet at seqNum %d", payloadSize, currentSeqNum);
                         }
                     }
-                    else if ((headByte & 0x31) == ARSTREAM_NETWORK_HEADERS2_NALU_TYPE_STAPA)
+                    else if ((headByte & 0x1F) == ARSTREAM_NETWORK_HEADERS2_NALU_TYPE_STAPA)
                     {
                         /* Aggregation (STAP-A) */
                         if (fuPending)
