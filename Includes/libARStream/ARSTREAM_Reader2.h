@@ -46,7 +46,6 @@
 /*
  * ARSDK Headers
  */
-#include <libARNetwork/ARNETWORK_Manager.h>
 #include <libARStream/ARSTREAM_Error.h>
 
 /*
@@ -63,11 +62,6 @@ typedef enum {
     ARSTREAM_READER2_CAUSE_CANCEL, /**< Reader is closing, so buffer is no longer used */
     ARSTREAM_READER2_CAUSE_MAX,
 } eARSTREAM_READER2_CAUSE;
-
-typedef enum {
-    ARSTREAM_READER2_NETWORK_MODE_ARNETWORK = 0,
-    ARSTREAM_READER2_NETWORK_MODE_SOCKET,
-} ARSTREAM_Reader2_NetworkMode_t;
 
 /**
  * @brief Callback called when a new frame is ready in a buffer
@@ -96,10 +90,6 @@ typedef enum {
 typedef uint8_t* (*ARSTREAM_Reader2_NaluCallback_t) (eARSTREAM_READER2_CAUSE cause, uint8_t *naluBuffer, int naluSize, uint64_t auTimestamp, int isFirstNaluInAu, int isLastNaluInAu, int missingPacketsBefore, int *newNaluBufferSize, void *custom);
 
 typedef struct ARSTREAM_Reader2_Config_t {
-    ARSTREAM_Reader2_NetworkMode_t networkMode;
-    ARNETWORK_Manager_t *manager;
-    int dataBufferID;
-    int ackBufferID;
     const char *ifaceAddr;
     const char *recvAddr;
     int recvPort;
@@ -117,22 +107,6 @@ typedef struct ARSTREAM_Reader2_t ARSTREAM_Reader2_t;
 /*
  * Functions declarations
  */
-
-/**
- * @brief Sets an ARNETWORK_IOBufferParam_t to describe a stream data buffer
- * @param[in] bufferParams Pointer to the ARNETWORK_IOBufferParam_t to set
- * @param[in] bufferID ID to set in the ARNETWORK_IOBufferParam_t
- * @param[in] maxFragmentSize Maximum allowed size for a video data fragment. Video frames larger that will be fragmented.
- * @param[in] maxNumberOfFragment number maximum of fragment of one frame.
- */
-void ARSTREAM_Reader2_InitStreamDataBuffer (ARNETWORK_IOBufferParam_t *bufferParams, int bufferID, int maxPacketSize);
-
-/**
- * @brief Sets an ARNETWORK_IOBufferParam_t to describe a stream ack buffer
- * @param[in] bufferParams Pointer to the ARNETWORK_IOBufferParam_t to set
- * @param[in] bufferID ID to set in the ARNETWORK_IOBufferParam_t
- */
-void ARSTREAM_Reader2_InitStreamAckBuffer (ARNETWORK_IOBufferParam_t *bufferParams, int bufferID);
 
 /**
  * @brief Creates a new ARSTREAM_Reader2_t
@@ -185,7 +159,7 @@ eARSTREAM_ERROR ARSTREAM_Reader2_Delete (ARSTREAM_Reader2_t **reader);
  * @post Stop the ARSTREAM_Reader2_t by calling ARSTREAM_Reader2_StopReader() before joining the thread calling this function
  * @param[in] ARSTREAM_Reader2_t_Param A valid (ARSTREAM_Reader2_t *) casted as a (void *)
  */
-void* ARSTREAM_Reader2_RunDataThread (void *ARSTREAM_Reader2_t_Param);
+void* ARSTREAM_Reader2_RunRecvThread (void *ARSTREAM_Reader2_t_Param);
 
 /**
  * @brief Runs the acknowledge loop of the ARSTREAM_Reader2_t
@@ -193,7 +167,7 @@ void* ARSTREAM_Reader2_RunDataThread (void *ARSTREAM_Reader2_t_Param);
  * @post Stop the ARSTREAM_Reader_t by calling ARSTREAM_Reader2_StopReader() before joining the thread calling this function
  * @param[in] ARSTREAM_Reader2_t_Param A valid (ARSTREAM_Reader2_t *) casted as a (void *)
  */
-void* ARSTREAM_Reader2_RunAckThread (void *ARSTREAM_Reader2_t_Param);
+void* ARSTREAM_Reader2_RunSendThread (void *ARSTREAM_Reader2_t_Param);
 
 /**
  * @brief Gets the custom pointer associated with the reader

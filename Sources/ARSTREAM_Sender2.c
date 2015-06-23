@@ -54,7 +54,6 @@
  * Private Headers
  */
 
-#include "ARSTREAM_Buffers.h"
 #include "ARSTREAM_NetworkHeaders.h"
 
 /*
@@ -125,10 +124,6 @@ typedef struct ARSTREAM_Sender2_MonitoringPoint_s {
 
 struct ARSTREAM_Sender2_t {
     /* Configuration on New */
-    ARSTREAM_Sender2_NetworkMode_t networkMode;
-    ARNETWORK_Manager_t *manager;
-    int dataBufferID;
-    int ackBufferID;
     char *ifaceAddr;
     char *sendAddr;
     int sendPort;
@@ -147,8 +142,8 @@ struct ARSTREAM_Sender2_t {
 
     /* Thread status */
     int threadsShouldStop;
-    int dataThreadStarted;
-    int ackThreadStarted;
+    int sendThreadStarted;
+    int recvThreadStarted;
 
     /* Sockets */
     int sendMulticast;
@@ -399,26 +394,6 @@ static int ARSTREAM_Sender2_FlushNaluFifo(ARSTREAM_Sender2_t *sender)
 }
 
 
-eARNETWORK_MANAGER_CALLBACK_RETURN ARSTREAM_Sender2_NetworkCallback(int IoBufferId, uint8_t *dataPtr, void *customData, eARNETWORK_MANAGER_CALLBACK_STATUS status)
-{
-    eARNETWORK_MANAGER_CALLBACK_RETURN retVal = ARNETWORK_MANAGER_CALLBACK_RETURN_DEFAULT;
-
-    return retVal;
-}
-
-
-void ARSTREAM_Sender2_InitStreamDataBuffer(ARNETWORK_IOBufferParam_t *bufferParams, int bufferID, int maxPacketSize)
-{
-    ARSTREAM_Buffers_InitStreamDataBuffer(bufferParams, bufferID, sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t), maxPacketSize, ARSTREAM_BUFFERS_DATA_BUFFER_NUMBER_OF_CELLS);
-}
-
-
-void ARSTREAM_Sender2_InitStreamAckBuffer(ARNETWORK_IOBufferParam_t *bufferParams, int bufferID)
-{
-    ARSTREAM_Buffers_InitStreamAckBuffer(bufferParams, bufferID);
-}
-
-
 ARSTREAM_Sender2_t* ARSTREAM_Sender2_New(ARSTREAM_Sender2_Config_t *config, void *custom, eARSTREAM_ERROR *error)
 {
     ARSTREAM_Sender2_t *retSender = NULL;
@@ -430,10 +405,9 @@ ARSTREAM_Sender2_t* ARSTREAM_Sender2_New(ARSTREAM_Sender2_Config_t *config, void
     eARSTREAM_ERROR internalError = ARSTREAM_OK;
     /* ARGS Check */
     if ((config == NULL) ||
-        ((config->networkMode == ARSTREAM_SENDER2_NETWORK_MODE_ARNETWORK) &&
-            (config->manager == NULL)) ||
-        ((config->networkMode == ARSTREAM_SENDER2_NETWORK_MODE_SOCKET) &&
-            ((config->sendAddr == NULL) || (strlen(config->sendAddr) <= 0) || (config->sendPort <= 0))) ||
+        (config->sendAddr == NULL) ||
+        (strlen(config->sendAddr) <= 0) ||
+        (config->sendPort <= 0) ||
         (config->auCallback == NULL) ||
         (config->maxPacketSize < 100) ||
         (config->targetPacketSize < 100) ||
@@ -459,20 +433,13 @@ ARSTREAM_Sender2_t* ARSTREAM_Sender2_New(ARSTREAM_Sender2_Config_t *config, void
         retSender->sendMulticast = 0;
         retSender->sendSocket = -1;
         retSender->recvSocket = -1;
-        retSender->networkMode = config->networkMode;
-        retSender->manager = config->manager;
-        retSender->dataBufferID = config->dataBufferID;
-        retSender->ackBufferID = config->ackBufferID;
-        if (config->networkMode == ARSTREAM_SENDER2_NETWORK_MODE_SOCKET)
+        if (config->sendAddr)
         {
-            if (config->sendAddr)
-            {
-                retSender->sendAddr = strndup(config->sendAddr, 16);
-            }
-            if (config->ifaceAddr)
-            {
-                retSender->ifaceAddr = strndup(config->ifaceAddr, 16);
-            }
+            retSender->sendAddr = strndup(config->sendAddr, 16);
+        }
+        if (config->ifaceAddr)
+        {
+            retSender->ifaceAddr = strndup(config->ifaceAddr, 16);
         }
         retSender->sendPort = config->sendPort;
         retSender->auCallback = config->auCallback;
@@ -638,8 +605,8 @@ eARSTREAM_ERROR ARSTREAM_Sender2_Delete(ARSTREAM_Sender2_t **sender)
     {
         int canDelete = 0;
         ARSAL_Mutex_Lock(&((*sender)->streamMutex));
-        if (((*sender)->dataThreadStarted == 0) &&
-            ((*sender)->ackThreadStarted == 0))
+        if (((*sender)->sendThreadStarted == 0) &&
+            ((*sender)->recvThreadStarted == 0))
         {
             canDelete = 1;
         }
@@ -690,7 +657,7 @@ eARSTREAM_ERROR ARSTREAM_Sender2_Delete(ARSTREAM_Sender2_t **sender)
 }
 
 
-eARSTREAM_ERROR ARSTREAM_Sender2_SendNewNalu(ARSTREAM_Sender2_t *sender, uint8_t *naluBuffer, uint32_t naluSize, uint64_t auTimestamp, int isLastInAu, void *auUserPtr)
+eARSTREAM_ERROR ARSTREAM_Sender2_SendNewNalu(ARSTREAM_Sender2_t *sender, uint8_t *naluBuffer, uint32_t naluSize, uint64_t auTimestamp, int isLastNaluInAu, void *auUserPtr)
 {
     eARSTREAM_ERROR retVal = ARSTREAM_OK;
     // Args check
@@ -703,7 +670,7 @@ eARSTREAM_ERROR ARSTREAM_Sender2_SendNewNalu(ARSTREAM_Sender2_t *sender, uint8_t
     }
 
     ARSAL_Mutex_Lock(&(sender->streamMutex));
-    if (!sender->dataThreadStarted)
+    if (!sender->sendThreadStarted)
     {
         retVal = ARSTREAM_ERROR_BAD_PARAMETERS;
     }
@@ -718,7 +685,7 @@ eARSTREAM_ERROR ARSTREAM_Sender2_SendNewNalu(ARSTREAM_Sender2_t *sender, uint8_t
         nalu.naluBuffer = naluBuffer;
         nalu.naluSize = naluSize;
         nalu.auTimestamp = auTimestamp;
-        nalu.isLastInAu = isLastInAu;
+        nalu.isLastInAu = isLastNaluInAu;
         nalu.auUserPtr = auUserPtr;
 
         res = ARSTREAM_Sender2_EnqueueNalu(sender, &nalu);
@@ -816,131 +783,124 @@ static int ARSTREAM_Sender2_Connect(ARSTREAM_Sender2_t *sender)
 {
     int ret = 0;
 
-    if (sender->networkMode == ARSTREAM_SENDER2_NETWORK_MODE_SOCKET)
+    int err;
+
+    /* check parameters */
+    //TODO
+
+    /* create socket */
+    sender->sendSocket = ARSAL_Socket_Create(AF_INET, SOCK_DGRAM, 0);
+    if (sender->sendSocket < 0)
     {
-        int err;
+        ret = -1;
+    }
 
-        /* check parameters */
-        //TODO
-
-        /* create socket */
-        sender->sendSocket = ARSAL_Socket_Create(AF_INET, SOCK_DGRAM, 0);
-        if (sender->sendSocket < 0)
-        {
-            ret = -1;
-        }
-
-        /* initialize socket */
+    /* initialize socket */
 #if HAVE_DECL_SO_NOSIGPIPE
-        if (ret == 0)
+    if (ret == 0)
+    {
+        /* remove SIGPIPE */
+        int set = 1;
+        err = ARSAL_Socket_Setsockopt(sender->sendSocket, SOL_SOCKET, SO_NOSIGPIPE, (void*)&set, sizeof(int));
+        if (err != 0)
         {
-            /* remove SIGPIPE */
-            int set = 1;
-            err = ARSAL_Socket_Setsockopt(sender->sendSocket, SOL_SOCKET, SO_NOSIGPIPE, (void*)&set, sizeof(int));
-            if (err != 0)
-            {
-                ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Error on setsockopt: error=%d (%s)", errno, strerror(errno));
-            }
+            ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Error on setsockopt: error=%d (%s)", errno, strerror(errno));
         }
+    }
 #endif
 
-        if (ret == 0)
+    if (ret == 0)
+    {
+        /* send address */
+        memset(&sender->sendSin, 0, sizeof(struct sockaddr_in));
+        sender->sendSin.sin_family = AF_INET;
+        sender->sendSin.sin_port = htons(sender->sendPort);
+        err = inet_pton(AF_INET, sender->sendAddr, &(sender->sendSin.sin_addr));
+        if (err <= 0)
         {
-            /* send address */
-            memset(&sender->sendSin, 0, sizeof(struct sockaddr_in));
-            sender->sendSin.sin_family = AF_INET;
-            sender->sendSin.sin_port = htons(sender->sendPort);
-            err = inet_pton(AF_INET, sender->sendAddr, &(sender->sendSin.sin_addr));
-            if (err <= 0)
-            {
-                ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Failed to convert address '%s'", sender->sendAddr);
-                ret = -1;
-            }
+            ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Failed to convert address '%s'", sender->sendAddr);
+            ret = -1;
         }
+    }
 
-        if (ret == 0)
+    if (ret == 0)
+    {
+        /* set to non-blocking */
+        int flags = fcntl(sender->sendSocket, F_GETFL, 0);
+        fcntl(sender->sendSocket, F_SETFL, flags | O_NONBLOCK);
+
+        int addrFirst = atoi(sender->sendAddr);
+        if ((addrFirst >= 224) && (addrFirst <= 239))
         {
-            /* set to non-blocking */
-            int flags = fcntl(sender->sendSocket, F_GETFL, 0);
-            fcntl(sender->sendSocket, F_SETFL, flags | O_NONBLOCK);
+            /* multicast */
 
-            int addrFirst = atoi(sender->sendAddr);
-            if ((addrFirst >= 224) && (addrFirst <= 239))
+            if ((sender->ifaceAddr) && (strlen(sender->ifaceAddr) > 0))
             {
-                /* multicast */
-
-                if ((sender->ifaceAddr) && (strlen(sender->ifaceAddr) > 0))
+                /* source address */
+                struct sockaddr_in addr;
+                memset(&addr, 0, sizeof(addr));
+                addr.sin_family = AF_INET;
+                addr.sin_port = htons(0);
+                err = inet_pton(AF_INET, sender->ifaceAddr, &(addr.sin_addr));
+                if (err <= 0)
                 {
-                    /* source address */
-                    struct sockaddr_in addr;
-                    memset(&addr, 0, sizeof(addr));
-                    addr.sin_family = AF_INET;
-                    addr.sin_port = htons(0);
-                    err = inet_pton(AF_INET, sender->ifaceAddr, &(addr.sin_addr));
-                    if (err <= 0)
+                    ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Failed to convert address '%s'", sender->ifaceAddr);
+                    ret = -1;
+                }
+
+                if (ret == 0)
+                {
+                    /* bind the socket */
+                    err = ARSAL_Socket_Bind(sender->sendSocket, (struct sockaddr*)&addr, sizeof(addr));
+                    if (err != 0)
                     {
-                        ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Failed to convert address '%s'", sender->ifaceAddr);
+                        ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Error on socket bind to addr='%s': error=%d (%s)", sender->ifaceAddr, errno, strerror(errno));
                         ret = -1;
                     }
-
-                    if (ret == 0)
-                    {
-                        /* bind the socket */
-                        err = ARSAL_Socket_Bind(sender->sendSocket, (struct sockaddr*)&addr, sizeof(addr));
-                        if (err != 0)
-                        {
-                            ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Error on socket bind to addr='%s': error=%d (%s)", sender->ifaceAddr, errno, strerror(errno));
-                            ret = -1;
-                        }
-                        sender->sendMulticast = 1;
-                    }
-                }
-                else
-                {
-                    ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Trying to send multicast to address '%s' without an interface address", sender->sendAddr);
-                    ret = -1;
+                    sender->sendMulticast = 1;
                 }
             }
             else
             {
-                /* unicast */
-
-                /* connect the socket */
-                err = ARSAL_Socket_Connect(sender->sendSocket, (struct sockaddr*)&sender->sendSin, sizeof(sender->sendSin));
-                if (err != 0)
-                {
-                    ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Error on socket connect to addr='%s' port=%d: error=%d (%s)", sender->sendAddr, sender->sendPort, errno, strerror(errno));
-                    ret = -1;
-                }                
+                ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Trying to send multicast to address '%s' without an interface address", sender->sendAddr);
+                ret = -1;
             }
         }
-
-        if (ret == 0)
+        else
         {
-            /* set the socket buffer size and NALU FIFO buffer size */
-            int totalBufSize = sender->maxBitrate * sender->maxLatencyMs / 1000 / 8;
-            sender->sendSocketBufferSize = totalBufSize / 2;
-            sender->naluFifoBufferSize = totalBufSize / 2;
-            err = ARSTREAM_Sender2_SetSocketSendBufferSize(sender, sender->sendSocketBufferSize);
+            /* unicast */
+
+            /* connect the socket */
+            err = ARSAL_Socket_Connect(sender->sendSocket, (struct sockaddr*)&sender->sendSin, sizeof(sender->sendSin));
             if (err != 0)
             {
-                ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Failed to set the send socket buffer size");
+                ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Error on socket connect to addr='%s' port=%d: error=%d (%s)", sender->sendAddr, sender->sendPort, errno, strerror(errno));
                 ret = -1;
             }                
         }
-
-        if (ret != 0)
-        {
-            if (sender->sendSocket >= 0)
-            {
-                ARSAL_Socket_Close(sender->sendSocket);
-            }
-            sender->sendSocket = -1;
-        }
     }
-    else if (sender->networkMode == ARSTREAM_SENDER2_NETWORK_MODE_ARNETWORK)
+
+    if (ret == 0)
     {
-        /* nothing to do */
+        /* set the socket buffer size and NALU FIFO buffer size */
+        int totalBufSize = sender->maxBitrate * sender->maxLatencyMs / 1000 / 8;
+        sender->sendSocketBufferSize = totalBufSize / 2;
+        sender->naluFifoBufferSize = totalBufSize / 2;
+        err = ARSTREAM_Sender2_SetSocketSendBufferSize(sender, sender->sendSocketBufferSize);
+        if (err != 0)
+        {
+            ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Failed to set the send socket buffer size");
+            ret = -1;
+        }                
+    }
+
+    if (ret != 0)
+    {
+        if (sender->sendSocket >= 0)
+        {
+            ARSAL_Socket_Close(sender->sendSocket);
+        }
+        sender->sendSocket = -1;
     }
 
     return ret;
@@ -970,107 +930,93 @@ static int ARSTREAM_Sender2_SendData(ARSTREAM_Sender2_t *sender, uint8_t *sendBu
     header->ssrc = htonl(ARSTREAM_NETWORK_HEADERS2_RTP_SSRC);
 
     /* send to the network layer */
-    if (sender->networkMode == ARSTREAM_SENDER2_NETWORK_MODE_SOCKET)
+    ssize_t bytes;
+    if (sender->sendMulticast)
     {
-        ssize_t bytes;
-        if (sender->sendMulticast)
+        bytes = ARSAL_Socket_Sendto(sender->sendSocket, sendBuffer, sendSize, 0, (struct sockaddr*)&sender->sendSin, sizeof(sender->sendSin));
+    }
+    else
+    {
+        bytes = ARSAL_Socket_Send(sender->sendSocket, sendBuffer, sendSize, 0);
+    }
+    if (bytes < 0)
+    {
+        switch (errno)
         {
-            bytes = ARSAL_Socket_Sendto(sender->sendSocket, sendBuffer, sendSize, 0, (struct sockaddr*)&sender->sendSin, sizeof(sender->sendSin));
-        }
-        else
-        {
-            bytes = ARSAL_Socket_Send(sender->sendSocket, sendBuffer, sendSize, 0);
-        }
-        if (bytes < 0)
-        {
-            switch (errno)
+        case EAGAIN:
+            /* the socket buffer is full - drop some NALUs */
+            ret = ARSTREAM_Sender2_DropFromFifo(sender, sender->naluFifoBufferSize);
+            if (ret < 0)
             {
-            case EAGAIN:
-                /* the socket buffer is full - drop some NALUs */
-                ret = ARSTREAM_Sender2_DropFromFifo(sender, sender->naluFifoBufferSize);
-                if (ret < 0)
+                ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Failed to drop NALUs from FIFO (%d)", ret);
+            }
+            else
+            {
+                if (ret > 0)
                 {
-                    ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Failed to drop NALUs from FIFO (%d)", ret);
+                    ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Socket buffer full - dropped %d bytes -> polling", ret);
                 }
-                else
-                {
-                    if (ret > 0)
-                    {
-                        ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Socket buffer full - dropped %d bytes -> polling", ret);
-                    }
 
-                    struct pollfd p;
-                    p.fd = sender->sendSocket;
-                    p.events = POLLOUT;
-                    p.revents = 0;
-                    int pollTimeMs = sender->naluFifoBufferSize * 8 * 1000 / sender->maxBitrate;
-                    int pollRet = poll(&p, 1, pollTimeMs);
-                    if (pollRet == 0)
+                struct pollfd p;
+                p.fd = sender->sendSocket;
+                p.events = POLLOUT;
+                p.revents = 0;
+                int pollTimeMs = sender->naluFifoBufferSize * 8 * 1000 / sender->maxBitrate;
+                int pollRet = poll(&p, 1, pollTimeMs);
+                if (pollRet == 0)
+                {
+                    ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Polling timed out");
+                    ret = -2;
+                }
+                else if (pollRet < 0)
+                {
+                    ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Poll error: error=%d (%s)", errno, strerror(errno));
+                    ret = -1;
+                }
+                else if (p.revents & POLLOUT)
+                {
+                    if (sender->sendMulticast)
                     {
-                        ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Polling timed out");
+                        bytes = ARSAL_Socket_Sendto(sender->sendSocket, sendBuffer, sendSize, 0, (struct sockaddr*)&sender->sendSin, sizeof(sender->sendSin));
+                    }
+                    else
+                    {
+                        bytes = ARSAL_Socket_Send(sender->sendSocket, sendBuffer, sendSize, 0);
+                    }
+                    if (bytes > -1)
+                    {
+                        ARSTREAM_Sender2_UpdateMonitoring(sender, auTimestamp, (uint32_t)bytes, 0);
+                        ret = 0;
+                    }
+                    else if (errno == EAGAIN)
+                    {
+                        ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Socket buffer full #2 - current packet dropped");
                         ret = -2;
                     }
-                    else if (pollRet < 0)
+                    else
                     {
-                        ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Poll error: error=%d (%s)", errno, strerror(errno));
+                        ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Socket send error #2 error=%d (%s)", errno, strerror(errno));
                         ret = -1;
                     }
-                    else if (p.revents & POLLOUT)
-                    {
-                        if (sender->sendMulticast)
-                        {
-                            bytes = ARSAL_Socket_Sendto(sender->sendSocket, sendBuffer, sendSize, 0, (struct sockaddr*)&sender->sendSin, sizeof(sender->sendSin));
-                        }
-                        else
-                        {
-                            bytes = ARSAL_Socket_Send(sender->sendSocket, sendBuffer, sendSize, 0);
-                        }
-                        if (bytes > -1)
-                        {
-                            ARSTREAM_Sender2_UpdateMonitoring(sender, auTimestamp, (uint32_t)bytes, 0);
-                            ret = 0;
-                        }
-                        else if (errno == EAGAIN)
-                        {
-                            ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Socket buffer full #2 - current packet dropped");
-                            ret = -2;
-                        }
-                        else
-                        {
-                            ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Socket send error #2 error=%d (%s)", errno, strerror(errno));
-                            ret = -1;
-                        }
-                    }
                 }
-                break;
-            default:
-                ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Socket send error: error=%d (%s)", errno, strerror(errno));
-                ret = -1;
-                break;
             }
-        }
-        else
-        {
-            ARSTREAM_Sender2_UpdateMonitoring(sender, auTimestamp, (uint32_t)bytes, 0);
+            break;
+        default:
+            ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Socket send error: error=%d (%s)", errno, strerror(errno));
+            ret = -1;
+            break;
         }
     }
-    else if (sender->networkMode == ARSTREAM_SENDER2_NETWORK_MODE_ARNETWORK)
+    else
     {
-        eARNETWORK_ERROR netError = ARNETWORK_OK;
-        netError = ARNETWORK_Manager_SendData(sender->manager, sender->dataBufferID, sendBuffer, sendSize, NULL, ARSTREAM_Sender2_NetworkCallback, 1); //TODO: nocopy
-        if (netError != ARNETWORK_OK)
-        {
-            ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Error occurred during sending of the packet; error: %d (%s)", netError, ARNETWORK_Error_ToString(netError));
-            ret = -1;
-        }
-        //TODO: monitoring
+        ARSTREAM_Sender2_UpdateMonitoring(sender, auTimestamp, (uint32_t)bytes, 0);
     }
 
     return ret;
 }
 
 
-void* ARSTREAM_Sender2_RunDataThread (void *ARSTREAM_Sender2_t_Param)
+void* ARSTREAM_Sender2_RunSendThread (void *ARSTREAM_Sender2_t_Param)
 {
     /* Local declarations */
     ARSTREAM_Sender2_t *sender = (ARSTREAM_Sender2_t*)ARSTREAM_Sender2_t_Param;
@@ -1107,9 +1053,9 @@ void* ARSTREAM_Sender2_RunDataThread (void *ARSTREAM_Sender2_t_Param)
         return (void*)0;
     }
 
-    ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_SENDER2_TAG, "Sender thread running");
+    ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_SENDER2_TAG, "Stream sender sending thread running");
     ARSAL_Mutex_Lock(&(sender->streamMutex));
-    sender->dataThreadStarted = 1;
+    sender->sendThreadStarted = 1;
     shouldStop = sender->threadsShouldStop;
     ARSAL_Mutex_Unlock(&(sender->streamMutex));
 
@@ -1255,7 +1201,7 @@ void* ARSTREAM_Sender2_RunDataThread (void *ARSTREAM_Sender2_t_Param)
     }
 
     ARSAL_Mutex_Lock(&(sender->streamMutex));
-    sender->dataThreadStarted = 0;
+    sender->sendThreadStarted = 0;
     ARSAL_Mutex_Unlock(&(sender->streamMutex));
 
     /* cancel the last Access Unit */
@@ -1279,24 +1225,24 @@ void* ARSTREAM_Sender2_RunDataThread (void *ARSTREAM_Sender2_t_Param)
 
     free(sendBuffer);
 
-    ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_SENDER2_TAG, "Sender thread ended");
+    ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_SENDER2_TAG, "Stream sender sending thread ended");
 
     return (void*)0;
 }
 
 
-void* ARSTREAM_Sender2_RunAckThread(void *ARSTREAM_Sender2_t_Param)
+void* ARSTREAM_Sender2_RunRecvThread(void *ARSTREAM_Sender2_t_Param)
 {
     ARSTREAM_Sender2_t *sender = (ARSTREAM_Sender2_t*)ARSTREAM_Sender2_t_Param;
 
-    ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_SENDER2_TAG, "Ack thread running");
+    ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_SENDER2_TAG, "Stream sender receiving thread running");
     ARSAL_Mutex_Lock(&(sender->streamMutex));
-    sender->ackThreadStarted = 1;
+    sender->recvThreadStarted = 1;
     ARSAL_Mutex_Unlock(&(sender->streamMutex));
 
-    ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_SENDER2_TAG, "Ack thread ended");
+    ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_SENDER2_TAG, "Stream sender receiving thread ended");
     ARSAL_Mutex_Lock(&(sender->streamMutex));
-    sender->ackThreadStarted = 0;
+    sender->recvThreadStarted = 0;
     ARSAL_Mutex_Unlock(&(sender->streamMutex));
 
     return (void*)0;

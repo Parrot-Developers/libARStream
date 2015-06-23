@@ -196,12 +196,12 @@ uint8_t* ARSTREAM_Reader_Reader2NaluCallback(eARSTREAM_READER2_CAUSE cause, uint
 
 void ARSTREAM_Reader_InitStreamDataBuffer (ARNETWORK_IOBufferParam_t *bufferParams, int bufferID, int maxFragmentSize, uint32_t maxNumberOfFragment)
 {
-    ARSTREAM_Reader2_InitStreamDataBuffer (bufferParams, bufferID, maxFragmentSize);
+    ARSTREAM_Buffers_InitStreamDataBuffer (bufferParams, bufferID, sizeof(ARSTREAM_NetworkHeaders_DataHeader_t), maxFragmentSize, maxNumberOfFragment);
 }
 
 void ARSTREAM_Reader_InitStreamAckBuffer (ARNETWORK_IOBufferParam_t *bufferParams, int bufferID)
 {
-    ARSTREAM_Reader2_InitStreamAckBuffer (bufferParams, bufferID);
+    ARSTREAM_Buffers_InitStreamAckBuffer (bufferParams, bufferID);
 }
 
 ARSTREAM_Reader_t* ARSTREAM_Reader_New (ARNETWORK_Manager_t *manager, int dataBufferID, int ackBufferID, ARSTREAM_Reader_FrameCompleteCallback_t callback, uint8_t *frameBuffer, uint32_t frameBufferSize, uint32_t maxFragmentSize, int32_t maxAckInterval, void *custom, eARSTREAM_ERROR *error)
@@ -250,10 +250,6 @@ ARSTREAM_Reader_t* ARSTREAM_Reader_New (ARNETWORK_Manager_t *manager, int dataBu
         eARSTREAM_ERROR error2;
         ARSTREAM_Reader2_Config_t config;
         memset(&config, 0, sizeof(config));
-        config.networkMode = ARSTREAM_READER2_NETWORK_MODE_SOCKET;
-        config.manager = manager;
-        config.dataBufferID = dataBufferID;
-        config.ackBufferID = ackBufferID;
         config.ifaceAddr = NULL;
         config.recvAddr = "192.168.42.1";
         config.recvPort = 5004;
@@ -318,14 +314,14 @@ void* ARSTREAM_Reader_RunDataThread (void *ARSTREAM_Reader_t_Param)
 {
     ARSTREAM_Reader_t *reader = (ARSTREAM_Reader_t *)ARSTREAM_Reader_t_Param;
 
-    return ARSTREAM_Reader2_RunDataThread ((void *)reader->reader2);
+    return ARSTREAM_Reader2_RunRecvThread ((void *)reader->reader2);
 }
 
 void* ARSTREAM_Reader_RunAckThread (void *ARSTREAM_Reader_t_Param)
 {
     ARSTREAM_Reader_t *reader = (ARSTREAM_Reader_t *)ARSTREAM_Reader_t_Param;
 
-    return ARSTREAM_Reader2_RunAckThread ((void *)reader->reader2);
+    return ARSTREAM_Reader2_RunSendThread ((void *)reader->reader2);
 }
 
 float ARSTREAM_Reader_GetEstimatedEfficiency (ARSTREAM_Reader_t *reader)

@@ -122,6 +122,8 @@ typedef struct {
     uint32_t ssrc;
 } __attribute__ ((packed)) ARSTREAM_NetworkHeaders_DataHeader2_t;
 
+#define ARSTREAM_NETWORK_MAX_RTP_PAYLOAD_SIZE (0xFFFF - sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t) - ARSTREAM_NETWORK_UDP_HEADER_SIZE - ARSTREAM_NETWORK_IP_HEADER_SIZE)
+
 /*
  * Functions declarations
  */

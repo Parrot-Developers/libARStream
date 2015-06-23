@@ -46,7 +46,6 @@
 /*
  * ARSDK Headers
  */
-#include <libARNetwork/ARNETWORK_Manager.h>
 #include <libARStream/ARSTREAM_Error.h>
 
 /*
@@ -66,11 +65,6 @@ typedef enum {
     ARSTREAM_SENDER2_STATUS_MAX,
 } eARSTREAM_SENDER2_STATUS;
 
-typedef enum {
-    ARSTREAM_SENDER2_NETWORK_MODE_ARNETWORK = 0,
-    ARSTREAM_SENDER2_NETWORK_MODE_SOCKET,
-} ARSTREAM_Sender2_NetworkMode_t;
-
 /**
  * @brief Callback type for sender informations
  * This callback is called when a frame pointer is no longer needed by the library.
@@ -85,10 +79,6 @@ typedef enum {
 typedef void (*ARSTREAM_Sender2_AuCallback_t)(eARSTREAM_SENDER2_STATUS status, void *auUserPtr, void *custom);
 
 typedef struct ARSTREAM_Sender2_Config_t {
-    ARSTREAM_Sender2_NetworkMode_t networkMode;
-    ARNETWORK_Manager_t *manager;
-    int dataBufferID;
-    int ackBufferID;
     const char *ifaceAddr;
     const char *sendAddr;
     int sendPort;
@@ -110,22 +100,6 @@ typedef struct ARSTREAM_Sender2_t ARSTREAM_Sender2_t;
 /*
  * Functions declarations
  */
-
-/**
- * @brief Sets an ARNETWORK_IOBufferParam_t to describe a stream data buffer
- * @param[in] bufferParams Pointer to the ARNETWORK_IOBufferParam_t to set
- * @param[in] bufferID ID to set in the ARNETWORK_IOBufferParam_t
- * @param[in] maxFragmentSize Maximum allowed size for a video data fragment. Video frames larger that will be fragmented.
- * @param[in] maxNumberOfFragment number maximum of fragment of one frame.
- */
-void ARSTREAM_Sender2_InitStreamDataBuffer (ARNETWORK_IOBufferParam_t *bufferParams, int bufferID, int maxPacketSize);
-
-/**
- * @brief Sets an ARNETWORK_IOBufferParam_t to describe a stream ack buffer
- * @param[in] bufferParams Pointer to the ARNETWORK_IOBufferParam_t to set
- * @param[in] bufferID ID to set in the ARNETWORK_IOBufferParam_t
- */
-void ARSTREAM_Sender2_InitStreamAckBuffer (ARNETWORK_IOBufferParam_t *bufferParams, int bufferID);
 
 /**
  * @brief Creates a new ARSTREAM_Sender2_t
@@ -188,7 +162,7 @@ eARSTREAM_ERROR ARSTREAM_Sender2_Delete (ARSTREAM_Sender2_t **sender);
  * @return ARSTREAM_ERROR_FRAME_TOO_LARGE if the frameSize is greater that the maximum frame size of the libARStream (typically 128000 bytes)
  * @return ARSTREAM_ERROR_QUEUE_FULL if the frame can not be added to queue. This value can not happen if flushPreviousFrames is active
  */
-eARSTREAM_ERROR ARSTREAM_Sender2_SendNewNalu (ARSTREAM_Sender2_t *sender, uint8_t *naluBuffer, uint32_t naluSize, uint64_t auTimestamp, int isLastInAu, void *auUserPtr);
+eARSTREAM_ERROR ARSTREAM_Sender2_SendNewNalu (ARSTREAM_Sender2_t *sender, uint8_t *naluBuffer, uint32_t naluSize, uint64_t auTimestamp, int isLastNaluInAu, void *auUserPtr);
 
 /**
  * @brief Flushes all currently queued frames
@@ -205,7 +179,7 @@ eARSTREAM_ERROR ARSTREAM_Sender2_FlushNaluQueue (ARSTREAM_Sender2_t *sender);
  * @post Stop the ARSTREAM_Sender2_t by calling ARSTREAM_Sender2_StopSender() before joining the thread calling this function
  * @param[in] ARSTREAM_Sender2_t_Param A valid (ARSTREAM_Sender2_t *) casted as a (void *)
  */
-void* ARSTREAM_Sender2_RunDataThread (void *ARSTREAM_Sender2_t_Param);
+void* ARSTREAM_Sender2_RunSendThread (void *ARSTREAM_Sender2_t_Param);
 
 /**
  * @brief Runs the acknowledge loop of the ARSTREAM_Sender2_t
@@ -213,7 +187,7 @@ void* ARSTREAM_Sender2_RunDataThread (void *ARSTREAM_Sender2_t_Param);
  * @post Stop the ARSTREAM_Sender2_t by calling ARSTREAM_Sender2_StopSender() before joining the thread calling this function
  * @param[in] ARSTREAM_Sender2_t_Param A valid (ARSTREAM_Sender2_t *) casted as a (void *)
  */
-void* ARSTREAM_Sender2_RunAckThread (void *ARSTREAM_Sender2_t_Param);
+void* ARSTREAM_Sender2_RunRecvThread (void *ARSTREAM_Sender2_t_Param);
 
 /**
  * @brief Gets the custom pointer associated with the sender
