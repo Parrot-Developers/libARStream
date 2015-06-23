@@ -96,6 +96,13 @@ struct ARSTREAM_Reader_t {
     ARSTREAM_Reader_FrameCompleteCallback_t callback;
     void *custom;
 
+    /* Buffers */
+    int currentAuBufferSize;
+    int currentAuSize;
+    uint8_t *currentAuBuffer;
+    int currentNaluBufferSize;
+    uint8_t *currentNaluBuffer;
+
     /* ARStream_Reader2 */
     ARSTREAM_Reader2_t *reader2;
     int reader2running;
@@ -106,37 +113,85 @@ struct ARSTREAM_Reader_t {
  * Implementation
  */
 
-uint8_t* ARSTREAM_Reader_Reader2AuCallback(eARSTREAM_READER2_CAUSE cause2, uint8_t *auBuffer, int auSize, uint64_t auTimestamp, int missingPackets, int totalPackets, int *newAuBufferSize, void *custom)
+uint8_t* ARSTREAM_Reader_Reader2NaluCallback(eARSTREAM_READER2_CAUSE cause, uint8_t *naluBuffer, int naluSize, uint64_t auTimestamp, int isFirstNaluInAu, int isLastNaluInAu, int missingPacketsBefore, int *newNaluBufferSize, void *custom)
 {
     ARSTREAM_Reader_t *reader = (ARSTREAM_Reader_t *)custom;
-    eARSTREAM_READER_CAUSE cause;
     int iFrame = 0;
+    uint8_t *retPtr = NULL;
+    uint32_t newAuBufferSize, dummy = 0;
+    uint8_t *newAuBuffer = NULL;
 
-    switch (cause2)
+    switch (cause)
     {
         default:
-        case ARSTREAM_READER2_CAUSE_AU_COMPLETE:
-        case ARSTREAM_READER2_CAUSE_AU_INCOMPLETE:
-            cause = ARSTREAM_READER_CAUSE_FRAME_COMPLETE;
+        case ARSTREAM_READER2_CAUSE_NALU_COMPLETE:
+            if (isLastNaluInAu)
+            {
+                /* Hack to declare an I-Frame if the AU starts with an SPS NALU */
+                iFrame = (((*(reader->currentAuBuffer+4)) & 0x1F) == 7) ? 1 : 0;
+                reader->currentAuSize += naluSize;
+                reader->currentAuBuffer = reader->callback(ARSTREAM_READER_CAUSE_FRAME_COMPLETE, reader->currentAuBuffer, reader->currentAuSize, 0, iFrame, &(reader->currentAuBufferSize), reader->custom);
+                reader->currentAuSize = 0;
+                reader->currentNaluBuffer = reader->currentAuBuffer + reader->currentAuSize;
+                reader->currentNaluBufferSize = reader->currentAuBufferSize - reader->currentAuSize;
+                *newNaluBufferSize = reader->currentNaluBufferSize;
+                retPtr = reader->currentNaluBuffer;
+            }
+            else
+            {
+                if ((isFirstNaluInAu) && (reader->currentAuSize > 0))
+                {
+                    uint8_t *tmpBuf = malloc(naluSize);
+                    if (tmpBuf)
+                    {
+                        memcpy(tmpBuf, naluBuffer, naluSize);
+                    }
+                    /* Hack to declare an I-Frame if the AU starts with an SPS NALU */
+                    iFrame = (((*(reader->currentAuBuffer+4)) & 0x1F) == 7) ? 1 : 0;
+                    reader->currentAuBuffer = reader->callback(ARSTREAM_READER_CAUSE_FRAME_COMPLETE, reader->currentAuBuffer, reader->currentAuSize, 0, iFrame, &(reader->currentAuBufferSize), reader->custom);
+                    reader->currentAuSize = 0;
+                    reader->currentNaluBuffer = reader->currentAuBuffer + reader->currentAuSize;
+                    reader->currentNaluBufferSize = reader->currentAuBufferSize - reader->currentAuSize;
+                    if (tmpBuf)
+                    {
+                        memcpy(reader->currentNaluBuffer, tmpBuf, naluSize);
+                        free(tmpBuf);
+                    }
+                }
+                reader->currentAuSize += naluSize;
+                reader->currentNaluBuffer = reader->currentAuBuffer + reader->currentAuSize;
+                reader->currentNaluBufferSize = reader->currentAuBufferSize - reader->currentAuSize;
+                *newNaluBufferSize = reader->currentNaluBufferSize;
+                retPtr = reader->currentNaluBuffer;
+            }
             break;
-        case ARSTREAM_READER2_CAUSE_AU_BUFFER_TOO_SMALL:
-            cause = ARSTREAM_READER_CAUSE_FRAME_TOO_SMALL;
+        case ARSTREAM_READER2_CAUSE_NALU_BUFFER_TOO_SMALL:
+            newAuBufferSize = reader->currentAuBufferSize + *newNaluBufferSize;
+            newAuBuffer = reader->callback(ARSTREAM_READER_CAUSE_FRAME_TOO_SMALL, reader->currentAuBuffer, 0, 0, 0, &newAuBufferSize, reader->custom);
+            if (newAuBuffer)
+            {
+                if ((newAuBufferSize > 0) && (newAuBufferSize >= reader->currentAuBufferSize + *newNaluBufferSize))
+                {
+                    memcpy(newAuBuffer, reader->currentAuBuffer, reader->currentAuSize);
+                    reader->callback(ARSTREAM_READER_CAUSE_COPY_COMPLETE, reader->currentAuBuffer, 0, 0, 0, &dummy, reader->custom);
+                }
+                reader->currentAuBuffer = newAuBuffer;
+                reader->currentAuBufferSize = newAuBufferSize;
+                reader->currentNaluBuffer = reader->currentAuBuffer + reader->currentAuSize;
+                reader->currentNaluBufferSize = reader->currentAuBufferSize - reader->currentAuSize;
+            }
+            *newNaluBufferSize = reader->currentNaluBufferSize;
+            retPtr = reader->currentNaluBuffer;
             break;
-        case ARSTREAM_READER2_CAUSE_AU_COPY_COMPLETE:
-            cause = ARSTREAM_READER_CAUSE_COPY_COMPLETE;
+        case ARSTREAM_READER2_CAUSE_NALU_COPY_COMPLETE:
+            *newNaluBufferSize = reader->currentNaluBufferSize;
+            retPtr = reader->currentNaluBuffer;
             break;
         case ARSTREAM_READER2_CAUSE_CANCEL:
-            cause = ARSTREAM_READER_CAUSE_CANCEL;
             break;
     }
 
-    /* Hack to declare an I-Frame if the AU starts with an SPS NALU */
-    if (cause == ARSTREAM_READER_CAUSE_FRAME_COMPLETE)
-    {
-        iFrame = (((*(auBuffer+4)) & 0x1F) == 7) ? 1 : 0;
-    }
-
-    return reader->callback (cause, auBuffer, auSize, 0, iFrame, newAuBufferSize, reader->custom);
+    return retPtr;
 }
 
 void ARSTREAM_Reader_InitStreamDataBuffer (ARNETWORK_IOBufferParam_t *bufferParams, int bufferID, int maxFragmentSize, uint32_t maxNumberOfFragment)
@@ -183,6 +238,10 @@ ARSTREAM_Reader_t* ARSTREAM_Reader_New (ARNETWORK_Manager_t *manager, int dataBu
         retReader->maxAckInterval = maxAckInterval;
         retReader->callback = callback;
         retReader->custom = custom;
+        retReader->currentAuBufferSize = frameBufferSize;
+        retReader->currentAuBuffer = frameBuffer;
+        retReader->currentNaluBufferSize = frameBufferSize;
+        retReader->currentNaluBuffer = frameBuffer;
     }
 
     /* Setup ARStream_Reader2 */
@@ -199,12 +258,11 @@ ARSTREAM_Reader_t* ARSTREAM_Reader_New (ARNETWORK_Manager_t *manager, int dataBu
         config.recvAddr = "192.168.42.1";
         config.recvPort = 5004;
         config.recvTimeoutSec = 5;
-        config.auCallback = ARSTREAM_Reader_Reader2AuCallback;
+        config.naluCallback = ARSTREAM_Reader_Reader2NaluCallback;
         config.maxPacketSize = maxFragmentSize;
         config.insertStartCodes = 1;
-        config.outputIncompleteAu = 1;
 
-        retReader->reader2 = ARSTREAM_Reader2_New (&config, frameBuffer, frameBufferSize, (void*)retReader, &error2);
+        retReader->reader2 = ARSTREAM_Reader2_New (&config, retReader->currentNaluBuffer, retReader->currentNaluBufferSize, (void*)retReader, &error2);
         if (error2 != ARSTREAM_OK)
         {
             internalError = error2;

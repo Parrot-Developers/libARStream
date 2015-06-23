@@ -57,10 +57,9 @@
  * @brief Causes for FrameComplete callback
  */
 typedef enum {
-    ARSTREAM_READER2_CAUSE_AU_COMPLETE = 0, /**< Frame is complete (no error) */
-    ARSTREAM_READER2_CAUSE_AU_INCOMPLETE, /**< Frame is incomplete (mising fragments) */
-    ARSTREAM_READER2_CAUSE_AU_BUFFER_TOO_SMALL, /**< Frame buffer is too small for the frame on the network */
-    ARSTREAM_READER2_CAUSE_AU_COPY_COMPLETE, /**< Copy of previous frame buffer is complete (called only after ARSTREAM_READER2_CAUSE_FRAME_TOO_SMALL) */
+    ARSTREAM_READER2_CAUSE_NALU_COMPLETE = 0, /**< Frame is complete (no error) */
+    ARSTREAM_READER2_CAUSE_NALU_BUFFER_TOO_SMALL, /**< Frame buffer is too small for the frame on the network */
+    ARSTREAM_READER2_CAUSE_NALU_COPY_COMPLETE, /**< Copy of previous frame buffer is complete (called only after ARSTREAM_READER2_CAUSE_FRAME_TOO_SMALL) */
     ARSTREAM_READER2_CAUSE_CANCEL, /**< Reader is closing, so buffer is no longer used */
     ARSTREAM_READER2_CAUSE_MAX,
 } eARSTREAM_READER2_CAUSE;
@@ -94,7 +93,7 @@ typedef enum {
  * @warning If the cause is ARSTREAM_READER2_CAUSE_FRAME_TOO_SMALL, returning a buffer shorter than 'frameSize' will cause the library to skip the current frame
  * @warning In any case, returning a NULL buffer is not supported.
  */
-typedef uint8_t* (*ARSTREAM_Reader2_AuCallback_t) (eARSTREAM_READER2_CAUSE cause, uint8_t *auBuffer, int auSize, uint64_t auTimestamp, int missingPackets, int totalPackets, int *newAuBufferSize, void *custom);
+typedef uint8_t* (*ARSTREAM_Reader2_NaluCallback_t) (eARSTREAM_READER2_CAUSE cause, uint8_t *naluBuffer, int naluSize, uint64_t auTimestamp, int isFirstNaluInAu, int isLastNaluInAu, int missingPacketsBefore, int *newNaluBufferSize, void *custom);
 
 typedef struct ARSTREAM_Reader2_Config_t {
     ARSTREAM_Reader2_NetworkMode_t networkMode;
@@ -105,10 +104,9 @@ typedef struct ARSTREAM_Reader2_Config_t {
     const char *recvAddr;
     int recvPort;
     int recvTimeoutSec;
-    ARSTREAM_Reader2_AuCallback_t auCallback;
+    ARSTREAM_Reader2_NaluCallback_t naluCallback;
     int maxPacketSize;
     int insertStartCodes;
-    int outputIncompleteAu;
 } ARSTREAM_Reader2_Config_t;
 
 /**
@@ -155,7 +153,7 @@ void ARSTREAM_Reader2_InitStreamAckBuffer (ARNETWORK_IOBufferParam_t *bufferPara
  * @see ARSTREAM_Reader2_StopReader()
  * @see ARSTREAM_Reader2_Delete()
  */
-ARSTREAM_Reader2_t* ARSTREAM_Reader2_New (ARSTREAM_Reader2_Config_t *config, uint8_t *auBuffer, int auBufferSize, void *custom, eARSTREAM_ERROR *error);
+ARSTREAM_Reader2_t* ARSTREAM_Reader2_New (ARSTREAM_Reader2_Config_t *config, uint8_t *naluBuffer, int naluBufferSize, void *custom, eARSTREAM_ERROR *error);
 
 /**
  * @brief Stops a running ARSTREAM_Reader2_t

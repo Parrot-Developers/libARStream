@@ -122,14 +122,13 @@ struct ARSTREAM_Reader2_t {
     int recvTimeoutSec;
     int maxPacketSize;
     int insertStartCodes;
-    int outputIncompleteAu;
-    ARSTREAM_Reader2_AuCallback_t auCallback;
+    ARSTREAM_Reader2_NaluCallback_t naluCallback;
     void *custom;
 
     /* Current frame storage */
-    int currentAuBufferSize; // Usable length of the buffer
-    int currentAuSize;       // Actual data length
-    uint8_t *currentAuBuffer;
+    int currentNaluBufferSize; // Usable length of the buffer
+    int currentNaluSize;       // Actual data length
+    uint8_t *currentNaluBuffer;
     uint32_t firstTimestamp;
 
     /* Thread status */
@@ -168,7 +167,7 @@ void ARSTREAM_Reader2_InitStreamAckBuffer(ARNETWORK_IOBufferParam_t *bufferParam
 }
 
 
-ARSTREAM_Reader2_t* ARSTREAM_Reader2_New(ARSTREAM_Reader2_Config_t *config, uint8_t *auBuffer, int auBufferSize, void *custom, eARSTREAM_ERROR *error)
+ARSTREAM_Reader2_t* ARSTREAM_Reader2_New(ARSTREAM_Reader2_Config_t *config, uint8_t *naluBuffer, int naluBufferSize, void *custom, eARSTREAM_ERROR *error)
 {
     ARSTREAM_Reader2_t *retReader = NULL;
     int streamMutexWasInit = 0;
@@ -180,9 +179,9 @@ ARSTREAM_Reader2_t* ARSTREAM_Reader2_New(ARSTREAM_Reader2_Config_t *config, uint
             (config->manager == NULL)) ||
         ((config->networkMode == ARSTREAM_READER2_NETWORK_MODE_SOCKET) &&
             ((config->recvPort <= 0) || (config->recvTimeoutSec <= 0))) ||
-        (config->auCallback == NULL) ||
-        (auBuffer == NULL) ||
-        (auBufferSize == 0) ||
+        (config->naluCallback == NULL) ||
+        (naluBuffer == NULL) ||
+        (naluBufferSize == 0) ||
         (config->maxPacketSize < 100))
     {
         SET_WITH_CHECK(error, ARSTREAM_ERROR_BAD_PARAMETERS);
@@ -221,11 +220,10 @@ ARSTREAM_Reader2_t* ARSTREAM_Reader2_New(ARSTREAM_Reader2_Config_t *config, uint
         retReader->recvPort = config->recvPort;
         retReader->maxPacketSize = config->maxPacketSize - sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t) - ARSTREAM_NETWORK_UDP_HEADER_SIZE - ARSTREAM_NETWORK_IP_HEADER_SIZE;
         retReader->insertStartCodes = config->insertStartCodes;
-        retReader->outputIncompleteAu = config->outputIncompleteAu;
-        retReader->auCallback = config->auCallback;
+        retReader->naluCallback = config->naluCallback;
         retReader->custom = custom;
-        retReader->currentAuBufferSize = auBufferSize;
-        retReader->currentAuBuffer = auBuffer;
+        retReader->currentNaluBufferSize = naluBufferSize;
+        retReader->currentNaluBuffer = naluBuffer;
     }
 
     /* Setup internal mutexes/sems */
@@ -677,19 +675,19 @@ static int ARSTREAM_Reader2_CheckBufferSize(ARSTREAM_Reader2_t *reader, int payl
 {
     int ret = 0;
 
-    if (reader->currentAuSize + payloadSize > reader->currentAuBufferSize)
+    if (reader->currentNaluSize + payloadSize > reader->currentNaluBufferSize)
     {
-        uint32_t nextAuBufferSize = reader->currentAuSize + payloadSize, dummy = 0;
-        uint8_t *nextAuBuffer = reader->auCallback(ARSTREAM_READER2_CAUSE_AU_BUFFER_TOO_SMALL, reader->currentAuBuffer, 0, 0, 0, 0, &nextAuBufferSize, reader->custom);
+        uint32_t nextNaluBufferSize = reader->currentNaluSize + payloadSize, dummy = 0;
+        uint8_t *nextNaluBuffer = reader->naluCallback(ARSTREAM_READER2_CAUSE_NALU_BUFFER_TOO_SMALL, reader->currentNaluBuffer, 0, 0, 0, 0, 0, &nextNaluBufferSize, reader->custom);
         ret = -1;
-        if ((nextAuBufferSize > 0) && (nextAuBufferSize >= reader->currentAuSize + payloadSize))
+        if ((nextNaluBufferSize > 0) && (nextNaluBufferSize >= reader->currentNaluSize + payloadSize))
         {
-            memcpy(nextAuBuffer, reader->currentAuBuffer, reader->currentAuSize);
-            reader->auCallback(ARSTREAM_READER2_CAUSE_AU_COPY_COMPLETE, reader->currentAuBuffer, 0, 0, 0, 0, &dummy, reader->custom);
+            memcpy(nextNaluBuffer, reader->currentNaluBuffer, reader->currentNaluSize);
+            reader->naluCallback(ARSTREAM_READER2_CAUSE_NALU_COPY_COMPLETE, reader->currentNaluBuffer, 0, 0, 0, 0, 0, &dummy, reader->custom);
             ret = 0;
         }
-        reader->currentAuBuffer = nextAuBuffer;
-        reader->currentAuBufferSize = nextAuBufferSize;
+        reader->currentNaluBuffer = nextNaluBuffer;
+        reader->currentNaluBufferSize = nextNaluBufferSize;
     }
 
     return ret;
@@ -702,7 +700,7 @@ void* ARSTREAM_Reader2_RunDataThread(void *ARSTREAM_Reader2_t_Param)
     uint8_t *recvBuffer = NULL;
     int recvBufferSize;
     int recvSize, payloadSize;
-    int fuPending = 0;
+    int fuPending = 0, currentAuSize = 0;
     ARSTREAM_NetworkHeaders_DataHeader2_t *header = NULL;
     uint32_t rtpTimestamp = 0;
     uint64_t currentTimestamp = 0, previousTimestamp = 0, receptionTs = 0;
@@ -772,7 +770,7 @@ void* ARSTREAM_Reader2_RunDataThread(void *ARSTREAM_Reader2_t_Param)
                 reader->firstTimestamp = rtpTimestamp;
             }
             currentSeqNum = (int)ntohs(header->seqNum);
-            if (reader->currentAuSize == 0)
+            if (currentAuSize == 0)
             {
                 startSeqNum = currentSeqNum;
             }
@@ -796,24 +794,20 @@ void* ARSTREAM_Reader2_RunDataThread(void *ARSTREAM_Reader2_t_Param)
                 {
                     if (gapsInSeqNum)
                     {
-                        if (reader->outputIncompleteAu)
+                        ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Incomplete access unit before seqNum %d, size %d bytes (missing %d packets)", currentSeqNum, currentAuSize, gapsInSeqNum);
+                        /*if (reader->outputIncompleteAu)
                         {
                             struct timespec res;
                             ARSAL_Time_GetLocalTime(&res, NULL);
                             receptionTs = (uint64_t)res.tv_sec * 1000000 + (uint64_t)res.tv_nsec / 1000;
-                            ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Output incomplete access unit before seqNum %d, size %d bytes (missing %d packets)", currentSeqNum, reader->currentAuSize, gapsInSeqNum);
 #ifdef ARSTREAM_READER2_DEBUG
                             ARSTREAM_Reader2Debug_ProcessAu(reader->rdbg, reader->currentAuBuffer, reader->currentAuSize, previousTimestamp, receptionTs, gapsInSeqNum, previousSeqNum - startSeqNum + 1);
 #endif
-                            reader->currentAuBuffer = reader->auCallback(ARSTREAM_READER2_CAUSE_AU_INCOMPLETE, reader->currentAuBuffer, reader->currentAuSize, previousTimestamp, gapsInSeqNum, previousSeqNum - startSeqNum + 1, &(reader->currentAuBufferSize), reader->custom);
-                        }
-                        else
-                        {
-                            ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Dropping incomplete access unit before seqNum %d, size %d bytes (missing %d packets)", currentSeqNum, reader->currentAuSize, gapsInSeqNum);
-                        }
+                            /*reader->currentAuBuffer = reader->auCallback(ARSTREAM_READER2_CAUSE_AU_INCOMPLETE, reader->currentAuBuffer, reader->currentAuSize, previousTimestamp, gapsInSeqNum, previousSeqNum - startSeqNum + 1, &(reader->currentAuBufferSize), reader->custom);
+                        }*/ //TODO
                     }
                     gapsInSeqNum = 0;
-                    reader->currentAuSize = 0;
+                    currentAuSize = 0;
                 }
 
                 payloadSize = recvSize - sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t);
@@ -843,6 +837,7 @@ void* ARSTREAM_Reader2_RunDataThread(void *ARSTREAM_Reader2_t_Param)
                             if (startBit)
                             {
                                 fuPending = 1;
+                                reader->currentNaluSize = 0;
                             }
                             if (fuPending)
                             {
@@ -851,17 +846,25 @@ void* ARSTREAM_Reader2_RunDataThread(void *ARSTREAM_Reader2_t_Param)
                                 {
                                     if ((startCodeLength > 0) && (startBit))
                                     {
-                                        memcpy(reader->currentAuBuffer + reader->currentAuSize, &startCode, startCodeLength);
-                                        reader->currentAuSize += startCodeLength;
+                                        memcpy(reader->currentNaluBuffer + reader->currentNaluSize, &startCode, startCodeLength);
+                                        reader->currentNaluSize += startCodeLength;
+                                        currentAuSize += startCodeLength;
                                     }
-                                    memcpy(reader->currentAuBuffer + reader->currentAuSize + ((startBit) ? 1 : 0), recvBuffer + sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t) + 2, payloadSize - 2);
+                                    memcpy(reader->currentNaluBuffer + reader->currentNaluSize + ((startBit) ? 1 : 0), recvBuffer + sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t) + 2, payloadSize - 2);
                                     if (startBit)
                                     {
                                         /* restore the NALU header byte */
-                                        *(reader->currentAuBuffer + reader->currentAuSize) = (fuIndicator & 0xE0) | (fuHeader & 0x1F);
-                                        reader->currentAuSize++;
+                                        *(reader->currentNaluBuffer + reader->currentNaluSize) = (fuIndicator & 0xE0) | (fuHeader & 0x1F);
+                                        reader->currentNaluSize++;
+                                        currentAuSize++;
                                     }
-                                    reader->currentAuSize += payloadSize - 2;
+                                    reader->currentNaluSize += payloadSize - 2;
+                                    currentAuSize += payloadSize - 2;
+                                    if (endBit)
+                                    {
+                                        reader->currentNaluBuffer = reader->naluCallback(ARSTREAM_READER2_CAUSE_NALU_COMPLETE, reader->currentNaluBuffer, reader->currentNaluSize, currentTimestamp,
+                                                                                         (startSeqNum == currentSeqNum) ? 1 : 0, (currentFlags & (1 << 7)) ? 1 : 0, gapsInSeqNum, &(reader->currentNaluBufferSize), reader->custom);
+                                    }
                                 }
                                 else
                                 {
@@ -900,15 +903,20 @@ void* ARSTREAM_Reader2_RunDataThread(void *ARSTREAM_Reader2_t_Param)
                             ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Incomplete FU-A packet before single NALU at seqNum %d (fuPending)", currentSeqNum);
                         }
 
+                        reader->currentNaluSize = 0;
                         if (!ARSTREAM_Reader2_CheckBufferSize(reader, payloadSize + startCodeLength))
                         {
                             if (startCodeLength > 0)
                             {
-                                memcpy(reader->currentAuBuffer + reader->currentAuSize, &startCode, startCodeLength);
-                                reader->currentAuSize += startCodeLength;
+                                memcpy(reader->currentNaluBuffer, &startCode, startCodeLength);
+                                reader->currentNaluSize += startCodeLength;
+                                currentAuSize += startCodeLength;
                             }
-                            memcpy(reader->currentAuBuffer + reader->currentAuSize, recvBuffer + sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t), payloadSize);
-                            reader->currentAuSize += payloadSize;
+                            memcpy(reader->currentNaluBuffer + reader->currentNaluSize, recvBuffer + sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t), payloadSize);
+                            reader->currentNaluSize += payloadSize;
+                            currentAuSize += payloadSize;
+                            reader->currentNaluBuffer = reader->naluCallback(ARSTREAM_READER2_CAUSE_NALU_COMPLETE, reader->currentNaluBuffer, reader->currentNaluSize, currentTimestamp,
+                                                                             (startSeqNum == currentSeqNum) ? 1 : 0, (currentFlags & (1 << 7)) ? 1 : 0, gapsInSeqNum, &(reader->currentNaluBufferSize), reader->custom);
                         }
                         else
                         {
@@ -923,17 +931,17 @@ void* ARSTREAM_Reader2_RunDataThread(void *ARSTREAM_Reader2_t_Param)
 
                 if (currentFlags & (1 << 7))
                 {
+                    ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Complete access unit at seqNum %d, size %d bytes (missing %d packets)", currentSeqNum, currentAuSize, gapsInSeqNum);
                     /* the marker bit is set: output the access unit */
-                    struct timespec res;
+                    /*struct timespec res;
                     ARSAL_Time_GetLocalTime(&res, NULL);
                     receptionTs = (uint64_t)res.tv_sec * 1000000 + (uint64_t)res.tv_nsec / 1000;
-                    ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Output access unit at seqNum %d, size %d bytes (missing %d packets)", currentSeqNum, reader->currentAuSize, gapsInSeqNum);
 #ifdef ARSTREAM_READER2_DEBUG
                     ARSTREAM_Reader2Debug_ProcessAu(reader->rdbg, reader->currentAuBuffer, reader->currentAuSize, currentTimestamp, receptionTs, gapsInSeqNum, currentSeqNum - startSeqNum + 1);
 #endif
-                    reader->currentAuBuffer = reader->auCallback(ARSTREAM_READER2_CAUSE_AU_COMPLETE, reader->currentAuBuffer, reader->currentAuSize, currentTimestamp, gapsInSeqNum, currentSeqNum - startSeqNum + 1, &(reader->currentAuBufferSize), reader->custom);
+                    reader->currentAuBuffer = reader->auCallback(ARSTREAM_READER2_CAUSE_AU_COMPLETE, reader->currentAuBuffer, reader->currentAuSize, currentTimestamp, gapsInSeqNum, currentSeqNum - startSeqNum + 1, &(reader->currentAuBufferSize), reader->custom);*/ //TODO
                     gapsInSeqNum = 0;
-                    reader->currentAuSize = 0;
+                    currentAuSize = 0;
                 }
 
                 previousSeqNum = currentSeqNum;
@@ -952,7 +960,7 @@ void* ARSTREAM_Reader2_RunDataThread(void *ARSTREAM_Reader2_t_Param)
         ARSAL_Mutex_Unlock(&(reader->streamMutex));
     }
 
-    reader->auCallback(ARSTREAM_READER2_CAUSE_CANCEL, reader->currentAuBuffer, 0, 0, 0, 0, &(reader->currentAuBufferSize), reader->custom);
+    reader->naluCallback(ARSTREAM_READER2_CAUSE_CANCEL, reader->currentNaluBuffer, 0, 0, 0, 0, 0, &(reader->currentNaluBufferSize), reader->custom);
 
     ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Stream reader thread ended");
     ARSAL_Mutex_Lock(&(reader->streamMutex));
