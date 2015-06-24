@@ -78,7 +78,7 @@ void ARSTREAM_Buffers_InitStreamDataBuffer (ARNETWORK_IOBufferParam_t *bufferPar
         bufferParams->ID = bufferID;
         bufferParams->dataType = ARSTREAM_BUFFERS_DATA_BUFFER_TYPE;
         bufferParams->sendingWaitTimeMs = ARSTREAM_BUFFERS_DATA_BUFFER_SEND_EVERY_MS;
-        bufferParams->numberOfCell = maxFragmentPerFrame * 2;
+        bufferParams->numberOfCell = maxFragmentPerFrame;
         bufferParams->dataCopyMaxSize = maxFragmentSize + sizeof (ARSTREAM_NetworkHeaders_DataHeader_t);
         bufferParams->isOverwriting = ARSTREAM_BUFFERS_DATA_BUFFER_OVERWRITE;
     }
