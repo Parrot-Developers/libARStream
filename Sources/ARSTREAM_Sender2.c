@@ -93,7 +93,7 @@
         }                                       \
     } while (0)
 
-//#define ARSTREAM_SENDER2_MONITORING_OUTPUT
+#define ARSTREAM_SENDER2_MONITORING_OUTPUT
 #ifdef ARSTREAM_SENDER2_MONITORING_OUTPUT
     #include <stdio.h>
     #define ARSTREAM_SENDER2_MONITORING_OUTPUT_PATH "/data/ftp/internal_000/stream_monitor"
