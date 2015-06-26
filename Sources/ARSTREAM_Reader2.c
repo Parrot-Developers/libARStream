@@ -65,6 +65,7 @@
 #include <libARSAL/ARSAL_Print.h>
 #include <libARSAL/ARSAL_Mutex.h>
 #include <libARSAL/ARSAL_Endianness.h>
+#include <libARSAL/ARSAL_Socket.h>
 
 /*
  * Macros
@@ -531,7 +532,7 @@ static void ARSTREAM_Reader2_UpdateMonitoring(ARSTREAM_Reader2_t *reader, uint32
 {
     uint64_t curTime;
     struct timespec t1;
-    clock_gettime(CLOCK_MONOTONIC, &t1);
+    ARSAL_Time_GetTime(&t1);
     curTime = (uint64_t)t1.tv_sec * 1000000 + (uint64_t)t1.tv_nsec / 1000;
 
     ARSAL_Mutex_Lock(&(reader->monitoringMutex));
