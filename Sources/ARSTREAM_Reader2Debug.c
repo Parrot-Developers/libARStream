@@ -72,6 +72,10 @@ struct ARSTREAM_Reader2Debug_t {
     int curIdrPicId;
     int idrPicIdBase;
     int lastFrameIdx;
+    int auSize;
+    int auMissingPackets;
+    int auTotalPackets;
+    uint64_t lastReceptionTs;
     uint32_t previousFrameIndex;
     H264P_Handle h264p;
     FILE* rtpStatsFile;
@@ -209,7 +213,7 @@ ARSTREAM_Reader2Debug_t* ARSTREAM_Reader2Debug_New(int outputRtpStatFile, int ou
     }
     if (rdbg->h264StatsFile)
     {
-        fprintf(rdbg->h264StatsFile, "frameIndex acquisitionTs rtpTs receptionTs systemTs frameSize psnr estimatedLostFrames sliceInfoIdrPicFlag sliceInfoSliceTypeMod5 ");
+        fprintf(rdbg->h264StatsFile, "frameIndex acquisitionTs rtpTs receptionTs systemTs frameSize psnr estimatedLostFrames ");
         fprintf(rdbg->h264StatsFile, "batteryPercentage latitude longitude altitude absoluteHeight relativeHeight xSpeed ySpeed zSpeed distance heading yaw pitch roll cameraPan cameraTilt ");
         fprintf(rdbg->h264StatsFile, "targetLiveVideoBitrate wifiRssi wifiMcsRate wifiTxRate wifiRxRate wifiTxFailRate wifiTxErrorRate ");
         fprintf(rdbg->h264StatsFile, "postReprojTimestampDelta postEeTimestampDelta postScalingTimestampDelta postLiveEncodingTimestampDelta postNetworkTimestampDelta ");
@@ -302,10 +306,9 @@ void ARSTREAM_Reader2Debug_Delete(ARSTREAM_Reader2Debug_t **rdbg)
 }
 
 
-void ARSTREAM_Reader2Debug_ProcessAu(ARSTREAM_Reader2Debug_t *rdbg, uint8_t* pAu, uint32_t auSize, uint64_t timestamp, uint64_t receptionTs, int missingPackets, int totalPackets)
+static void ARSTREAM_Reader2Debug_OutputAu(ARSTREAM_Reader2Debug_t *rdbg, uint32_t auSize, uint64_t timestamp, uint64_t receptionTs, int missingPackets, int totalPackets)
 {
     int ret;
-    unsigned int offset = 0, nextStartCodeOffset = 0;
     void* pUserDataBuf;
     unsigned int userDataSize;
     double psnr = 0.0;
@@ -316,38 +319,10 @@ void ARSTREAM_Reader2Debug_ProcessAu(ARSTREAM_Reader2Debug_t *rdbg, uint8_t* pAu
     H264P_ParrotDragonExtendedUserDataSei_t parrotDragonExtendedUserData;
     H264P_ParrotUserDataSeiTypes_t parrotUserDataType = H264P_UNKNOWN_USER_DATA_SEI;
 
-    if ((!rdbg) || (!pAu) || (!auSize))
-    {
-        return;
-    }
-
-    if (!rdbg->h264StatsFile)
-    {
-        return;
-    }
-
     memset(&sliceInfo, 0, sizeof(sliceInfo));
     memset(&parrotDragonBasicUserData, 0, sizeof(parrotDragonBasicUserData));
     memset(&parrotDragonExtendedUserData, 0, sizeof(parrotDragonExtendedUserData));
 
-    do
-    {
-        ret = H264P_ReadNextNalu_buffer(rdbg->h264p, pAu + offset, auSize - offset, &nextStartCodeOffset);
-        if (ret < 0)
-        {
-            ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2DEBUG_TAG, "H264P_ReadNextNalu_buffer() failed (%d)", ret);
-            break;
-        }
-        offset += nextStartCodeOffset;
-        ret = H264P_ParseNalu(rdbg->h264p);
-        if (ret < 0)
-        {
-            ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2DEBUG_TAG, "H264P_ParseNalu() failed (%d)", ret);
-            break;
-        }
-    }
-    while (nextStartCodeOffset);
-    
     ret = H264P_GetSliceInfo(rdbg->h264p, &sliceInfo);
     if (ret >= 0)
     {
@@ -433,12 +408,10 @@ void ARSTREAM_Reader2Debug_ProcessAu(ARSTREAM_Reader2Debug_t *rdbg, uint8_t* pAu
             fprintf(rdbg->h264StatsFile, "%llu ", (long long unsigned int)timestamp);
             fprintf(rdbg->h264StatsFile, "%llu ", (long long unsigned int)receptionTs);
             fprintf(rdbg->h264StatsFile, "%llu ", (long long unsigned int)0);
-            fprintf(rdbg->h264StatsFile, "%lu %.3f %d %d %d ", 
+            fprintf(rdbg->h264StatsFile, "%lu %.3f %d ", 
                     (long unsigned int)auSize, 
                     psnr, 
-                    estimatedLostFrames,
-                    sliceInfo.idrPicFlag,
-                    sliceInfo.sliceTypeMod5);
+                    estimatedLostFrames);
             fprintf(rdbg->h264StatsFile, "%lu %.8f %.8f %.3f ", 
                     (long unsigned int)0, 0., 0., 0.);
             fprintf(rdbg->h264StatsFile, "%.3f %.3f %.3f %.3f %.3f %.3f %.3f ", 
@@ -462,12 +435,10 @@ void ARSTREAM_Reader2Debug_ProcessAu(ARSTREAM_Reader2Debug_t *rdbg, uint8_t* pAu
             fprintf(rdbg->h264StatsFile, "%llu ", (long long unsigned int)timestamp);
             fprintf(rdbg->h264StatsFile, "%llu ", (long long unsigned int)receptionTs);
             fprintf(rdbg->h264StatsFile, "%llu ", (long long unsigned int)systemTs);
-            fprintf(rdbg->h264StatsFile, "%lu %.3f %d %d %d ", 
+            fprintf(rdbg->h264StatsFile, "%lu %.3f %d ", 
                     (long unsigned int)auSize,
                     psnr, 
-                    estimatedLostFrames,
-                    sliceInfo.idrPicFlag,
-                    sliceInfo.sliceTypeMod5);
+                    estimatedLostFrames);
             fprintf(rdbg->h264StatsFile, "%lu %.8f %.8f %.3f ", 
                     (long unsigned int)parrotDragonExtendedUserData.batteryPercentage, 
                     (double)parrotDragonExtendedUserData.latitude_fp20 / 1048576., 
@@ -521,12 +492,10 @@ void ARSTREAM_Reader2Debug_ProcessAu(ARSTREAM_Reader2Debug_t *rdbg, uint8_t* pAu
             fprintf(rdbg->h264StatsFile, "%llu ", (long long unsigned int)timestamp);
             fprintf(rdbg->h264StatsFile, "%llu ", (long long unsigned int)receptionTs);
             fprintf(rdbg->h264StatsFile, "%llu ", (long long unsigned int)0);
-            fprintf(rdbg->h264StatsFile, "%lu %.3f %d %d %d ", 
+            fprintf(rdbg->h264StatsFile, "%lu %.3f %d ", 
                     (long unsigned int)auSize, 
                     0., 
-                    0,
-                    sliceInfo.idrPicFlag,
-                    sliceInfo.sliceTypeMod5);
+                    0);
             fprintf(rdbg->h264StatsFile, "%lu %.8f %.8f %.3f ", 
                     (long unsigned int)0, 0., 0., 0.);
             fprintf(rdbg->h264StatsFile, "%.3f %.3f %.3f %.3f %.3f %.3f %.3f ", 
@@ -546,10 +515,117 @@ void ARSTREAM_Reader2Debug_ProcessAu(ARSTREAM_Reader2Debug_t *rdbg, uint8_t* pAu
             break;
     }
     setlocale(LC_ALL, "");
+}
+
+
+void ARSTREAM_Reader2Debug_ProcessAu(ARSTREAM_Reader2Debug_t *rdbg, uint8_t* pAu, uint32_t auSize, uint64_t timestamp, uint64_t receptionTs, int missingPackets, int totalPackets)
+{
+    int ret;
+    unsigned int offset = 0, nextStartCodeOffset = 0;
+    void* pUserDataBuf;
+    unsigned int userDataSize;
+    double psnr = 0.0;
+    uint64_t acquisitionTs = 0, systemTs = 0;
+    int estimatedLostFrames = 0, curFrameIdx = 0;
+    H264P_SliceInfo_t sliceInfo;
+    H264P_ParrotDragonBasicUserDataSei_t parrotDragonBasicUserData;
+    H264P_ParrotDragonExtendedUserDataSei_t parrotDragonExtendedUserData;
+    H264P_ParrotUserDataSeiTypes_t parrotUserDataType = H264P_UNKNOWN_USER_DATA_SEI;
+
+    if ((!rdbg) || (!pAu) || (!auSize))
+    {
+        return;
+    }
+
+    if (!rdbg->h264StatsFile)
+    {
+        return;
+    }
+
+    memset(&sliceInfo, 0, sizeof(sliceInfo));
+    memset(&parrotDragonBasicUserData, 0, sizeof(parrotDragonBasicUserData));
+    memset(&parrotDragonExtendedUserData, 0, sizeof(parrotDragonExtendedUserData));
+
+    do
+    {
+        ret = H264P_ReadNextNalu_buffer(rdbg->h264p, pAu + offset, auSize - offset, &nextStartCodeOffset);
+        if (ret < 0)
+        {
+            ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2DEBUG_TAG, "H264P_ReadNextNalu_buffer() failed (%d)", ret);
+            break;
+        }
+        offset += nextStartCodeOffset;
+        ret = H264P_ParseNalu(rdbg->h264p);
+        if (ret < 0)
+        {
+            ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2DEBUG_TAG, "H264P_ParseNalu() failed (%d)", ret);
+            break;
+        }
+    }
+    while (nextStartCodeOffset);
+    
+    ARSTREAM_Reader2Debug_OutputAu(rdbg, auSize, timestamp, receptionTs, missingPackets, totalPackets);
 
     if (rdbg->videoFile)
     {
         fwrite(pAu, auSize, 1, rdbg->videoFile);
+        fflush(rdbg->videoFile);
+    }
+}
+
+
+void ARSTREAM_Reader2Debug_ProcessNalu(ARSTREAM_Reader2Debug_t *rdbg, uint8_t* pNalu, uint32_t naluSize, uint64_t timestamp, uint64_t receptionTs, int missingPacketsBefore, int totalPackets, int isFirstNaluInAu, int isLastNaluInAu)
+{
+    int ret;
+
+    if ((!rdbg) || (!pNalu) || (!naluSize))
+    {
+        return;
+    }
+
+    if (!rdbg->h264StatsFile)
+    {
+        return;
+    }
+
+    if ((isFirstNaluInAu) && (rdbg->auSize > 0))
+    {
+        ARSTREAM_Reader2Debug_OutputAu(rdbg, rdbg->auSize, timestamp, rdbg->lastReceptionTs, rdbg->auMissingPackets, rdbg->auTotalPackets);
+        rdbg->auSize = 0;
+        rdbg->auMissingPackets = 0;
+        rdbg->auTotalPackets = 0;
+    }
+
+    rdbg->auSize += naluSize;
+    rdbg->lastReceptionTs = receptionTs;
+    rdbg->auMissingPackets += missingPacketsBefore;
+    rdbg->auTotalPackets += totalPackets;
+
+    ret = H264P_ReadNextNalu_buffer(rdbg->h264p, pNalu, naluSize, NULL);
+    if (ret < 0)
+    {
+        ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2DEBUG_TAG, "H264P_ReadNextNalu_buffer() failed (%d)", ret);
+    }
+    else
+    {
+        ret = H264P_ParseNalu(rdbg->h264p);
+        if (ret < 0)
+        {
+            ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2DEBUG_TAG, "H264P_ParseNalu() failed (%d)", ret);
+        }
+    }
+
+    if (isLastNaluInAu)
+    {
+        ARSTREAM_Reader2Debug_OutputAu(rdbg, rdbg->auSize, timestamp, rdbg->lastReceptionTs, rdbg->auMissingPackets, rdbg->auTotalPackets);
+        rdbg->auSize = 0;
+        rdbg->auMissingPackets = 0;
+        rdbg->auTotalPackets = 0;
+    }
+
+    if (rdbg->videoFile)
+    {
+        fwrite(pNalu, naluSize, 1, rdbg->videoFile);
         fflush(rdbg->videoFile);
     }
 }

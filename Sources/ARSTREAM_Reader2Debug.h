@@ -80,15 +80,31 @@ void ARSTREAM_Reader2Debug_Delete (ARSTREAM_Reader2Debug_t **rdbg);
  * @brief Process an Access Unit
  *
  * @param rdbg Pointer to the ARSTREAM_Reader2Debug_t
- * @param pAu pointer to the access unit bitstrem
+ * @param pAu pointer to the access unit bitstream
  * @param auSize size of the access unit
  * @param timestamp access unit timestamp
  * @param receptionTs reception timestamp
  * @param missingPackets number of missing packets in the access unit
- * @param totalPackets total number of packets in the access unit
+ * @param totalPackets total number of packets in the access unit including missingPackets
  *
  */
 void ARSTREAM_Reader2Debug_ProcessAu (ARSTREAM_Reader2Debug_t *rdbg, uint8_t* pAu, uint32_t auSize, uint64_t timestamp, uint64_t receptionTs, int missingPackets, int totalPackets);
+
+/**
+ * @brief Process a NAL Unit
+ *
+ * @param rdbg Pointer to the ARSTREAM_Reader2Debug_t
+ * @param pNalu pointer to the NAL unit bitstream
+ * @param naluSize size of the NAL unit
+ * @param timestamp access unit timestamp
+ * @param receptionTs reception timestamp
+ * @param missingPacketsBefore number of missing packets before the NAL unit
+ * @param totalPackets total number of packets in the NAL unit including missingPacketsBefore
+ * @param isFirstNaluInAu the NAL unit is the first in the access unit
+ * @param isLastNaluInAu the NAL unit is the last in the access unit
+ *
+ */
+void ARSTREAM_Reader2Debug_ProcessNalu (ARSTREAM_Reader2Debug_t *rdbg, uint8_t* pNalu, uint32_t naluSize, uint64_t timestamp, uint64_t receptionTs, int missingPacketsBefore, int totalPackets, int isFirstNaluInAu, int isLastNaluInAu);
 
 /**
  * @brief Process a packet
