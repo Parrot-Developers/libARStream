@@ -727,9 +727,15 @@ void* ARSTREAM_Reader2_RunRecvThread(void *ARSTREAM_Reader2_t_Param)
             if (previousSeqNum != -1)
             {
                 seqNumDelta = currentSeqNum - previousSeqNum;
-                if (seqNumDelta < -32768) seqNumDelta += 65536; /* handle seqNum 16 bits loopback */
-                gapsInSeqNum += seqNumDelta - 1;
-                gapsInSeqNumAu += seqNumDelta - 1;
+                if (seqNumDelta < -32768)
+                {
+                    seqNumDelta += 65536; /* handle seqNum 16 bits loopback */
+                }
+                if (seqNumDelta > 0)
+                {
+                    gapsInSeqNum += seqNumDelta - 1;
+                    gapsInSeqNumAu += seqNumDelta - 1;
+                }
             }
             else
             {
