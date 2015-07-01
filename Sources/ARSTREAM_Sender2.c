@@ -720,7 +720,7 @@ eARSTREAM_ERROR ARSTREAM_Sender2_FlushNaluQueue(ARSTREAM_Sender2_t *sender)
 }
 
 
-static void ARSTREAM_Sender2_UpdateMonitoring(ARSTREAM_Sender2_t *sender, uint64_t auTimestamp, uint32_t bytesSent, uint32_t bytesDropped)
+static void ARSTREAM_Sender2_UpdateMonitoring(ARSTREAM_Sender2_t *sender, uint64_t auTimestamp, uint32_t rtpTimestamp, uint16_t seqNum, uint32_t bytesSent, uint32_t bytesDropped)
 {
     uint64_t curTime;
     struct timespec t1;
@@ -746,7 +746,7 @@ static void ARSTREAM_Sender2_UpdateMonitoring(ARSTREAM_Sender2_t *sender, uint64
     {
         fprintf(sender->fMonitorOut, "%llu ", curTime);
         fprintf(sender->fMonitorOut, "%llu ", auTimestamp);
-        fprintf(sender->fMonitorOut, "%lu %lu\n", bytesSent, bytesDropped);
+        fprintf(sender->fMonitorOut, "%lu %u %lu %lu\n", rtpTimestamp, seqNum, bytesSent, bytesDropped);
     }
 #endif
 }
@@ -914,6 +914,7 @@ static int ARSTREAM_Sender2_SendData(ARSTREAM_Sender2_t *sender, uint8_t *sendBu
     int ret = 0;
     ARSTREAM_NetworkHeaders_DataHeader2_t *header = (ARSTREAM_NetworkHeaders_DataHeader2_t *)sendBuffer;
     uint16_t flags;
+    uint32_t rtpTimestamp;
 
     /* header */
     flags = 0x8060; /* with PT=96 */
@@ -928,7 +929,8 @@ static int ARSTREAM_Sender2_SendData(ARSTREAM_Sender2_t *sender, uint8_t *sendBu
     {
         sender->firstTimestamp = auTimestamp;
     }
-    header->timestamp = htonl((uint32_t)(((((auTimestamp - sender->firstTimestamp) * 90) + 500) / 1000) & 0xFFFFFFFF)); /* microseconds to 90000 Hz clock */
+    rtpTimestamp = (uint32_t)(((((auTimestamp - sender->firstTimestamp) * 90) + 500) / 1000) & 0xFFFFFFFF); /* microseconds to 90000 Hz clock */
+    header->timestamp = htonl(rtpTimestamp);
     header->ssrc = htonl(ARSTREAM_NETWORK_HEADERS2_RTP_SSRC);
 
     /* send to the network layer */
@@ -954,56 +956,59 @@ static int ARSTREAM_Sender2_SendData(ARSTREAM_Sender2_t *sender, uint8_t *sendBu
             }
             else
             {
-                if (ret > 0)
-                {
-                    ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Socket buffer full - dropped %d bytes -> polling", ret);
-                }
+                ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Socket buffer full - dropped %d bytes -> polling", ret);
+            }
+            ret = 0;
 
-                struct pollfd p;
-                p.fd = sender->sendSocket;
-                p.events = POLLOUT;
-                p.revents = 0;
-                int pollTimeMs = sender->naluFifoBufferSize * 8 * 1000 / sender->maxBitrate;
-                int pollRet = poll(&p, 1, pollTimeMs);
-                if (pollRet == 0)
+            struct pollfd p;
+            p.fd = sender->sendSocket;
+            p.events = POLLOUT;
+            p.revents = 0;
+            int pollTimeMs = sender->naluFifoBufferSize * 8 * 1000 / sender->maxBitrate;
+            int pollRet = poll(&p, 1, pollTimeMs);
+            if (pollRet == 0)
+            {
+                ARSTREAM_Sender2_UpdateMonitoring(sender, auTimestamp, rtpTimestamp, sender->seqNum - 1, 0, sendSize);
+                ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Polling timed out");
+                ret = -2;
+            }
+            else if (pollRet < 0)
+            {
+                ARSTREAM_Sender2_UpdateMonitoring(sender, auTimestamp, rtpTimestamp, sender->seqNum - 1, 0, sendSize);
+                ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Poll error: error=%d (%s)", errno, strerror(errno));
+                ret = -1;
+            }
+            else if (p.revents & POLLOUT)
+            {
+                if (sender->sendMulticast)
                 {
-                    ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Polling timed out");
+                    bytes = ARSAL_Socket_Sendto(sender->sendSocket, sendBuffer, sendSize, 0, (struct sockaddr*)&sender->sendSin, sizeof(sender->sendSin));
+                }
+                else
+                {
+                    bytes = ARSAL_Socket_Send(sender->sendSocket, sendBuffer, sendSize, 0);
+                }
+                if (bytes > -1)
+                {
+                    ARSTREAM_Sender2_UpdateMonitoring(sender, auTimestamp, rtpTimestamp, sender->seqNum - 1, (uint32_t)bytes, 0);
+                    ret = 0;
+                }
+                else if (errno == EAGAIN)
+                {
+                    ARSTREAM_Sender2_UpdateMonitoring(sender, auTimestamp, rtpTimestamp, sender->seqNum - 1, 0, sendSize);
+                    ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Socket buffer full #2 - current packet dropped");
                     ret = -2;
                 }
-                else if (pollRet < 0)
+                else
                 {
-                    ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Poll error: error=%d (%s)", errno, strerror(errno));
+                    ARSTREAM_Sender2_UpdateMonitoring(sender, auTimestamp, rtpTimestamp, sender->seqNum - 1, 0, sendSize);
+                    ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Socket send error #2 error=%d (%s)", errno, strerror(errno));
                     ret = -1;
-                }
-                else if (p.revents & POLLOUT)
-                {
-                    if (sender->sendMulticast)
-                    {
-                        bytes = ARSAL_Socket_Sendto(sender->sendSocket, sendBuffer, sendSize, 0, (struct sockaddr*)&sender->sendSin, sizeof(sender->sendSin));
-                    }
-                    else
-                    {
-                        bytes = ARSAL_Socket_Send(sender->sendSocket, sendBuffer, sendSize, 0);
-                    }
-                    if (bytes > -1)
-                    {
-                        ARSTREAM_Sender2_UpdateMonitoring(sender, auTimestamp, (uint32_t)bytes, 0);
-                        ret = 0;
-                    }
-                    else if (errno == EAGAIN)
-                    {
-                        ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Socket buffer full #2 - current packet dropped");
-                        ret = -2;
-                    }
-                    else
-                    {
-                        ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Socket send error #2 error=%d (%s)", errno, strerror(errno));
-                        ret = -1;
-                    }
                 }
             }
             break;
         default:
+            ARSTREAM_Sender2_UpdateMonitoring(sender, auTimestamp, rtpTimestamp, sender->seqNum - 1, 0, sendSize);
             ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Socket send error: error=%d (%s)", errno, strerror(errno));
             ret = -1;
             break;
@@ -1011,7 +1016,7 @@ static int ARSTREAM_Sender2_SendData(ARSTREAM_Sender2_t *sender, uint8_t *sendBu
     }
     else
     {
-        ARSTREAM_Sender2_UpdateMonitoring(sender, auTimestamp, (uint32_t)bytes, 0);
+        ARSTREAM_Sender2_UpdateMonitoring(sender, auTimestamp, rtpTimestamp, sender->seqNum - 1, (uint32_t)bytes, 0);
     }
 
     return ret;
@@ -1163,7 +1168,11 @@ void* ARSTREAM_Sender2_RunSendThread (void *ARSTREAM_Sender2_t_Param)
             }
             else
             {
-                ARSTREAM_Sender2_UpdateMonitoring(sender, nalu.auTimestamp, 0, nalu.naluSize);
+                uint32_t rtpTimestamp = (uint32_t)(((((nalu.auTimestamp - sender->firstTimestamp) * 90) + 500) / 1000) & 0xFFFFFFFF);
+                ARSTREAM_Sender2_UpdateMonitoring(sender, nalu.auTimestamp, rtpTimestamp, sender->seqNum, 0, nalu.naluSize);
+                //ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_SENDER2_TAG, "Time %llu: dropped NALU (seqNum = %d)", nalu.auTimestamp, sender->seqNum); //TODO: debug
+                /* increment the sequence number to let the receiver know that we dropped something */
+                sender->seqNum++;
             }
 
             /* last NALU in the Access Unit: call the auCallback */
