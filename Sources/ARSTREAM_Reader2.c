@@ -657,7 +657,7 @@ void* ARSTREAM_Reader2_RunRecvThread(void *ARSTREAM_Reader2_t_Param)
     uint64_t currentTimestamp = 0, previousTimestamp = 0, receptionTs = 0;
     uint16_t currentFlags;
     int auStartSeqNum = -1, naluStartSeqNum = -1, previousSeqNum = -1, currentSeqNum, seqNumDelta;
-    int gapsInSeqNum = 0, gapsInSeqNumAu = 0;
+    int gapsInSeqNum = 0, gapsInSeqNumAu = 0, uncertainAuChange = 0;
     uint32_t startCode = 0;
     int startCodeLength = 0;
     int shouldStop;
@@ -750,6 +750,10 @@ void* ARSTREAM_Reader2_RunRecvThread(void *ARSTREAM_Reader2_t_Param)
                     {
                         ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Incomplete access unit before seqNum %d, size %d bytes (missing %d of %d packets)", currentSeqNum, currentAuSize, gapsInSeqNumAu, currentSeqNum - auStartSeqNum + 1);
                     }
+                    if ((currentAuSize != 0) || (gapsInSeqNum != 0))
+                    {
+                        uncertainAuChange = 1;
+                    }
                     gapsInSeqNumAu = 0;
                     currentAuSize = 0;
                 }
@@ -812,14 +816,23 @@ void* ARSTREAM_Reader2_RunRecvThread(void *ARSTREAM_Reader2_t_Param)
                                     currentAuSize += payloadSize - 2;
                                     if (endBit)
                                     {
+                                        int isFirst = 0, isLast = 0;
+                                        if ((!uncertainAuChange) && (auStartSeqNum == currentSeqNum))
+                                        {
+                                            isFirst = 1;
+                                        }
+                                        if (currentFlags & (1 << 7))
+                                        {
+                                            isLast = 1;
+                                        }
                                         /*ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Output FU-A NALU (seqNum %d->%d) isFirst=%d isLast=%d gapsInSeqNum=%d",
-                                                    naluStartSeqNum, currentSeqNum, (auStartSeqNum == currentSeqNum) ? 1 : 0, (currentFlags & (1 << 7)) ? 1 : 0, gapsInSeqNum);*/ //TODO debug
+                                                    naluStartSeqNum, currentSeqNum, isFirst, isLast, gapsInSeqNum);*/ //TODO debug
 #ifdef ARSTREAM_READER2_DEBUG
-                                        ARSTREAM_Reader2Debug_ProcessNalu(reader->rdbg, reader->currentNaluBuffer, reader->currentNaluSize, currentTimestamp, receptionTs, gapsInSeqNum, currentSeqNum - naluStartSeqNum + 1,
-                                                                          (auStartSeqNum == currentSeqNum) ? 1 : 0, (currentFlags & (1 << 7)) ? 1 : 0);
+                                        ARSTREAM_Reader2Debug_ProcessNalu(reader->rdbg, reader->currentNaluBuffer, reader->currentNaluSize, currentTimestamp, receptionTs,
+                                                                          gapsInSeqNum, currentSeqNum - naluStartSeqNum + 1, isFirst, isLast);
 #endif
                                         reader->currentNaluBuffer = reader->naluCallback(ARSTREAM_READER2_CAUSE_NALU_COMPLETE, reader->currentNaluBuffer, reader->currentNaluSize, currentTimestamp,
-                                                                                         (auStartSeqNum == currentSeqNum) ? 1 : 0, (currentFlags & (1 << 7)) ? 1 : 0, gapsInSeqNum, &(reader->currentNaluBufferSize), reader->custom);
+                                                                                         isFirst, isLast, gapsInSeqNum, &(reader->currentNaluBufferSize), reader->custom);
                                         gapsInSeqNum = 0;
                                     }
                                 }
@@ -863,6 +876,15 @@ void* ARSTREAM_Reader2_RunRecvThread(void *ARSTREAM_Reader2_t_Param)
                         reader->currentNaluSize = 0;
                         if (!ARSTREAM_Reader2_CheckBufferSize(reader, payloadSize + startCodeLength))
                         {
+                            int isFirst = 0, isLast = 0;
+                            if ((!uncertainAuChange) && (auStartSeqNum == currentSeqNum))
+                            {
+                                isFirst = 1;
+                            }
+                            if (currentFlags & (1 << 7))
+                            {
+                                isLast = 1;
+                            }
                             if (startCodeLength > 0)
                             {
                                 memcpy(reader->currentNaluBuffer, &startCode, startCodeLength);
@@ -873,13 +895,13 @@ void* ARSTREAM_Reader2_RunRecvThread(void *ARSTREAM_Reader2_t_Param)
                             reader->currentNaluSize += payloadSize;
                             currentAuSize += payloadSize;
                             /*ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Output single NALU (seqNum %d) isFirst=%d isLast=%d gapsInSeqNum=%d",
-                                        currentSeqNum, (auStartSeqNum == currentSeqNum) ? 1 : 0, (currentFlags & (1 << 7)) ? 1 : 0, gapsInSeqNum);*/ //TODO debug
+                                        currentSeqNum, isFirst, isLast, gapsInSeqNum);*/ //TODO debug
 #ifdef ARSTREAM_READER2_DEBUG
-                            ARSTREAM_Reader2Debug_ProcessNalu(reader->rdbg, reader->currentNaluBuffer, reader->currentNaluSize, currentTimestamp, receptionTs, gapsInSeqNum, 1,
-                                                              (auStartSeqNum == currentSeqNum) ? 1 : 0, (currentFlags & (1 << 7)) ? 1 : 0);
+                            ARSTREAM_Reader2Debug_ProcessNalu(reader->rdbg, reader->currentNaluBuffer, reader->currentNaluSize, currentTimestamp, receptionTs,
+                                                              gapsInSeqNum, 1, isFirst, isLast);
 #endif
                             reader->currentNaluBuffer = reader->naluCallback(ARSTREAM_READER2_CAUSE_NALU_COMPLETE, reader->currentNaluBuffer, reader->currentNaluSize, currentTimestamp,
-                                                                             (auStartSeqNum == currentSeqNum) ? 1 : 0, (currentFlags & (1 << 7)) ? 1 : 0, gapsInSeqNum, &(reader->currentNaluBufferSize), reader->custom);
+                                                                             isFirst, isLast, gapsInSeqNum, &(reader->currentNaluBufferSize), reader->custom);
                             gapsInSeqNum = 0;
                         }
                         else
@@ -895,8 +917,9 @@ void* ARSTREAM_Reader2_RunRecvThread(void *ARSTREAM_Reader2_t_Param)
 
                 if (currentFlags & (1 << 7))
                 {
-                    ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Complete access unit at seqNum %d, size %d bytes (missing %d of %d packets)", currentSeqNum, currentAuSize, gapsInSeqNumAu, currentSeqNum - auStartSeqNum + 1);
                     /* the marker bit is set: complete access unit */
+                    ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Complete access unit at seqNum %d, size %d bytes (missing %d of %d packets)", currentSeqNum, currentAuSize, gapsInSeqNumAu, currentSeqNum - auStartSeqNum + 1);
+                    uncertainAuChange = 0;
                     gapsInSeqNumAu = 0;
                     currentAuSize = 0;
                 }
