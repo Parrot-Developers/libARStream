@@ -93,7 +93,7 @@
         }                                       \
     } while (0)
 
-#define ARSTREAM_SENDER2_MONITORING_OUTPUT
+//#define ARSTREAM_SENDER2_MONITORING_OUTPUT
 #ifdef ARSTREAM_SENDER2_MONITORING_OUTPUT
     #include <stdio.h>
     #define ARSTREAM_SENDER2_MONITORING_OUTPUT_PATH "/data/ftp/internal_000/stream_monitor"
@@ -106,6 +106,7 @@ typedef struct ARSTREAM_Sender2_Nalu_s {
     uint64_t auTimestamp;
     int isLastInAu;
     void *auUserPtr;
+    void *naluUserPtr;
     int drop;
 
     struct ARSTREAM_Sender2_Nalu_s* prev;
@@ -130,6 +131,7 @@ struct ARSTREAM_Sender2_t {
     char *sendAddr;
     int sendPort;
     ARSTREAM_Sender2_AuCallback_t auCallback;
+    ARSTREAM_Sender2_NaluCallback_t naluCallback;
     int maxPacketSize;
     int targetPacketSize;
     int naluFifoSize;
@@ -339,7 +341,7 @@ static int ARSTREAM_Sender2_DropFromFifo(ARSTREAM_Sender2_t *sender, int maxTarg
         ARSAL_Mutex_Unlock(&(sender->fifoMutex));
     }
 
-    if (dropSize[0])
+    /*if (dropSize[0])
     {
         ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_SENDER2_TAG, "Drop from FIFO - dropSize[0] = %d bytes", dropSize[0]); //TODO: debug
     }
@@ -354,7 +356,7 @@ static int ARSTREAM_Sender2_DropFromFifo(ARSTREAM_Sender2_t *sender, int maxTarg
     if (dropSize[3])
     {
         ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_SENDER2_TAG, "Drop from FIFO - dropSize[3] = %d bytes", dropSize[3]); //TODO: debug
-    }
+    }*/
 
     return dropSize[0] + dropSize[1] + dropSize[2] + dropSize[3];
 }
@@ -372,8 +374,15 @@ static int ARSTREAM_Sender2_FlushNaluFifo(ARSTREAM_Sender2_t *sender)
 
     while ((fifoRes = ARSTREAM_Sender2_DequeueNalu(sender, &nalu)) == 0)
     {
+        /* call the naluCallback */
+        if (sender->naluCallback != NULL)
+        {
+            //ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_SENDER2_TAG, "Time %llu: flushing NALU FIFO -> naluCallback", nalu.auTimestamp);
+            sender->naluCallback(ARSTREAM_SENDER2_STATUS_CANCELLED, nalu.naluUserPtr, sender->custom);
+        }
+
         /* last NALU in the Access Unit: call the auCallback */
-        if (nalu.isLastInAu)
+        if ((sender->auCallback != NULL) && (nalu.isLastInAu))
         {
             ARSAL_Mutex_Lock(&(sender->streamMutex));
             if (nalu.auTimestamp != sender->lastAuTimestamp)
@@ -382,8 +391,8 @@ static int ARSTREAM_Sender2_FlushNaluFifo(ARSTREAM_Sender2_t *sender)
                 ARSAL_Mutex_Unlock(&(sender->streamMutex));
 
                 /* call the auCallback */
-                ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_SENDER2_TAG, "Time %llu: flushing NALU FIFO -> auCallback", nalu.auTimestamp);
-                sender->auCallback(ARSTREAM_SENDER2_STATUS_AU_CANCELLED, nalu.auUserPtr, sender->custom);
+                //ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_SENDER2_TAG, "Time %llu: flushing NALU FIFO -> auCallback", nalu.auTimestamp);
+                sender->auCallback(ARSTREAM_SENDER2_STATUS_CANCELLED, nalu.auUserPtr, sender->custom);
             }
             else
             {
@@ -410,7 +419,6 @@ ARSTREAM_Sender2_t* ARSTREAM_Sender2_New(ARSTREAM_Sender2_Config_t *config, void
         (config->sendAddr == NULL) ||
         (strlen(config->sendAddr) <= 0) ||
         (config->sendPort <= 0) ||
-        (config->auCallback == NULL) ||
         (config->maxPacketSize < 100) ||
         (config->targetPacketSize < 100) ||
         (config->maxBitrate <= 0) ||
@@ -445,6 +453,7 @@ ARSTREAM_Sender2_t* ARSTREAM_Sender2_New(ARSTREAM_Sender2_Config_t *config, void
         }
         retSender->sendPort = config->sendPort;
         retSender->auCallback = config->auCallback;
+        retSender->naluCallback = config->naluCallback;
         retSender->naluFifoSize = config->naluFifoSize;
         retSender->maxPacketSize = config->maxPacketSize - sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t) - ARSTREAM_NETWORK_UDP_HEADER_SIZE - ARSTREAM_NETWORK_IP_HEADER_SIZE;
         retSender->targetPacketSize = config->targetPacketSize - sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t) - ARSTREAM_NETWORK_UDP_HEADER_SIZE - ARSTREAM_NETWORK_IP_HEADER_SIZE;
@@ -659,7 +668,7 @@ eARSTREAM_ERROR ARSTREAM_Sender2_Delete(ARSTREAM_Sender2_t **sender)
 }
 
 
-eARSTREAM_ERROR ARSTREAM_Sender2_SendNewNalu(ARSTREAM_Sender2_t *sender, uint8_t *naluBuffer, uint32_t naluSize, uint64_t auTimestamp, int isLastNaluInAu, void *auUserPtr)
+eARSTREAM_ERROR ARSTREAM_Sender2_SendNewNalu(ARSTREAM_Sender2_t *sender, uint8_t *naluBuffer, uint32_t naluSize, uint64_t auTimestamp, int isLastNaluInAu, void *auUserPtr, void *naluUserPtr)
 {
     eARSTREAM_ERROR retVal = ARSTREAM_OK;
     // Args check
@@ -689,6 +698,7 @@ eARSTREAM_ERROR ARSTREAM_Sender2_SendNewNalu(ARSTREAM_Sender2_t *sender, uint8_t
         nalu.auTimestamp = auTimestamp;
         nalu.isLastInAu = isLastNaluInAu;
         nalu.auUserPtr = auUserPtr;
+        nalu.naluUserPtr = naluUserPtr;
 
         res = ARSTREAM_Sender2_EnqueueNalu(sender, &nalu);
         if (res < 0)
@@ -954,7 +964,7 @@ static int ARSTREAM_Sender2_SendData(ARSTREAM_Sender2_t *sender, uint8_t *sendBu
             {
                 ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Failed to drop NALUs from FIFO (%d)", ret);
             }
-            else
+            else if (ret > 0)
             {
                 ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Socket buffer full - dropped %d bytes -> polling", ret);
             }
@@ -1072,7 +1082,7 @@ void* ARSTREAM_Sender2_RunSendThread (void *ARSTREAM_Sender2_t_Param)
 
         if (fifoRes == 0)
         {
-            if ((previousTimestamp != 0) && (nalu.auTimestamp != previousTimestamp))
+            if ((sender->auCallback != NULL) && (previousTimestamp != 0) && (nalu.auTimestamp != previousTimestamp))
             {
                 /* new Access Unit: do we need to call the auCallback? */
                 ARSAL_Mutex_Lock(&(sender->streamMutex));
@@ -1082,8 +1092,8 @@ void* ARSTREAM_Sender2_RunSendThread (void *ARSTREAM_Sender2_t_Param)
                     ARSAL_Mutex_Unlock(&(sender->streamMutex));
 
                     /* call the auCallback */
-                    ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_SENDER2_TAG, "Time %llu: start sending new AU -> auCallback", previousTimestamp);
-                    sender->auCallback(ARSTREAM_SENDER2_STATUS_AU_SENT, previousAuUserPtr, sender->custom);
+                    //ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_SENDER2_TAG, "Time %llu: start sending new AU -> auCallback", previousTimestamp);
+                    sender->auCallback(ARSTREAM_SENDER2_STATUS_SENT, previousAuUserPtr, sender->custom);
                 }
                 else
                 {
@@ -1136,7 +1146,7 @@ void* ARSTREAM_Sender2_RunSendThread (void *ARSTREAM_Sender2_t_Param)
                                 ret = ARSTREAM_Sender2_SendData(sender, sendBuffer, sendSize, nalu.auTimestamp, ((nalu.isLastInAu) && (endBit)) ? 1 : 0);
                                 if (ret != 0)
                                 {
-                                    ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Time %llu: FU-A SendData failed (error %d)", nalu.auTimestamp, ret);
+                                    //ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_SENDER2_TAG, "Time %llu: FU-A SendData failed (error %d)", nalu.auTimestamp, ret);
                                 }
                             }
                             else
@@ -1162,8 +1172,15 @@ void* ARSTREAM_Sender2_RunSendThread (void *ARSTREAM_Sender2_t_Param)
                     ret = ARSTREAM_Sender2_SendData(sender, sendBuffer, sendSize, nalu.auTimestamp, nalu.isLastInAu);
                     if (ret != 0)
                     {
-                        ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Time %llu: singleNALU SendData failed (error %d)", nalu.auTimestamp, ret);
+                        //ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_SENDER2_TAG, "Time %llu: singleNALU SendData failed (error %d)", nalu.auTimestamp, ret);
                     }
+                }
+
+                /* call the naluCallback */
+                if (sender->naluCallback != NULL)
+                {
+                    //ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_SENDER2_TAG, "Time %llu: sent NALU -> naluCallback", nalu.auTimestamp);
+                    sender->naluCallback(ARSTREAM_SENDER2_STATUS_SENT, nalu.naluUserPtr, sender->custom);
                 }
             }
             else
@@ -1173,10 +1190,17 @@ void* ARSTREAM_Sender2_RunSendThread (void *ARSTREAM_Sender2_t_Param)
                 //ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_SENDER2_TAG, "Time %llu: dropped NALU (seqNum = %d)", nalu.auTimestamp, sender->seqNum); //TODO: debug
                 /* increment the sequence number to let the receiver know that we dropped something */
                 sender->seqNum++;
+
+                /* call the naluCallback */
+                if (sender->naluCallback != NULL)
+                {
+                    //ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_SENDER2_TAG, "Time %llu: dropped NALU -> naluCallback", nalu.auTimestamp);
+                    sender->naluCallback(ARSTREAM_SENDER2_STATUS_CANCELLED, nalu.naluUserPtr, sender->custom);
+                }
             }
 
             /* last NALU in the Access Unit: call the auCallback */
-            if (nalu.isLastInAu)
+            if ((sender->auCallback != NULL) && (nalu.isLastInAu))
             {
                 ARSAL_Mutex_Lock(&(sender->streamMutex));
                 if (nalu.auTimestamp != sender->lastAuTimestamp)
@@ -1185,8 +1209,8 @@ void* ARSTREAM_Sender2_RunSendThread (void *ARSTREAM_Sender2_t_Param)
                     ARSAL_Mutex_Unlock(&(sender->streamMutex));
 
                     /* call the auCallback */
-                    ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_SENDER2_TAG, "Time %llu: all packets were sent -> auCallback", nalu.auTimestamp);
-                    sender->auCallback(ARSTREAM_SENDER2_STATUS_AU_SENT, nalu.auUserPtr, sender->custom);
+                    //ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_SENDER2_TAG, "Time %llu: all packets were sent -> auCallback", nalu.auTimestamp);
+                    sender->auCallback(ARSTREAM_SENDER2_STATUS_SENT, nalu.auUserPtr, sender->custom);
                 }
                 else
                 {
@@ -1216,19 +1240,22 @@ void* ARSTREAM_Sender2_RunSendThread (void *ARSTREAM_Sender2_t_Param)
     ARSAL_Mutex_Unlock(&(sender->streamMutex));
 
     /* cancel the last Access Unit */
-    ARSAL_Mutex_Lock(&(sender->streamMutex));
-    if (previousTimestamp != sender->lastAuTimestamp)
+    if (sender->auCallback != NULL)
     {
-        sender->lastAuTimestamp = previousTimestamp;
-        ARSAL_Mutex_Unlock(&(sender->streamMutex));
+        ARSAL_Mutex_Lock(&(sender->streamMutex));
+        if (previousTimestamp != sender->lastAuTimestamp)
+        {
+            sender->lastAuTimestamp = previousTimestamp;
+            ARSAL_Mutex_Unlock(&(sender->streamMutex));
 
-        /* call the auCallback */
-        ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_SENDER2_TAG, "Time %llu: cancel frame -> auCallback", previousTimestamp);
-        sender->auCallback(ARSTREAM_SENDER2_STATUS_AU_CANCELLED, previousAuUserPtr, sender->custom);
-    }
-    else
-    {
-        ARSAL_Mutex_Unlock(&(sender->streamMutex));
+            /* call the auCallback */
+            //ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_SENDER2_TAG, "Time %llu: cancel frame -> auCallback", previousTimestamp);
+            sender->auCallback(ARSTREAM_SENDER2_STATUS_CANCELLED, previousAuUserPtr, sender->custom);
+        }
+        else
+        {
+            ARSAL_Mutex_Unlock(&(sender->streamMutex));
+        }
     }
 
     /* flush the NALU FIFO */

@@ -60,8 +60,8 @@
  * @brief Callback status values
  */
 typedef enum {
-    ARSTREAM_SENDER2_STATUS_AU_SENT = 0, /**< Access Unit was sent */
-    ARSTREAM_SENDER2_STATUS_AU_CANCELLED, /**< Access Unit was cancelled (not sent or partly sent) */
+    ARSTREAM_SENDER2_STATUS_SENT = 0, /**< Access Unit was sent */
+    ARSTREAM_SENDER2_STATUS_CANCELLED, /**< Access Unit was cancelled (not sent or partly sent) */
     ARSTREAM_SENDER2_STATUS_MAX,
 } eARSTREAM_SENDER2_STATUS;
 
@@ -78,11 +78,14 @@ typedef enum {
  */
 typedef void (*ARSTREAM_Sender2_AuCallback_t)(eARSTREAM_SENDER2_STATUS status, void *auUserPtr, void *custom);
 
+typedef void (*ARSTREAM_Sender2_NaluCallback_t)(eARSTREAM_SENDER2_STATUS status, void *naluUserPtr, void *custom);
+
 typedef struct ARSTREAM_Sender2_Config_t {
     const char *ifaceAddr;
     const char *sendAddr;
     int sendPort;
     ARSTREAM_Sender2_AuCallback_t auCallback;
+    ARSTREAM_Sender2_NaluCallback_t naluCallback;
     int naluFifoSize;
     int maxPacketSize;
     int targetPacketSize;
@@ -162,7 +165,7 @@ eARSTREAM_ERROR ARSTREAM_Sender2_Delete (ARSTREAM_Sender2_t **sender);
  * @return ARSTREAM_ERROR_FRAME_TOO_LARGE if the frameSize is greater that the maximum frame size of the libARStream (typically 128000 bytes)
  * @return ARSTREAM_ERROR_QUEUE_FULL if the frame can not be added to queue. This value can not happen if flushPreviousFrames is active
  */
-eARSTREAM_ERROR ARSTREAM_Sender2_SendNewNalu (ARSTREAM_Sender2_t *sender, uint8_t *naluBuffer, uint32_t naluSize, uint64_t auTimestamp, int isLastNaluInAu, void *auUserPtr);
+eARSTREAM_ERROR ARSTREAM_Sender2_SendNewNalu (ARSTREAM_Sender2_t *sender, uint8_t *naluBuffer, uint32_t naluSize, uint64_t auTimestamp, int isLastNaluInAu, void *auUserPtr, void *naluUserPtr);
 
 /**
  * @brief Flushes all currently queued frames
