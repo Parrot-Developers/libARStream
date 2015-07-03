@@ -99,10 +99,22 @@ typedef struct ARSTREAM_Reader2_Config_t {
     int insertStartCodes;
 } ARSTREAM_Reader2_Config_t;
 
+typedef struct ARSTREAM_Reader2_Resender_Config_t {
+    const char *ifaceAddr;
+    const char *sendAddr;
+    int sendPort;
+    int maxPacketSize;
+    int targetPacketSize;
+    int maxBitrate;
+    int maxLatencyMs;
+} ARSTREAM_Reader2_Resender_Config_t;
+
 /**
  * @brief An ARSTREAM_Reader2_t instance allow reading streamed frames from a network
  */
 typedef struct ARSTREAM_Reader2_t ARSTREAM_Reader2_t;
+
+typedef struct ARSTREAM_Reader2_Resender_t ARSTREAM_Reader2_Resender_t;
 
 /*
  * Functions declarations
@@ -178,5 +190,15 @@ void* ARSTREAM_Reader2_GetCustom (ARSTREAM_Reader2_t *reader);
 
 eARSTREAM_ERROR ARSTREAM_Reader2_GetMonitoring(ARSTREAM_Reader2_t *reader, uint32_t timeIntervalUs, uint32_t *realTimeIntervalUs, uint32_t *receptionTimeJitter,
                                                uint32_t *bytesReceived, uint32_t *meanPacketSize, uint32_t *packetSizeStdDev, uint32_t *packetsReceived, uint32_t *packetsMissed);
+
+ARSTREAM_Reader2_Resender_t* ARSTREAM_Reader2_Resender_New (ARSTREAM_Reader2_t *reader, ARSTREAM_Reader2_Resender_Config_t *config, eARSTREAM_ERROR *error);
+
+void ARSTREAM_Reader2_Resender_Stop (ARSTREAM_Reader2_Resender_t *resender);
+
+eARSTREAM_ERROR ARSTREAM_Reader2_Resender_Delete (ARSTREAM_Reader2_Resender_t **resender);
+
+void* ARSTREAM_Reader2_Resender_RunSendThread (void *ARSTREAM_Reader2_Resender_t_Param);
+
+void* ARSTREAM_Reader2_Resender_RunRecvThread (void *ARSTREAM_Reader2_Resender_t_Param);
 
 #endif /* _ARSTREAM_READER2_H_ */

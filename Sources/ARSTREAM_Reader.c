@@ -63,12 +63,15 @@
 #include <libARSAL/ARSAL_Print.h>
 #include <libARSAL/ARSAL_Mutex.h>
 #include <libARSAL/ARSAL_Endianness.h>
+#include <libARSAL/ARSAL_Thread.h>
 
 /*
  * Macros
  */
 
 #define ARSTREAM_READER_TAG "ARSTREAM_Reader"
+
+#define ARSTREAM_READER_RESENDER_MAX_COUNT (4)
 
 /**
  * Sets *PTR to VAL if PTR is not null
@@ -106,12 +109,31 @@ struct ARSTREAM_Reader_t {
     /* ARStream_Reader2 */
     ARSTREAM_Reader2_t *reader2;
     int reader2running;
+
+    /* ARStream_Reader2_Resender */
+    ARSTREAM_Reader2_Resender_t *resender[ARSTREAM_READER_RESENDER_MAX_COUNT];
+    ARSAL_Thread_t resenderSendThread[ARSTREAM_READER_RESENDER_MAX_COUNT];
+    ARSAL_Thread_t resenderRecvThread[ARSTREAM_READER_RESENDER_MAX_COUNT];
 };
 
 
 /*
  * Implementation
  */
+
+static void* ARSTREAM_Reader_RunResenderSendThread (void *ARSTREAM_Reader2_Resender_t_Param)
+{
+    ARSTREAM_Reader2_Resender_t *resender = (ARSTREAM_Reader2_Resender_t *)ARSTREAM_Reader2_Resender_t_Param;
+
+    return ARSTREAM_Reader2_Resender_RunSendThread ((void *)resender);
+}
+
+static void* ARSTREAM_Reader_RunResenderRecvThread (void *ARSTREAM_Reader2_Resender_t_Param)
+{
+    ARSTREAM_Reader2_Resender_t *resender = (ARSTREAM_Reader2_Resender_t *)ARSTREAM_Reader2_Resender_t_Param;
+
+    return ARSTREAM_Reader2_Resender_RunRecvThread ((void *)resender);
+}
 
 uint8_t* ARSTREAM_Reader_Reader2NaluCallback(eARSTREAM_READER2_CAUSE cause, uint8_t *naluBuffer, int naluSize, uint64_t auTimestamp, int isFirstNaluInAu, int isLastNaluInAu, int missingPacketsBefore, int *newNaluBufferSize, void *custom)
 {
@@ -270,6 +292,132 @@ ARSTREAM_Reader_t* ARSTREAM_Reader_New (ARNETWORK_Manager_t *manager, int dataBu
         retReader->reader2running = 1;
     }
 
+    /* Setup ARStream_Reader2_Resender */
+    if (internalError == ARSTREAM_OK)
+    {
+        eARSTREAM_ERROR error2;
+        int i;
+        for (i = 0; i < ARSTREAM_READER_RESENDER_MAX_COUNT; i++)
+        {
+            ARSTREAM_Reader2_Resender_Config_t config;
+            FILE *fConf;
+            char resenderName[16], propName[20], propVal[16];
+            int resenderIdx;
+
+            memset(&config, 0, sizeof(config));
+            config.ifaceAddr = NULL;
+            config.sendAddr = NULL;
+            config.sendPort = 5004;
+            config.maxPacketSize = 1500;
+            config.targetPacketSize = 1000;
+            config.maxBitrate = 1500000;
+            config.maxLatencyMs = 200;
+
+            fConf = fopen("/data/skycontroller/resenders.conf", "r");
+            if (fConf)
+            {
+                while (!feof(fConf))
+                {
+                    if (fscanf(fConf, "%8s%d.%s %s", resenderName, &resenderIdx, propName, propVal) == 4)
+                    {
+                        if ((!strncmp(resenderName, "resender", 8)) && (resenderIdx == i + 1))
+                        {
+                            if (!strncmp(propName, "ifaceAddr", 9))
+                            {
+                                config.ifaceAddr = strdup(propVal);
+                            }
+                            else if (!strncmp(propName, "sendAddr", 8))
+                            {
+                                config.sendAddr = strdup(propVal);
+                            }
+                            else if (!strncmp(propName, "sendPort", 8))
+                            {
+                                config.sendPort = atoi(propVal);
+                            }
+                            else if (!strncmp(propName, "maxPacketSize", 13))
+                            {
+                                config.maxPacketSize = atoi(propVal);
+                            }
+                            else if (!strncmp(propName, "targetPacketSize", 16))
+                            {
+                                config.targetPacketSize = atoi(propVal);
+                            }
+                            else if (!strncmp(propName, "maxBitrate", 10))
+                            {
+                                config.maxBitrate = atoi(propVal);
+                            }
+                            else if (!strncmp(propName, "maxLatencyMs", 12))
+                            {
+                                config.maxLatencyMs = atoi(propVal);
+                            }
+                        }
+                    }
+                }
+                fclose(fConf);
+            }
+
+            if (config.sendAddr)
+            {
+                ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER_TAG, "Creating new resender to %s (sendPort=%d, maxPacketSize=%d, targetPacketSize=%d, maxBitrate=%d, maxLatencyMs=%d)",
+                            config.sendAddr, config.sendPort, config.maxPacketSize, config.targetPacketSize, config.maxBitrate, config.maxLatencyMs);
+                retReader->resender[i] = ARSTREAM_Reader2_Resender_New (retReader->reader2, &config, &error2);
+                if (error2 != ARSTREAM_OK)
+                {
+                    internalError = error2;
+                }
+                else
+                {
+                    int ret = 0;
+
+                    if (!ret)
+                    {
+                        ret = ARSAL_Thread_Create(&retReader->resenderSendThread[i], ARSTREAM_Reader_RunResenderSendThread, retReader->resender[i]);
+                        if (ret)
+                        {
+                            internalError = ARSTREAM_ERROR_ALLOC;
+                        }
+                    }
+
+                    if (!ret)
+                    {
+                        ret = ARSAL_Thread_Create(&retReader->resenderRecvThread[i], ARSTREAM_Reader_RunResenderRecvThread, retReader->resender[i]);
+                        if (ret)
+                        {
+                            internalError = ARSTREAM_ERROR_ALLOC;
+                        }
+                    }
+                }
+                if (internalError != ARSTREAM_OK)
+                {
+                    break;
+                }
+            }
+
+            if (config.ifaceAddr) free((void*)config.ifaceAddr);
+            if (config.sendAddr) free((void*)config.sendAddr);
+        }
+    }
+
+    if ((internalError != ARSTREAM_OK) &&
+        (retReader != NULL))
+    {
+        ARSTREAM_Reader2_Delete(&retReader->reader2);
+        int i;
+        for (i = 0; i < ARSTREAM_READER_RESENDER_MAX_COUNT; i++)
+        {
+            if (retReader->resenderSendThread[i])
+            {
+                ARSAL_Thread_Destroy(&retReader->resenderSendThread[i]);
+            }
+            if (retReader->resenderRecvThread[i])
+            {
+                ARSAL_Thread_Destroy(&retReader->resenderRecvThread[i]);
+            }
+        }
+        free(retReader);
+        retReader = NULL;
+    }
+
     SET_WITH_CHECK (error, internalError);
     return retReader;
 }
@@ -280,6 +428,18 @@ void ARSTREAM_Reader_StopReader (ARSTREAM_Reader_t *reader)
     {
         ARSTREAM_Reader2_StopReader (reader->reader2);
         reader->reader2running = 0;
+        int i;
+        for (i = 0; i < ARSTREAM_READER_RESENDER_MAX_COUNT; i++)
+        {
+            if (reader->resenderSendThread[i])
+            {
+                ARSAL_Thread_Join(reader->resenderSendThread[i], NULL);
+            }
+            if (reader->resenderRecvThread[i])
+            {
+                ARSAL_Thread_Join(reader->resenderRecvThread[i], NULL);
+            }
+        }
     }
 }
 
@@ -292,6 +452,18 @@ eARSTREAM_ERROR ARSTREAM_Reader_Delete (ARSTREAM_Reader_t **reader)
         if (!(*reader)->reader2running)
         {
             retVal = ARSTREAM_Reader2_Delete (&((*reader)->reader2));
+            int i;
+            for (i = 0; i < ARSTREAM_READER_RESENDER_MAX_COUNT; i++)
+            {
+                if ((*reader)->resenderSendThread[i])
+                {
+                    ARSAL_Thread_Destroy(&(*reader)->resenderSendThread[i]);
+                }
+                if ((*reader)->resenderRecvThread[i])
+                {
+                    ARSAL_Thread_Destroy(&(*reader)->resenderRecvThread[i]);
+                }
+            }
             if (retVal == ARSTREAM_OK)
             {
                 free (*reader);

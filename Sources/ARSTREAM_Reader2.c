@@ -62,6 +62,7 @@
  */
 
 #include <libARStream/ARSTREAM_Reader2.h>
+#include <libARStream/ARSTREAM_Sender2.h>
 #include <libARSAL/ARSAL_Print.h>
 #include <libARSAL/ARSAL_Mutex.h>
 #include <libARSAL/ARSAL_Endianness.h>
@@ -73,6 +74,10 @@
 
 #define ARSTREAM_READER2_TAG "ARSTREAM_Reader2"
 #define ARSTREAM_READER2_DATAREAD_TIMEOUT_MS (500)
+#define ARSTREAM_READER2_RESENDER_MAX_COUNT (4)
+#define ARSTREAM_READER2_RESENDER_MAX_NALU_BUFFER_COUNT (1024) //TODO: tune this value
+#define ARSTREAM_READER2_RESENDER_NALU_BUFFER_MALLOC_CHUNK_SIZE (4096)
+#define ARSTREAM_READER2_MONITORING_MAX_POINTS (2048)
 
 #define ARSTREAM_H264_STARTCODE 0x00000001
 #define ARSTREAM_H264_STARTCODE_LENGTH 4
@@ -99,8 +104,6 @@
  * Types
  */
 
-#define ARSTREAM_READER2_MONITORING_MAX_POINTS (2048)
-
 typedef struct ARSTREAM_Reader2_MonitoringPoint_s {
     uint64_t recvTimestamp;
     uint32_t timestamp;
@@ -108,6 +111,23 @@ typedef struct ARSTREAM_Reader2_MonitoringPoint_s {
     uint16_t markerBit;
     uint32_t bytes;
 } ARSTREAM_Reader2_MonitoringPoint_t;
+
+
+struct ARSTREAM_Reader2_Resender_t {
+    ARSTREAM_Reader2_t *reader;
+    ARSTREAM_Sender2_t *sender;
+    int senderRunning;
+};
+
+
+typedef struct ARSTREAM_Reader2_NaluBuffer_s {
+    int useCount;
+    uint8_t *naluBuffer;
+    int naluBufferSize;
+    int naluSize;
+    uint64_t auTimestamp;
+    int isLastNaluInAu;
+} ARSTREAM_Reader2_NaluBuffer_t;
 
 
 struct ARSTREAM_Reader2_t {
@@ -144,6 +164,14 @@ struct ARSTREAM_Reader2_t {
     int monitoringIndex;
     ARSTREAM_Reader2_MonitoringPoint_t monitoringPoint[ARSTREAM_READER2_MONITORING_MAX_POINTS];
 
+    /* Resenders */
+    ARSTREAM_Reader2_Resender_t *resender[ARSTREAM_READER2_RESENDER_MAX_COUNT];
+    int resenderCount;
+    ARSAL_Mutex_t naluBufferMutex;
+    ARSTREAM_Reader2_NaluBuffer_t naluBuffer[ARSTREAM_READER2_RESENDER_MAX_NALU_BUFFER_COUNT];
+    int naluBufferCount;
+    
+
 #ifdef ARSTREAM_READER2_DEBUG
     /* Debug */
     ARSTREAM_Reader2Debug_t* rdbg;
@@ -151,11 +179,160 @@ struct ARSTREAM_Reader2_t {
 };
 
 
+static void ARSTREAM_Reader2_Resender_NaluCallback(eARSTREAM_SENDER2_STATUS status, void *naluUserPtr, void *custom)
+{
+    ARSTREAM_Reader2_Resender_t *resender = (ARSTREAM_Reader2_Resender_t *)custom;
+    ARSTREAM_Reader2_t *reader;
+    ARSTREAM_Reader2_NaluBuffer_t *naluBuf = (ARSTREAM_Reader2_NaluBuffer_t *)naluUserPtr;
+
+    if ((resender == NULL) || (naluUserPtr == NULL))
+    {
+        return;
+    }
+
+    reader = resender->reader;
+    if (reader == NULL)
+    {
+        return;
+    }
+    
+    ARSAL_Mutex_Lock(&(reader->naluBufferMutex));
+    naluBuf->useCount--;
+    ARSAL_Mutex_Unlock(&(reader->naluBufferMutex));
+}
+
+
+static ARSTREAM_Reader2_NaluBuffer_t* ARSTREAM_Reader2_Resender_GetAvailableNaluBuffer(ARSTREAM_Reader2_t *reader, int naluSize)
+{
+    int i, availableCount;
+    ARSTREAM_Reader2_NaluBuffer_t *retNaluBuf = NULL;
+
+    for (i = 0, availableCount = 0; i < reader->naluBufferCount; i++)
+    {
+        ARSTREAM_Reader2_NaluBuffer_t *naluBuf = &reader->naluBuffer[i];
+        
+        if (naluBuf->useCount <= 0)
+        {
+            availableCount++;
+            if (naluBuf->naluBufferSize >= naluSize)
+            {
+                retNaluBuf = naluBuf;
+                break;
+            }
+        }
+    }
+
+    if ((retNaluBuf == NULL) && (availableCount > 0))
+    {
+        for (i = 0; i < reader->naluBufferCount; i++)
+        {
+            ARSTREAM_Reader2_NaluBuffer_t *naluBuf = &reader->naluBuffer[i];
+            
+            if (naluBuf->useCount <= 0)
+            {
+                /* round naluSize up to nearest multiple of ARSTREAM_READER2_RESENDER_NALU_BUFFER_MALLOC_CHUNK_SIZE */
+                int newSize = ((naluSize + ARSTREAM_READER2_RESENDER_NALU_BUFFER_MALLOC_CHUNK_SIZE - 1) / ARSTREAM_READER2_RESENDER_NALU_BUFFER_MALLOC_CHUNK_SIZE) * ARSTREAM_READER2_RESENDER_NALU_BUFFER_MALLOC_CHUNK_SIZE;
+                free(naluBuf->naluBuffer);
+                naluBuf->naluBuffer = malloc(newSize);
+                if (naluBuf->naluBuffer == NULL)
+                {
+                    naluBuf->naluBufferSize = 0;
+                }
+                else
+                {
+                    ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Reallocated NALU buffer (size: %d) - naluBufferCount = %d", newSize, reader->naluBufferCount); //TODO: debug
+                    naluBuf->naluBufferSize = newSize;
+                    retNaluBuf = naluBuf;
+                    break;
+                }
+            }
+        }
+    }
+
+    if ((retNaluBuf == NULL) && (reader->naluBufferCount < ARSTREAM_READER2_RESENDER_MAX_NALU_BUFFER_COUNT))
+    {
+        ARSTREAM_Reader2_NaluBuffer_t *naluBuf = &reader->naluBuffer[reader->naluBufferCount];
+        reader->naluBufferCount++;
+        naluBuf->useCount = 0;
+
+        /* round naluSize up to nearest multiple of ARSTREAM_READER2_RESENDER_NALU_BUFFER_MALLOC_CHUNK_SIZE */
+        int newSize = ((naluSize + ARSTREAM_READER2_RESENDER_NALU_BUFFER_MALLOC_CHUNK_SIZE - 1) / ARSTREAM_READER2_RESENDER_NALU_BUFFER_MALLOC_CHUNK_SIZE) * ARSTREAM_READER2_RESENDER_NALU_BUFFER_MALLOC_CHUNK_SIZE;
+        naluBuf->naluBuffer = malloc(newSize);
+        if (naluBuf->naluBuffer == NULL)
+        {
+            naluBuf->naluBufferSize = 0;
+        }
+        else
+        {
+            ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Allocated new NALU buffer (size: %d) - naluBufferCount = %d", newSize, reader->naluBufferCount); //TODO: debug
+            naluBuf->naluBufferSize = newSize;
+            retNaluBuf = naluBuf;
+        }
+    }
+
+    return retNaluBuf;
+}
+
+
+static int ARSTREAM_Reader2_ResendNalu(ARSTREAM_Reader2_t *reader, uint8_t *naluBuffer, uint32_t naluSize, uint64_t auTimestamp, int isLastNaluInAu)
+{
+    int ret = 0, i;
+    ARSTREAM_Reader2_NaluBuffer_t *naluBuf = NULL;
+
+    /* remove the byte stream format start code */
+    if (reader->insertStartCodes)
+    {
+        naluBuffer += ARSTREAM_H264_STARTCODE_LENGTH;
+        naluSize -= ARSTREAM_H264_STARTCODE_LENGTH;
+    }
+
+    ARSAL_Mutex_Lock(&(reader->naluBufferMutex));
+
+    /* get a buffer from the pool */
+    naluBuf = ARSTREAM_Reader2_Resender_GetAvailableNaluBuffer(reader, (int)naluSize);
+    if (naluBuf == NULL)
+    {
+        ARSAL_Mutex_Unlock(&(reader->naluBufferMutex));
+        ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_READER2_TAG, "Failed to get available NALU buffer (naluSize=%d, naluBufferCount=%d)", naluSize, reader->naluBufferCount); //TODO: debug
+        return -1;
+    }
+    memcpy(naluBuf->naluBuffer, naluBuffer, naluSize);
+    naluBuf->naluSize = naluSize;
+    naluBuf->auTimestamp = auTimestamp;
+    naluBuf->isLastNaluInAu = isLastNaluInAu;
+
+    /* esnd the NALU to all resenders */
+    for (i = 0; i < reader->resenderCount; i++)
+    {
+        ARSTREAM_Reader2_Resender_t *resender = reader->resender[i];
+        eARSTREAM_ERROR err;
+
+        naluBuf->useCount++;
+        ARSAL_Mutex_Unlock(&(reader->naluBufferMutex));
+        
+        err = ARSTREAM_Sender2_SendNewNalu(resender->sender, naluBuf->naluBuffer, naluSize, auTimestamp, isLastNaluInAu, NULL, naluBuf);
+
+        ARSAL_Mutex_Lock(&(reader->naluBufferMutex));
+
+        if (err != ARSTREAM_OK)
+        {
+            naluBuf->useCount--;
+            ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_READER2_TAG, "Failed to resend NALU (%d)", err); //TODO: debug
+        }
+    }
+
+    ARSAL_Mutex_Unlock(&(reader->naluBufferMutex));
+
+    return ret;
+}
+
+
 ARSTREAM_Reader2_t* ARSTREAM_Reader2_New(ARSTREAM_Reader2_Config_t *config, uint8_t *naluBuffer, int naluBufferSize, void *custom, eARSTREAM_ERROR *error)
 {
     ARSTREAM_Reader2_t *retReader = NULL;
     int streamMutexWasInit = 0;
     int monitoringMutexWasInit = 0;
+    int naluBufferMutexWasInit = 0;
     eARSTREAM_ERROR internalError = ARSTREAM_OK;
     /* ARGS Check */
     if ((config == NULL) ||
@@ -225,6 +402,18 @@ ARSTREAM_Reader2_t* ARSTREAM_Reader2_New(ARSTREAM_Reader2_Config_t *config, uint
             monitoringMutexWasInit = 1;
         }
     }
+    if (internalError == ARSTREAM_OK)
+    {
+        int mutexInitRet = ARSAL_Mutex_Init(&(retReader->naluBufferMutex));
+        if (mutexInitRet != 0)
+        {
+            internalError = ARSTREAM_ERROR_ALLOC;
+        }
+        else
+        {
+            naluBufferMutexWasInit = 1;
+        }
+    }
 
 #ifdef ARSTREAM_READER2_DEBUG
     /* Setup debug */
@@ -249,6 +438,10 @@ ARSTREAM_Reader2_t* ARSTREAM_Reader2_New(ARSTREAM_Reader2_Config_t *config, uint
         {
             ARSAL_Mutex_Destroy(&(retReader->monitoringMutex));
         }
+        if (naluBufferMutexWasInit == 1)
+        {
+            ARSAL_Mutex_Destroy(&(retReader->naluBufferMutex));
+        }
         if ((retReader) && (retReader->recvAddr))
         {
             free(retReader->recvAddr);
@@ -268,12 +461,19 @@ ARSTREAM_Reader2_t* ARSTREAM_Reader2_New(ARSTREAM_Reader2_Config_t *config, uint
 
 void ARSTREAM_Reader2_StopReader(ARSTREAM_Reader2_t *reader)
 {
+    int i;
+
     if (reader != NULL)
     {
         ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Stopping reader...");
         ARSAL_Mutex_Lock(&(reader->streamMutex));
         reader->threadsShouldStop = 1;
         ARSAL_Mutex_Unlock(&(reader->streamMutex));
+
+        for (i = 0; i < reader->resenderCount; i++)
+        {
+            ARSTREAM_Reader2_Resender_Stop(reader->resender[i]);
+        }
     }
 }
 
@@ -296,11 +496,29 @@ eARSTREAM_ERROR ARSTREAM_Reader2_Delete(ARSTREAM_Reader2_t **reader)
 
         if (canDelete == 1)
         {
+            int i;
+            for (i = 0; i < (*reader)->resenderCount; i++)
+            {
+                retVal = ARSTREAM_Reader2_Resender_Delete(&(*reader)->resender[i]);
+                if (retVal != ARSTREAM_OK)
+                {
+                    ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "ARSTREAM_Reader2_Resender_Delete failed (%d)", retVal);
+                }
+            }
+            for (i = 0; i < (*reader)->naluBufferCount; i++)
+            {
+                ARSTREAM_Reader2_NaluBuffer_t *naluBuf = &(*reader)->naluBuffer[i];
+                if (naluBuf->naluBuffer)
+                {
+                    free(naluBuf->naluBuffer);
+                }
+            }
 #ifdef ARSTREAM_READER2_DEBUG
             ARSTREAM_Reader2Debug_Delete(&(*reader)->rdbg);
 #endif
             ARSAL_Mutex_Destroy(&((*reader)->streamMutex));
             ARSAL_Mutex_Destroy(&((*reader)->monitoringMutex));
+            ARSAL_Mutex_Destroy(&((*reader)->naluBufferMutex));
             if ((*reader)->sendSocket != -1)
             {
                 ARSAL_Socket_Close((*reader)->sendSocket);
@@ -748,7 +966,8 @@ void* ARSTREAM_Reader2_RunRecvThread(void *ARSTREAM_Reader2_t_Param)
                 {
                     if (gapsInSeqNumAu)
                     {
-                        ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Incomplete access unit before seqNum %d, size %d bytes (missing %d of %d packets)", currentSeqNum, currentAuSize, gapsInSeqNumAu, currentSeqNum - auStartSeqNum + 1);
+                        /*ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Incomplete access unit before seqNum %d, size %d bytes (missing %d of %d packets)", 
+                                    currentSeqNum, currentAuSize, gapsInSeqNumAu, currentSeqNum - auStartSeqNum + 1);*/
                     }
                     if ((currentAuSize != 0) || (gapsInSeqNum != 0))
                     {
@@ -785,7 +1004,7 @@ void* ARSTREAM_Reader2_RunRecvThread(void *ARSTREAM_Reader2_t_Param)
                             {
                                 //TODO: drop the previous incomplete FU-A?
                                 fuPending = 0;
-                                ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Incomplete FU-A packet before FU-A at seqNum %d ((fuPending) && (startBit))", currentSeqNum);
+                                //ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Incomplete FU-A packet before FU-A at seqNum %d ((fuPending) && (startBit))", currentSeqNum);
                             }
                             if (startBit)
                             {
@@ -831,6 +1050,14 @@ void* ARSTREAM_Reader2_RunRecvThread(void *ARSTREAM_Reader2_t_Param)
                                         ARSTREAM_Reader2Debug_ProcessNalu(reader->rdbg, reader->currentNaluBuffer, reader->currentNaluSize, currentTimestamp, receptionTs,
                                                                           gapsInSeqNum, currentSeqNum - naluStartSeqNum + 1, isFirst, isLast);
 #endif
+                                        if (reader->resenderCount > 0)
+                                        {
+                                            int resendRet = ARSTREAM_Reader2_ResendNalu(reader, reader->currentNaluBuffer, reader->currentNaluSize, currentTimestamp, isLast);
+                                            if (resendRet != 0)
+                                            {
+                                                //ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Failed to resend NALU (%d)", resendRet); //TODO: debug
+                                            }
+                                        }
                                         reader->currentNaluBuffer = reader->naluCallback(ARSTREAM_READER2_CAUSE_NALU_COMPLETE, reader->currentNaluBuffer, reader->currentNaluSize, currentTimestamp,
                                                                                          isFirst, isLast, gapsInSeqNum, &(reader->currentNaluBufferSize), reader->custom);
                                         gapsInSeqNum = 0;
@@ -858,7 +1085,7 @@ void* ARSTREAM_Reader2_RunRecvThread(void *ARSTREAM_Reader2_t_Param)
                         {
                             //TODO: drop the previous incomplete FU-A?
                             fuPending = 0;
-                            ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Incomplete FU-A packet before STAP-A at seqNum %d (fuPending)", currentSeqNum);
+                            //ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Incomplete FU-A packet before STAP-A at seqNum %d (fuPending)", currentSeqNum);
                         }
 
                         //TODO
@@ -870,7 +1097,7 @@ void* ARSTREAM_Reader2_RunRecvThread(void *ARSTREAM_Reader2_t_Param)
                         {
                             //TODO: drop the previous incomplete FU-A?
                             fuPending = 0;
-                            ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Incomplete FU-A packet before single NALU at seqNum %d (fuPending)", currentSeqNum);
+                            //ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Incomplete FU-A packet before single NALU at seqNum %d (fuPending)", currentSeqNum);
                         }
 
                         reader->currentNaluSize = 0;
@@ -900,6 +1127,14 @@ void* ARSTREAM_Reader2_RunRecvThread(void *ARSTREAM_Reader2_t_Param)
                             ARSTREAM_Reader2Debug_ProcessNalu(reader->rdbg, reader->currentNaluBuffer, reader->currentNaluSize, currentTimestamp, receptionTs,
                                                               gapsInSeqNum, 1, isFirst, isLast);
 #endif
+                            if (reader->resenderCount > 0)
+                            {
+                                int resendRet = ARSTREAM_Reader2_ResendNalu(reader, reader->currentNaluBuffer, reader->currentNaluSize, currentTimestamp, isLast);
+                                if (resendRet != 0)
+                                {
+                                    //ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Failed to resend NALU (%d)", resendRet); //TODO debug
+                                }
+                            }
                             reader->currentNaluBuffer = reader->naluCallback(ARSTREAM_READER2_CAUSE_NALU_COMPLETE, reader->currentNaluBuffer, reader->currentNaluSize, currentTimestamp,
                                                                              isFirst, isLast, gapsInSeqNum, &(reader->currentNaluBufferSize), reader->custom);
                             gapsInSeqNum = 0;
@@ -918,7 +1153,7 @@ void* ARSTREAM_Reader2_RunRecvThread(void *ARSTREAM_Reader2_t_Param)
                 if (currentFlags & (1 << 7))
                 {
                     /* the marker bit is set: complete access unit */
-                    ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Complete access unit at seqNum %d, size %d bytes (missing %d of %d packets)", currentSeqNum, currentAuSize, gapsInSeqNumAu, currentSeqNum - auStartSeqNum + 1);
+                    //ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Complete access unit at seqNum %d, size %d bytes (missing %d of %d packets)", currentSeqNum, currentAuSize, gapsInSeqNumAu, currentSeqNum - auStartSeqNum + 1);
                     uncertainAuChange = 0;
                     gapsInSeqNumAu = 0;
                     currentAuSize = 0;
@@ -1084,5 +1319,161 @@ eARSTREAM_ERROR ARSTREAM_Reader2_GetMonitoring(ARSTREAM_Reader2_t *reader, uint3
     }
 
     return ret;
+}
+
+
+ARSTREAM_Reader2_Resender_t* ARSTREAM_Reader2_Resender_New(ARSTREAM_Reader2_t *reader, ARSTREAM_Reader2_Resender_Config_t *config, eARSTREAM_ERROR *error)
+{
+    ARSTREAM_Reader2_Resender_t *retResender = NULL;
+    int streamMutexWasInit = 0;
+    int monitoringMutexWasInit = 0;
+    eARSTREAM_ERROR internalError = ARSTREAM_OK;
+    /* ARGS Check */
+    if ((reader == NULL) ||
+        (config == NULL) ||
+        (reader->resenderCount >= ARSTREAM_READER2_RESENDER_MAX_COUNT))
+    {
+        SET_WITH_CHECK(error, ARSTREAM_ERROR_BAD_PARAMETERS);
+        return retResender;
+    }
+
+    /* Alloc new resender */
+    retResender = malloc(sizeof(ARSTREAM_Reader2_Resender_t));
+    if (retResender == NULL)
+    {
+        internalError = ARSTREAM_ERROR_ALLOC;
+    }
+
+    /* Initialize the resender and copy parameters */
+    if (internalError == ARSTREAM_OK)
+    {
+        memset(retResender, 0, sizeof(ARSTREAM_Reader2_Resender_t));
+        retResender->reader = reader;
+    }
+
+    /* Setup ARStream_Sender2 */
+    if (internalError == ARSTREAM_OK)
+    {
+        eARSTREAM_ERROR error2;
+        ARSTREAM_Sender2_Config_t senderConfig;
+        memset(&senderConfig, 0, sizeof(senderConfig));
+        senderConfig.ifaceAddr = config->ifaceAddr;
+        senderConfig.sendAddr = config->sendAddr;
+        senderConfig.sendPort = config->sendPort;
+        senderConfig.naluCallback = ARSTREAM_Reader2_Resender_NaluCallback;
+        senderConfig.naluFifoSize = ARSTREAM_READER2_RESENDER_MAX_NALU_BUFFER_COUNT;
+        senderConfig.maxPacketSize = config->maxPacketSize;
+        senderConfig.targetPacketSize = config->targetPacketSize;
+        senderConfig.maxBitrate = config->maxBitrate;
+        senderConfig.maxLatencyMs = config->maxLatencyMs;
+        retResender->sender = ARSTREAM_Sender2_New(&senderConfig, (void*)retResender, &error2);
+        if (error2 != ARSTREAM_OK)
+        {
+            internalError = error2;
+        }
+    }
+
+    if (internalError == ARSTREAM_OK)
+    {
+        retResender->senderRunning = 1;
+        reader->resender[reader->resenderCount] = retResender;
+        reader->resenderCount++;
+    }
+
+    if ((internalError != ARSTREAM_OK) &&
+        (retResender != NULL))
+    {
+        free(retResender);
+        retResender = NULL;
+    }
+
+    SET_WITH_CHECK(error, internalError);
+    return retResender;
+}
+
+
+void ARSTREAM_Reader2_Resender_Stop(ARSTREAM_Reader2_Resender_t *resender)
+{
+    if ((resender != NULL) && (resender->sender != NULL))
+    {
+        ARSTREAM_Sender2_StopSender(resender->sender);
+        resender->senderRunning = 0;
+    }
+}
+
+
+eARSTREAM_ERROR ARSTREAM_Reader2_Resender_Delete(ARSTREAM_Reader2_Resender_t **resender)
+{
+    int i, idx;
+    eARSTREAM_ERROR retVal = ARSTREAM_ERROR_BAD_PARAMETERS;
+    if ((resender != NULL) &&
+        (*resender != NULL)&&
+        ((*resender)->reader != NULL))
+    {
+        for (i = 0, idx = -1; i < (*resender)->reader->resenderCount; i++)
+        {
+            if (*resender == (*resender)->reader->resender[i])
+            {
+                idx = i;
+                break;
+            }
+        }
+        if (idx < 0)
+        {
+            return retVal;
+        }
+
+        if (!(*resender)->senderRunning)
+        {
+            retVal = ARSTREAM_Sender2_Delete(&((*resender)->sender));
+            if (retVal == ARSTREAM_OK)
+            {
+                (*resender)->reader->resender[idx] = NULL;
+                for (i = idx; i < (*resender)->reader->resenderCount; i++)
+                {
+                    (*resender)->reader->resender[i] = (*resender)->reader->resender[i + 1];
+                }
+                (*resender)->reader->resenderCount--;
+
+                free(*resender);
+                *resender = NULL;
+            }
+            else
+            {
+                ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Failed to delete Sender2");
+            }
+        }
+        else
+        {
+            ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Sender2 is still running");
+        }
+    }
+    return retVal;
+}
+
+
+void* ARSTREAM_Reader2_Resender_RunSendThread (void *ARSTREAM_Reader2_Resender_t_Param)
+{
+    ARSTREAM_Reader2_Resender_t *resender = (ARSTREAM_Reader2_Resender_t *)ARSTREAM_Reader2_Resender_t_Param;
+
+    if (resender == NULL)
+    {
+        return (void *)0;
+    }
+
+    return ARSTREAM_Sender2_RunSendThread((void *)resender->sender);
+}
+
+
+void* ARSTREAM_Reader2_Resender_RunRecvThread (void *ARSTREAM_Reader2_Resender_t_Param)
+{
+    ARSTREAM_Reader2_Resender_t *resender = (ARSTREAM_Reader2_Resender_t *)ARSTREAM_Reader2_Resender_t_Param;
+
+    if (resender == NULL)
+    {
+        return (void *)0;
+    }
+
+    return ARSTREAM_Sender2_RunRecvThread((void *)resender->sender);
 }
 
