@@ -27,4 +27,6 @@
 /JNI/java/com/parrot/arsdk/arstream/ARSTREAM_ERROR_ENUM.java
 /JNI/java/com/parrot/arsdk/arstream/ARSTREAM_READER_CAUSE_ENUM.java
 /JNI/java/com/parrot/arsdk/arstream/ARSTREAM_SENDER_STATUS_ENUM.java
+/JNI/java/com/parrot/arsdk/arstream/ARSTREAM_READER2_CAUSE_ENUM.java
+/JNI/java/com/parrot/arsdk/arstream/ARSTREAM_SENDER2_STATUS_ENUM.java
 /Sources/ARSTREAM_Error.c
