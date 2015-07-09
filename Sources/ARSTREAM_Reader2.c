@@ -1088,7 +1088,69 @@ void* ARSTREAM_Reader2_RunRecvThread(void *ARSTREAM_Reader2_t_Param)
                             //ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Incomplete FU-A packet before STAP-A at seqNum %d (fuPending)", currentSeqNum);
                         }
 
-                        //TODO
+//ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "STAP-A at seqNum %d, payloadSize=%d", currentSeqNum, payloadSize);
+                        if (payloadSize >= 3)
+                        {
+                            uint8_t *curBuf = recvBuffer + sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t) + 1;
+                            int sizeLeft = payloadSize - 1, naluCount = 0;
+                            uint16_t naluSize = ((uint16_t)(*curBuf) << 8) | ((uint16_t)(*(curBuf + 1))), nextNaluSize = 0;
+                            curBuf += 2;
+                            sizeLeft -= 2;
+                            while ((naluSize > 0) && (sizeLeft >= naluSize))
+                            {
+                                naluCount++;
+                                nextNaluSize = (sizeLeft >= naluSize + 2) ? ((uint16_t)(*(curBuf + naluSize)) << 8) | ((uint16_t)(*(curBuf + naluSize + 1))) : 0;
+//ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "-- STAP-A at seqNum %d, naluSize=%d, sizeLeft=%d, nextNaluSize=%d", currentSeqNum, naluSize, sizeLeft, nextNaluSize);
+                                reader->currentNaluSize = 0;
+                                if (!ARSTREAM_Reader2_CheckBufferSize(reader, naluSize + startCodeLength))
+                                {
+                                    int isFirst = 0, isLast = 0;
+                                    if ((!uncertainAuChange) && (auStartSeqNum == currentSeqNum) && (naluCount == 1))
+                                    {
+                                        isFirst = 1;
+                                    }
+                                    if ((currentFlags & (1 << 7)) && (nextNaluSize == 0))
+                                    {
+                                        isLast = 1;
+                                    }
+                                    if (startCodeLength > 0)
+                                    {
+                                        memcpy(reader->currentNaluBuffer, &startCode, startCodeLength);
+                                        reader->currentNaluSize += startCodeLength;
+                                        currentAuSize += startCodeLength;
+                                    }
+                                    memcpy(reader->currentNaluBuffer + reader->currentNaluSize, curBuf, naluSize);
+                                    reader->currentNaluSize += naluSize;
+                                    currentAuSize += naluSize;
+                                    /*ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Output STAP-A NALU (seqNum %d) isFirst=%d isLast=%d gapsInSeqNum=%d",
+                                                currentSeqNum, isFirst, isLast, gapsInSeqNum);*/ //TODO debug
+#ifdef ARSTREAM_READER2_DEBUG
+                                    ARSTREAM_Reader2Debug_ProcessNalu(reader->rdbg, reader->currentNaluBuffer, reader->currentNaluSize, currentTimestamp, receptionTs,
+                                                                      gapsInSeqNum, 1, isFirst, isLast);
+#endif
+                                    if (reader->resenderCount > 0)
+                                    {
+                                        int resendRet = ARSTREAM_Reader2_ResendNalu(reader, reader->currentNaluBuffer, reader->currentNaluSize, currentTimestamp, isLast);
+                                        if (resendRet != 0)
+                                        {
+                                            //ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Failed to resend NALU (%d)", resendRet); //TODO debug
+                                        }
+                                    }
+                                    reader->currentNaluBuffer = reader->naluCallback(ARSTREAM_READER2_CAUSE_NALU_COMPLETE, reader->currentNaluBuffer, reader->currentNaluSize, currentTimestamp,
+                                                                                     isFirst, isLast, gapsInSeqNum, &(reader->currentNaluBufferSize), reader->custom);
+                                    gapsInSeqNum = 0;
+                                }
+                                else
+                                {
+                                    ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Failed to realloc auBuffer for output size (%d) for single NALU packet at seqNum %d", payloadSize + startCodeLength, currentSeqNum);
+                                }
+                                curBuf += naluSize;
+                                sizeLeft -= naluSize;
+                                curBuf += 2;
+                                sizeLeft -= 2;
+                                naluSize = nextNaluSize;
+                            }
+                        }
                     }
                     else
                     {

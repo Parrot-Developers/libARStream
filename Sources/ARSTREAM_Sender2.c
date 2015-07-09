@@ -235,20 +235,20 @@ static int ARSTREAM_Sender2_EnqueueNalu(ARSTREAM_Sender2_t *sender, const ARSTRE
 static int ARSTREAM_Sender2_DequeueNalu(ARSTREAM_Sender2_t *sender, ARSTREAM_Sender2_Nalu_t* nalu)
 {
     ARSTREAM_Sender2_Nalu_t* cur = NULL;
-    
+
     if ((!sender) || (!nalu))
     {
         return -1;
     }
 
     ARSAL_Mutex_Lock(&(sender->fifoMutex));
-    
+
     if ((!sender->fifoHead) || (!sender->fifoCount))
     {
         ARSAL_Mutex_Unlock(&sender->fifoMutex);
         return -2;
     }
-    
+
     cur = sender->fifoHead;
     if (cur->next)
     {
@@ -262,14 +262,14 @@ static int ARSTREAM_Sender2_DequeueNalu(ARSTREAM_Sender2_t *sender, ARSTREAM_Sen
         sender->fifoCount = 0;
         sender->fifoTail = NULL;
     }
-    
+
     cur->used = 0;
     cur->prev = NULL;
     cur->next = NULL;
     memcpy(nalu, cur, sizeof(ARSTREAM_Sender2_Nalu_t));
-    
+
     ARSAL_Mutex_Unlock (&(sender->fifoMutex));
-    
+
     return 0;
 }
 
@@ -1040,11 +1040,13 @@ void* ARSTREAM_Sender2_RunSendThread (void *ARSTREAM_Sender2_t_Param)
     uint8_t *sendBuffer = NULL;
     uint32_t sendSize = 0;
     ARSTREAM_Sender2_Nalu_t nalu;
-    uint64_t previousTimestamp = 0;
+    uint64_t previousTimestamp = 0, stapAuTimestamp = 0;
     void *previousAuUserPtr = NULL;
     int shouldStop;
     int targetPacketSize, maxPacketSize, packetSize, fragmentSize, meanFragmentSize, offset, fragmentOffset, fragmentCount;
     int ret;
+    int stapPending = 0, stapNaluCount = 0;
+    uint8_t stapMaxNri = 0;
 
     /* Parameters check */
     if (sender == NULL)
@@ -1082,22 +1084,40 @@ void* ARSTREAM_Sender2_RunSendThread (void *ARSTREAM_Sender2_t_Param)
 
         if (fifoRes == 0)
         {
-            if ((sender->auCallback != NULL) && (previousTimestamp != 0) && (nalu.auTimestamp != previousTimestamp))
+            if ((previousTimestamp != 0) && (nalu.auTimestamp != previousTimestamp))
             {
-                /* new Access Unit: do we need to call the auCallback? */
-                ARSAL_Mutex_Lock(&(sender->streamMutex));
-                if (previousTimestamp != sender->lastAuTimestamp)
+                if (stapPending)
                 {
-                    sender->lastAuTimestamp = previousTimestamp;
-                    ARSAL_Mutex_Unlock(&(sender->streamMutex));
-
-                    /* call the auCallback */
-                    //ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_SENDER2_TAG, "Time %llu: start sending new AU -> auCallback", previousTimestamp);
-                    sender->auCallback(ARSTREAM_SENDER2_STATUS_SENT, previousAuUserPtr, sender->custom);
+                    /* Finish the previous STAP-A packet */
+//ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Time %llu: STAP-A (previous) sendSize=%d, naluCount=%d", nalu.auTimestamp, sendSize, stapNaluCount); //TODO: debug
+                    uint8_t stapHeader = ARSTREAM_NETWORK_HEADERS2_NALU_TYPE_STAPA | ((stapMaxNri & 3) << 5);
+                    *(sendBuffer + sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t)) = stapHeader;
+                    ret = ARSTREAM_Sender2_SendData(sender, sendBuffer, sendSize, stapAuTimestamp, 0); // do not set the marker bit
+                    if (ret != 0)
+                    {
+                        //ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_SENDER2_TAG, "Time %llu: STAP-A SendData failed (error %d)", nalu.auTimestamp, ret);
+                    }
+                    stapPending = 0;
+                    sendSize = 0;
                 }
-                else
+
+                if (sender->auCallback != NULL)
                 {
-                    ARSAL_Mutex_Unlock(&(sender->streamMutex));
+                    /* new Access Unit: do we need to call the auCallback? */
+                    ARSAL_Mutex_Lock(&(sender->streamMutex));
+                    if (previousTimestamp != sender->lastAuTimestamp)
+                    {
+                        sender->lastAuTimestamp = previousTimestamp;
+                        ARSAL_Mutex_Unlock(&(sender->streamMutex));
+
+                        /* call the auCallback */
+                        //ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_SENDER2_TAG, "Time %llu: start sending new AU -> auCallback", previousTimestamp);
+                        sender->auCallback(ARSTREAM_SENDER2_STATUS_SENT, previousAuUserPtr, sender->custom);
+                    }
+                    else
+                    {
+                        ARSAL_Mutex_Unlock(&(sender->streamMutex));
+                    }
                 }
             }
 
@@ -1109,12 +1129,29 @@ void* ARSTREAM_Sender2_RunSendThread (void *ARSTREAM_Sender2_t_Param)
                 targetPacketSize = sender->targetPacketSize;
                 maxPacketSize = sender->maxPacketSize;
                 ARSAL_Mutex_Unlock(&(sender->streamMutex));
+
                 fragmentCount = (nalu.naluSize + targetPacketSize / 2) / targetPacketSize;
                 if (fragmentCount < 1) fragmentCount = 1;
 
                 if ((fragmentCount > 1) || (nalu.naluSize > maxPacketSize))
                 {
                     /* Fragmentation (FU-A) */
+
+                    if (stapPending)
+                    {
+                        /* Finish the previous STAP-A packet */
+//ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Time %llu: STAP-A (previous) sendSize=%d, naluCount=%d", nalu.auTimestamp, sendSize, stapNaluCount); //TODO: debug
+                        uint8_t stapHeader = ARSTREAM_NETWORK_HEADERS2_NALU_TYPE_STAPA | ((stapMaxNri & 3) << 5);
+                        *(sendBuffer + sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t)) = stapHeader;
+                        ret = ARSTREAM_Sender2_SendData(sender, sendBuffer, sendSize, stapAuTimestamp, 0); // do not set the marker bit
+                        if (ret != 0)
+                        {
+                            //ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_SENDER2_TAG, "Time %llu: STAP-A SendData failed (error %d)", nalu.auTimestamp, ret);
+                        }
+                        stapPending = 0;
+                        sendSize = 0;
+                    }
+
                     int i;
                     uint8_t fuIndicator, fuHeader, startBit, endBit;
                     fuIndicator = fuHeader = *nalu.naluBuffer;
@@ -1142,12 +1179,13 @@ void* ARSTREAM_Sender2_RunSendThread (void *ARSTREAM_Sender2_t_Param)
                                 endBit = ((i == fragmentCount - 1) && (fragmentOffset + packetSize == fragmentSize)) ? 0x40 : 0;
                                 *(sendBuffer + sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t) + 1) = fuHeader | startBit | endBit;
 
-//ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "-- Time %llu: FU-A, sendSize=%d, startBit=%d, endBit=%d, markerBit=%d", nalu.auTimestamp, sendSize, startBit, endBit, ((nalu.isLastInAu) && (endBit)) ? 1 : 0); //TODO: debug
+//ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Time %llu: FU-A, sendSize=%d, startBit=%d, endBit=%d, markerBit=%d", nalu.auTimestamp, sendSize, startBit, endBit, ((nalu.isLastInAu) && (endBit)) ? 1 : 0); //TODO: debug
                                 ret = ARSTREAM_Sender2_SendData(sender, sendBuffer, sendSize, nalu.auTimestamp, ((nalu.isLastInAu) && (endBit)) ? 1 : 0);
                                 if (ret != 0)
                                 {
                                     //ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_SENDER2_TAG, "Time %llu: FU-A SendData failed (error %d)", nalu.auTimestamp, ret);
                                 }
+                                sendSize = 0;
                             }
                             else
                             {
@@ -1162,17 +1200,77 @@ void* ARSTREAM_Sender2_RunSendThread (void *ARSTREAM_Sender2_t_Param)
                 }
                 else
                 {
-                    /* Aggregation (STAP-A) */
-                    //TODO
-
-                    /* Single NAL unit */
-                    memcpy(sendBuffer + sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t), nalu.naluBuffer, nalu.naluSize);
-                    sendSize = nalu.naluSize + sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t);
-                    
-                    ret = ARSTREAM_Sender2_SendData(sender, sendBuffer, sendSize, nalu.auTimestamp, nalu.isLastInAu);
-                    if (ret != 0)
+                    int stapSize = nalu.naluSize + 2 + ((!stapPending) ? sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t) + 1 : 0);
+                    if ((sendSize + stapSize >= maxPacketSize) || (sendSize + stapSize > targetPacketSize))
                     {
-                        //ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_SENDER2_TAG, "Time %llu: singleNALU SendData failed (error %d)", nalu.auTimestamp, ret);
+                        if (stapPending)
+                        {
+                            /* Finish the previous STAP-A packet */
+//ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Time %llu: STAP-A (previous) sendSize=%d, naluCount=%d", nalu.auTimestamp, sendSize, stapNaluCount); //TODO: debug
+                            uint8_t stapHeader = ARSTREAM_NETWORK_HEADERS2_NALU_TYPE_STAPA | ((stapMaxNri & 3) << 5);
+                            *(sendBuffer + sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t)) = stapHeader;
+                            ret = ARSTREAM_Sender2_SendData(sender, sendBuffer, sendSize, stapAuTimestamp, 0); // do not set the marker bit
+                            if (ret != 0)
+                            {
+                                //ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_SENDER2_TAG, "Time %llu: STAP-A SendData failed (error %d)", nalu.auTimestamp, ret);
+                            }
+                            stapPending = 0;
+                            sendSize = 0;
+
+                            stapSize = nalu.naluSize + 2 + ((!stapPending) ? sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t) + 1 : 0);
+                        }
+                    }
+
+                    if ((sendSize + stapSize >= maxPacketSize) || (sendSize + stapSize > targetPacketSize))
+                    {
+                        /* Single NAL unit */
+                        memcpy(sendBuffer + sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t), nalu.naluBuffer, nalu.naluSize);
+                        sendSize = nalu.naluSize + sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t);
+                        
+//ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Time %llu: SingleNALU sendSize=%d", nalu.auTimestamp, sendSize); //TODO: debug
+                        ret = ARSTREAM_Sender2_SendData(sender, sendBuffer, sendSize, nalu.auTimestamp, nalu.isLastInAu);
+                        if (ret != 0)
+                        {
+                            //ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_SENDER2_TAG, "Time %llu: singleNALU SendData failed (error %d)", nalu.auTimestamp, ret);
+                        }
+                        sendSize = 0;
+                    }
+                    else
+                    {
+                        /* Aggregation (STAP-A) */
+                        if (!stapPending)
+                        {
+                            stapPending = 1;
+                            stapMaxNri = 0;
+                            stapNaluCount = 0;
+                            sendSize = sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t) + 1;
+                            stapAuTimestamp = nalu.auTimestamp;
+                        }
+                        uint8_t nri = ((uint8_t)(*(nalu.naluBuffer)) >> 5) & 0x3;
+                        if (nri > stapMaxNri)
+                        {
+                            stapMaxNri = nri;
+                        }
+                        *(sendBuffer + sendSize) = ((nalu.naluSize >> 8) & 0xFF);
+                        *(sendBuffer + sendSize + 1) = (nalu.naluSize & 0xFF);
+                        sendSize += 2;
+                        memcpy(sendBuffer + sendSize, nalu.naluBuffer, nalu.naluSize);
+                        sendSize += nalu.naluSize;
+                        stapNaluCount++;
+                        if (nalu.isLastInAu)
+                        {
+                            /* Finish the STAP-A packet */
+//ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Time %llu: STAP-A (current) sendSize=%d, naluCount=%d", nalu.auTimestamp, sendSize, stapNaluCount); //TODO: debug
+                            uint8_t stapHeader = ARSTREAM_NETWORK_HEADERS2_NALU_TYPE_STAPA | ((stapMaxNri & 3) << 5);
+                            *(sendBuffer + sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t)) = stapHeader;
+                            ret = ARSTREAM_Sender2_SendData(sender, sendBuffer, sendSize, stapAuTimestamp, 1); // set the marker bit
+                            if (ret != 0)
+                            {
+                                //ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_SENDER2_TAG, "Time %llu: STAP-A SendData failed (error %d)", nalu.auTimestamp, ret);
+                            }
+                            stapPending = 0;
+                            sendSize = 0;
+                        }
                     }
                 }
 
