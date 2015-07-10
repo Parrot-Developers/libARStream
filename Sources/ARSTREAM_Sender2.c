@@ -93,10 +93,19 @@
         }                                       \
     } while (0)
 
-//#define ARSTREAM_SENDER2_MONITORING_OUTPUT
+#define ARSTREAM_SENDER2_MONITORING_OUTPUT
 #ifdef ARSTREAM_SENDER2_MONITORING_OUTPUT
     #include <stdio.h>
-    #define ARSTREAM_SENDER2_MONITORING_OUTPUT_PATH "/data/ftp/internal_000/stream_monitor"
+    #define ARSTREAM_SENDER2_MONITORING_OUTPUT_ALLOW_DRONE
+    #define ARSTREAM_SENDER2_MONITORING_OUTPUT_PATH_DRONE "/data/ftp/internal_000/streamdebug"
+    #define ARSTREAM_SENDER2_MONITORING_OUTPUT_ALLOW_NAP_USB
+    #define ARSTREAM_SENDER2_MONITORING_OUTPUT_PATH_NAP_USB "/tmp/mnt/STREAMDEBUG"
+    //#define ARSTREAM_SENDER2_MONITORING_OUTPUT_ALLOW_NAP_INTERNAL
+    #define ARSTREAM_SENDER2_MONITORING_OUTPUT_PATH_NAP_INTERNAL "/data/skycontroller/streamdebug"
+    //#define ARSTREAM_SENDER2_MONITORING_OUTPUT_ALLOW_ANDROID_INTERNAL
+    #define ARSTREAM_SENDER2_MONITORING_OUTPUT_PATH_ANDROID_INTERNAL "/storage/emulated/legacy/FF/streamdebug"
+    //#define ARSTREAM_SENDER2_MONITORING_OUTPUT_ALLOW_PCLINUX
+    #define ARSTREAM_SENDER2_MONITORING_OUTPUT_PATH_PCLINUX "."
 #endif
 
 
@@ -532,16 +541,53 @@ ARSTREAM_Sender2_t* ARSTREAM_Sender2_New(ARSTREAM_Sender2_Config_t *config, void
     {
         int i;
         char szOutputFileName[128];
+        char *pszFilePath = NULL;
         szOutputFileName[0] = '\0';
-        for (i = 0; i < 100; i++)
+        if (0)
         {
-            snprintf(szOutputFileName, 128, "%s/monitor_%02d.dat", ARSTREAM_SENDER2_MONITORING_OUTPUT_PATH, i);
-            if (access(szOutputFileName, F_OK) == -1)
+        }
+#ifdef ARSTREAM_SENDER2_MONITORING_OUTPUT_ALLOW_DRONE
+        else if ((access(ARSTREAM_SENDER2_MONITORING_OUTPUT_PATH_DRONE, F_OK) == 0) && (access(ARSTREAM_SENDER2_MONITORING_OUTPUT_PATH_DRONE, W_OK) == 0))
+        {
+            pszFilePath = ARSTREAM_SENDER2_MONITORING_OUTPUT_PATH_DRONE;
+        }
+#endif
+#ifdef ARSTREAM_SENDER2_MONITORING_OUTPUT_ALLOW_NAP_USB
+        else if ((access(ARSTREAM_SENDER2_MONITORING_OUTPUT_PATH_NAP_USB, F_OK) == 0) && (access(ARSTREAM_SENDER2_MONITORING_OUTPUT_PATH_NAP_USB, W_OK) == 0))
+        {
+            pszFilePath = ARSTREAM_SENDER2_MONITORING_OUTPUT_PATH_NAP_USB;
+        }
+#endif
+#ifdef ARSTREAM_SENDER2_MONITORING_OUTPUT_ALLOW_NAP_INTERNAL
+        else if ((access(ARSTREAM_SENDER2_MONITORING_OUTPUT_PATH_NAP_INTERNAL, F_OK) == 0) && (access(ARSTREAM_SENDER2_MONITORING_OUTPUT_PATH_NAP_INTERNAL, W_OK) == 0))
+        {
+            pszFilePath = ARSTREAM_SENDER2_MONITORING_OUTPUT_PATH_NAP_INTERNAL;
+        }
+#endif
+#ifdef ARSTREAM_SENDER2_MONITORING_OUTPUT_ALLOW_ANDROID_INTERNAL
+        else if ((access(ARSTREAM_SENDER2_MONITORING_OUTPUT_PATH_ANDROID_INTERNAL, F_OK) == 0) && (access(ARSTREAM_SENDER2_MONITORING_OUTPUT_PATH_ANDROID_INTERNAL, W_OK) == 0))
+        {
+            pszFilePath = ARSTREAM_SENDER2_MONITORING_OUTPUT_PATH_ANDROID_INTERNAL;
+        }
+#endif
+#ifdef ARSTREAM_SENDER2_MONITORING_OUTPUT_ALLOW_PCLINUX
+        else if ((access(ARSTREAM_SENDER2_MONITORING_OUTPUT_PATH_PCLINUX, F_OK) == 0) && (access(ARSTREAM_SENDER2_MONITORING_OUTPUT_PATH_PCLINUX, W_OK) == 0))
+        {
+            pszFilePath = ARSTREAM_SENDER2_MONITORING_OUTPUT_PATH_PCLINUX;
+        }
+#endif
+        if (pszFilePath)
+        {
+            for (i = 0; i < 1000; i++)
             {
-                // file does not exist
-                break;
+                snprintf(szOutputFileName, 128, "%s/sender_monitor_%03d.dat", pszFilePath, i);
+                if (access(szOutputFileName, F_OK) == -1)
+                {
+                    // file does not exist
+                    break;
+                }
+                szOutputFileName[0] = '\0';
             }
-            szOutputFileName[0] = '\0';
         }
 
         if (strlen(szOutputFileName))
@@ -552,8 +598,13 @@ ARSTREAM_Sender2_t* ARSTREAM_Sender2_New(ARSTREAM_Sender2_Config_t *config, void
                 ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Unable to open monitor output file '%s'", szOutputFileName);
             }
         }
+
+        if (retSender->fMonitorOut)
+        {
+            fprintf(retSender->fMonitorOut, "sendTimestamp auTimestamp rtpTimestamp rtpSeqNum rtpMarkerBit bytesSent bytesDropped\n");
+        }
     }
-#endif
+#endif //#ifdef ARSTREAM_SENDER2_MONITORING_OUTPUT
 
     if ((internalError != ARSTREAM_OK) &&
         (retSender != NULL))
@@ -730,7 +781,7 @@ eARSTREAM_ERROR ARSTREAM_Sender2_FlushNaluQueue(ARSTREAM_Sender2_t *sender)
 }
 
 
-static void ARSTREAM_Sender2_UpdateMonitoring(ARSTREAM_Sender2_t *sender, uint64_t auTimestamp, uint32_t rtpTimestamp, uint16_t seqNum, uint32_t bytesSent, uint32_t bytesDropped)
+static void ARSTREAM_Sender2_UpdateMonitoring(ARSTREAM_Sender2_t *sender, uint64_t auTimestamp, uint32_t rtpTimestamp, uint16_t seqNum, uint16_t markerBit, uint32_t bytesSent, uint32_t bytesDropped)
 {
     uint64_t curTime;
     struct timespec t1;
@@ -756,7 +807,7 @@ static void ARSTREAM_Sender2_UpdateMonitoring(ARSTREAM_Sender2_t *sender, uint64
     {
         fprintf(sender->fMonitorOut, "%llu ", curTime);
         fprintf(sender->fMonitorOut, "%llu ", auTimestamp);
-        fprintf(sender->fMonitorOut, "%lu %u %lu %lu\n", rtpTimestamp, seqNum, bytesSent, bytesDropped);
+        fprintf(sender->fMonitorOut, "%lu %u %u %lu %lu\n", rtpTimestamp, seqNum, markerBit, bytesSent, bytesDropped);
     }
 #endif
 }
@@ -978,13 +1029,13 @@ static int ARSTREAM_Sender2_SendData(ARSTREAM_Sender2_t *sender, uint8_t *sendBu
             int pollRet = poll(&p, 1, pollTimeMs);
             if (pollRet == 0)
             {
-                ARSTREAM_Sender2_UpdateMonitoring(sender, auTimestamp, rtpTimestamp, sender->seqNum - 1, 0, sendSize);
+                ARSTREAM_Sender2_UpdateMonitoring(sender, auTimestamp, rtpTimestamp, sender->seqNum - 1, isLastInAu, 0, sendSize);
                 ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Polling timed out");
                 ret = -2;
             }
             else if (pollRet < 0)
             {
-                ARSTREAM_Sender2_UpdateMonitoring(sender, auTimestamp, rtpTimestamp, sender->seqNum - 1, 0, sendSize);
+                ARSTREAM_Sender2_UpdateMonitoring(sender, auTimestamp, rtpTimestamp, sender->seqNum - 1, isLastInAu, 0, sendSize);
                 ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Poll error: error=%d (%s)", errno, strerror(errno));
                 ret = -1;
             }
@@ -1000,25 +1051,25 @@ static int ARSTREAM_Sender2_SendData(ARSTREAM_Sender2_t *sender, uint8_t *sendBu
                 }
                 if (bytes > -1)
                 {
-                    ARSTREAM_Sender2_UpdateMonitoring(sender, auTimestamp, rtpTimestamp, sender->seqNum - 1, (uint32_t)bytes, 0);
+                    ARSTREAM_Sender2_UpdateMonitoring(sender, auTimestamp, rtpTimestamp, sender->seqNum - 1, isLastInAu, (uint32_t)bytes, 0);
                     ret = 0;
                 }
                 else if (errno == EAGAIN)
                 {
-                    ARSTREAM_Sender2_UpdateMonitoring(sender, auTimestamp, rtpTimestamp, sender->seqNum - 1, 0, sendSize);
+                    ARSTREAM_Sender2_UpdateMonitoring(sender, auTimestamp, rtpTimestamp, sender->seqNum - 1, isLastInAu, 0, sendSize);
                     ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Socket buffer full #2 - current packet dropped");
                     ret = -2;
                 }
                 else
                 {
-                    ARSTREAM_Sender2_UpdateMonitoring(sender, auTimestamp, rtpTimestamp, sender->seqNum - 1, 0, sendSize);
+                    ARSTREAM_Sender2_UpdateMonitoring(sender, auTimestamp, rtpTimestamp, sender->seqNum - 1, isLastInAu, 0, sendSize);
                     ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Socket send error #2 error=%d (%s)", errno, strerror(errno));
                     ret = -1;
                 }
             }
             break;
         default:
-            ARSTREAM_Sender2_UpdateMonitoring(sender, auTimestamp, rtpTimestamp, sender->seqNum - 1, 0, sendSize);
+            ARSTREAM_Sender2_UpdateMonitoring(sender, auTimestamp, rtpTimestamp, sender->seqNum - 1, isLastInAu, 0, sendSize);
             ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Socket send error: error=%d (%s)", errno, strerror(errno));
             ret = -1;
             break;
@@ -1026,7 +1077,7 @@ static int ARSTREAM_Sender2_SendData(ARSTREAM_Sender2_t *sender, uint8_t *sendBu
     }
     else
     {
-        ARSTREAM_Sender2_UpdateMonitoring(sender, auTimestamp, rtpTimestamp, sender->seqNum - 1, (uint32_t)bytes, 0);
+        ARSTREAM_Sender2_UpdateMonitoring(sender, auTimestamp, rtpTimestamp, sender->seqNum - 1, isLastInAu, (uint32_t)bytes, 0);
     }
 
     return ret;
@@ -1284,7 +1335,7 @@ void* ARSTREAM_Sender2_RunSendThread (void *ARSTREAM_Sender2_t_Param)
             else
             {
                 uint32_t rtpTimestamp = (uint32_t)(((((nalu.auTimestamp - sender->firstTimestamp) * 90) + 500) / 1000) & 0xFFFFFFFF);
-                ARSTREAM_Sender2_UpdateMonitoring(sender, nalu.auTimestamp, rtpTimestamp, sender->seqNum, 0, nalu.naluSize);
+                ARSTREAM_Sender2_UpdateMonitoring(sender, nalu.auTimestamp, rtpTimestamp, sender->seqNum, nalu.isLastInAu, 0, nalu.naluSize);
                 //ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_SENDER2_TAG, "Time %llu: dropped NALU (seqNum = %d)", nalu.auTimestamp, sender->seqNum); //TODO: debug
                 /* increment the sequence number to let the receiver know that we dropped something */
                 sender->seqNum++;

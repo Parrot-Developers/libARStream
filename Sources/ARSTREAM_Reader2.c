@@ -82,7 +82,7 @@
 #define ARSTREAM_H264_STARTCODE 0x00000001
 #define ARSTREAM_H264_STARTCODE_LENGTH 4
 
-//#define ARSTREAM_READER2_DEBUG
+#define ARSTREAM_READER2_DEBUG
 #ifdef ARSTREAM_READER2_DEBUG
     #include "ARSTREAM_Reader2Debug.h"
 #endif
@@ -419,9 +419,10 @@ ARSTREAM_Reader2_t* ARSTREAM_Reader2_New(ARSTREAM_Reader2_Config_t *config, uint
     /* Setup debug */
     if (internalError == ARSTREAM_OK)
     {
-        retReader->rdbg = ARSTREAM_Reader2Debug_New(1, 1, 0);
+        retReader->rdbg = ARSTREAM_Reader2Debug_New(1, 1, 1);
         if (!retReader->rdbg)
         {
+            ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_READER2_TAG, "ARSTREAM_Reader2Debug_New() failed");
             internalError = ARSTREAM_ERROR_ALLOC;
         }
     }

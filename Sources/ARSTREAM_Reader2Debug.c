@@ -57,15 +57,27 @@
 #define ARSTREAM_READER2DEBUG_PSNR_MAX 48.130803609
 
 
-const char* ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_NAP_USB = "/tmp/mnt/STREAMDEBUG";
-const char* ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_NAP_INTERNAL = "/data/skycontroller/streamdebug";
-const char* ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_ANDROID_INTERNAL = "/storage/emulated/legacy/FF";
-const char* ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_PCLINUX = ".";
+//#define ARSTREAM_READER2DEBUG_STATS_OUTPUT_ALLOW_DRONE
+#define ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_DRONE "/data/ftp/internal_000/streamdebug"
+#define ARSTREAM_READER2DEBUG_STATS_OUTPUT_ALLOW_NAP_USB
+#define ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_NAP_USB "/tmp/mnt/STREAMDEBUG/streamdebug"
+//#define ARSTREAM_READER2DEBUG_STATS_OUTPUT_ALLOW_NAP_INTERNAL
+#define ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_NAP_INTERNAL "/data/skycontroller/streamdebug"
+//#define ARSTREAM_READER2DEBUG_STATS_OUTPUT_ALLOW_ANDROID_INTERNAL
+#define ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_ANDROID_INTERNAL "/storage/emulated/legacy/FF/streamdebug"
+//#define ARSTREAM_READER2DEBUG_STATS_OUTPUT_ALLOW_PCLINUX
+#define ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_PCLINUX "."
 
-const char* ARSTREAM_READER2DEBUG_VIDEO_OUTPUT_PATH_NAP_USB = "/tmp/mnt/STREAMDEBUG";
-const char* ARSTREAM_READER2DEBUG_VIDEO_OUTPUT_PATH_NAP_INTERNAL = "/data/skycontroller/streamdebug";
-const char* ARSTREAM_READER2DEBUG_VIDEO_OUTPUT_PATH_ANDROID_INTERNAL = "/storage/emulated/legacy/FF";
-const char* ARSTREAM_READER2DEBUG_VIDEO_OUTPUT_PATH_PCLINUX = ".";
+//#define ARSTREAM_READER2DEBUG_VIDEO_OUTPUT_ALLOW_DRONE
+#define ARSTREAM_READER2DEBUG_VIDEO_OUTPUT_PATH_DRONE "/data/ftp/internal_000/stream"
+#define ARSTREAM_READER2DEBUG_VIDEO_OUTPUT_ALLOW_NAP_USB
+#define ARSTREAM_READER2DEBUG_VIDEO_OUTPUT_PATH_NAP_USB "/tmp/mnt/STREAMDEBUG/stream"
+//#define ARSTREAM_READER2DEBUG_VIDEO_OUTPUT_ALLOW_NAP_INTERNAL
+#define ARSTREAM_READER2DEBUG_VIDEO_OUTPUT_PATH_NAP_INTERNAL "/data/skycontroller/stream"
+//#define ARSTREAM_READER2DEBUG_VIDEO_OUTPUT_ALLOW_ANDROID_INTERNAL
+#define ARSTREAM_READER2DEBUG_VIDEO_OUTPUT_PATH_ANDROID_INTERNAL "/storage/emulated/legacy/FF/stream"
+//#define ARSTREAM_READER2DEBUG_VIDEO_OUTPUT_ALLOW_PCLINUX
+#define ARSTREAM_READER2DEBUG_VIDEO_OUTPUT_PATH_PCLINUX "."
 
 
 struct ARSTREAM_Reader2Debug_t {
@@ -116,27 +128,44 @@ ARSTREAM_Reader2Debug_t* ARSTREAM_Reader2Debug_New(int outputRtpStatFile, int ou
     szFileName[0] = '\0';
     if (outputRtpStatFile)
     {
-        if ((access(ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_NAP_USB, F_OK) == 0) && (access(ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_NAP_USB, W_OK) == 0))
+        if (0)
+        {
+        }
+#ifdef ARSTREAM_READER2DEBUG_STATS_OUTPUT_ALLOW_DRONE
+        else if ((access(ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_DRONE, F_OK) == 0) && (access(ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_DRONE, W_OK) == 0))
+        {
+            pszFilePath = ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_DRONE;
+        }
+#endif
+#ifdef ARSTREAM_READER2DEBUG_STATS_OUTPUT_ALLOW_NAP_USB
+        else if ((access(ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_NAP_USB, F_OK) == 0) && (access(ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_NAP_USB, W_OK) == 0))
         {
             pszFilePath = ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_NAP_USB;
         }
+#endif
+#ifdef ARSTREAM_READER2DEBUG_STATS_OUTPUT_ALLOW_NAP_INTERNAL
         else if ((access(ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_NAP_INTERNAL, F_OK) == 0) && (access(ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_NAP_INTERNAL, W_OK) == 0))
         {
             pszFilePath = ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_NAP_INTERNAL;
         }
+#endif
+#ifdef ARSTREAM_READER2DEBUG_STATS_OUTPUT_ALLOW_ANDROID_INTERNAL
         else if ((access(ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_ANDROID_INTERNAL, F_OK) == 0) && (access(ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_ANDROID_INTERNAL, W_OK) == 0))
         {
             pszFilePath = ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_ANDROID_INTERNAL;
         }
+#endif
+#ifdef ARSTREAM_READER2DEBUG_STATS_OUTPUT_ALLOW_PCLINUX
         else if ((access(ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_PCLINUX, F_OK) == 0) && (access(ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_PCLINUX, W_OK) == 0))
         {
             pszFilePath = ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_PCLINUX;
         }
+#endif
         if (pszFilePath)
         {
-            for (i = 0; i < 100; i++)
+            for (i = 0; i < 1000; i++)
             {
-                snprintf(szFileName, 128, "%s/rtpStats_%02d.dat", pszFilePath, i);
+                snprintf(szFileName, 128, "%s/reader_monitor_%03d.dat", pszFilePath, i);
                 if (access(szFileName, F_OK) == -1)
                 {
                     // file does not exist
@@ -168,27 +197,44 @@ ARSTREAM_Reader2Debug_t* ARSTREAM_Reader2Debug_New(int outputRtpStatFile, int ou
     szFileName[0] = '\0';
     if (outputH264StatFile)
     {
-        if ((access(ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_NAP_USB, F_OK) == 0) && (access(ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_NAP_USB, W_OK) == 0))
+        if (0)
+        {
+        }
+#ifdef ARSTREAM_READER2DEBUG_STATS_OUTPUT_ALLOW_DRONE
+        else if ((access(ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_DRONE, F_OK) == 0) && (access(ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_DRONE, W_OK) == 0))
+        {
+            pszFilePath = ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_DRONE;
+        }
+#endif
+#ifdef ARSTREAM_READER2DEBUG_STATS_OUTPUT_ALLOW_NAP_USB
+        else if ((access(ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_NAP_USB, F_OK) == 0) && (access(ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_NAP_USB, W_OK) == 0))
         {
             pszFilePath = ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_NAP_USB;
         }
+#endif
+#ifdef ARSTREAM_READER2DEBUG_STATS_OUTPUT_ALLOW_NAP_INTERNAL
         else if ((access(ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_NAP_INTERNAL, F_OK) == 0) && (access(ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_NAP_INTERNAL, W_OK) == 0))
         {
             pszFilePath = ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_NAP_INTERNAL;
         }
+#endif
+#ifdef ARSTREAM_READER2DEBUG_STATS_OUTPUT_ALLOW_ANDROID_INTERNAL
         else if ((access(ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_ANDROID_INTERNAL, F_OK) == 0) && (access(ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_ANDROID_INTERNAL, W_OK) == 0))
         {
             pszFilePath = ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_ANDROID_INTERNAL;
         }
+#endif
+#ifdef ARSTREAM_READER2DEBUG_STATS_OUTPUT_ALLOW_PCLINUX
         else if ((access(ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_PCLINUX, F_OK) == 0) && (access(ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_PCLINUX, W_OK) == 0))
         {
             pszFilePath = ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_PCLINUX;
         }
+#endif
         if (pszFilePath)
         {
-            for (i = 0; i < 100; i++)
+            for (i = 0; i < 1000; i++)
             {
-                snprintf(szFileName, 128, "%s/h264Stats_%02d.dat", pszFilePath, i);
+                snprintf(szFileName, 128, "%s/sei_monitor_%03d.dat", pszFilePath, i);
                 if (access(szFileName, F_OK) == -1)
                 {
                     // file does not exist
@@ -225,27 +271,44 @@ ARSTREAM_Reader2Debug_t* ARSTREAM_Reader2Debug_New(int outputRtpStatFile, int ou
     szFileName[0] = '\0';
     if (outputVideoFile)
     {
-        if ((access(ARSTREAM_READER2DEBUG_VIDEO_OUTPUT_PATH_NAP_USB, F_OK) == 0) && (access(ARSTREAM_READER2DEBUG_VIDEO_OUTPUT_PATH_NAP_USB, W_OK) == 0))
+        if (0)
+        {
+        }
+#ifdef ARSTREAM_READER2DEBUG_VIDEO_OUTPUT_ALLOW_DRONE
+        else if ((access(ARSTREAM_READER2DEBUG_VIDEO_OUTPUT_PATH_DRONE, F_OK) == 0) && (access(ARSTREAM_READER2DEBUG_VIDEO_OUTPUT_PATH_DRONE, W_OK) == 0))
+        {
+            pszFilePath = ARSTREAM_READER2DEBUG_VIDEO_OUTPUT_PATH_DRONE;
+        }
+#endif
+#ifdef ARSTREAM_READER2DEBUG_VIDEO_OUTPUT_ALLOW_NAP_USB
+        else if ((access(ARSTREAM_READER2DEBUG_VIDEO_OUTPUT_PATH_NAP_USB, F_OK) == 0) && (access(ARSTREAM_READER2DEBUG_VIDEO_OUTPUT_PATH_NAP_USB, W_OK) == 0))
         {
             pszFilePath = ARSTREAM_READER2DEBUG_VIDEO_OUTPUT_PATH_NAP_USB;
         }
+#endif
+#ifdef ARSTREAM_READER2DEBUG_VIDEO_OUTPUT_ALLOW_NAP_INTERNAL
         else if ((access(ARSTREAM_READER2DEBUG_VIDEO_OUTPUT_PATH_NAP_INTERNAL, F_OK) == 0) && (access(ARSTREAM_READER2DEBUG_VIDEO_OUTPUT_PATH_NAP_INTERNAL, W_OK) == 0))
         {
             pszFilePath = ARSTREAM_READER2DEBUG_VIDEO_OUTPUT_PATH_NAP_INTERNAL;
         }
+#endif
+#ifdef ARSTREAM_READER2DEBUG_VIDEO_OUTPUT_ALLOW_ANDROID_INTERNAL
         else if ((access(ARSTREAM_READER2DEBUG_VIDEO_OUTPUT_PATH_ANDROID_INTERNAL, F_OK) == 0) && (access(ARSTREAM_READER2DEBUG_VIDEO_OUTPUT_PATH_ANDROID_INTERNAL, W_OK) == 0))
         {
             pszFilePath = ARSTREAM_READER2DEBUG_VIDEO_OUTPUT_PATH_ANDROID_INTERNAL;
         }
+#endif
+#ifdef ARSTREAM_READER2DEBUG_VIDEO_OUTPUT_ALLOW_PCLINUX
         else if ((access(ARSTREAM_READER2DEBUG_VIDEO_OUTPUT_PATH_PCLINUX, F_OK) == 0) && (access(ARSTREAM_READER2DEBUG_VIDEO_OUTPUT_PATH_PCLINUX, W_OK) == 0))
         {
             pszFilePath = ARSTREAM_READER2DEBUG_VIDEO_OUTPUT_PATH_PCLINUX;
         }
+#endif
         if (pszFilePath)
         {
-            for (i = 0; i < 100; i++)
+            for (i = 0; i < 1000; i++)
             {
-                snprintf(szFileName, 128, "%s/stream_%02d.264", pszFilePath, i);
+                snprintf(szFileName, 128, "%s/stream_%03d.264", pszFilePath, i);
                 if (access(szFileName, F_OK) == -1)
                 {
                     // file does not exist
