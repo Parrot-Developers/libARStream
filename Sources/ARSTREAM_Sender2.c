@@ -1590,8 +1590,8 @@ eARSTREAM_ERROR ARSTREAM_Sender2_GetMonitoring(ARSTREAM_Sender2_t *sender, uint3
     }
 
     endTime = curTime;
-    _meanPacketSize = bytesSentSum / _packetsSent;
-    _meanAcqToNetworkTime = (uint32_t)(acqToNetworkSum / _packetsSent);
+    _meanPacketSize = (_packetsSent > 0) ? (bytesSentSum / _packetsSent) : 0;
+    _meanAcqToNetworkTime = (_packetsSent > 0) ? (uint32_t)(acqToNetworkSum / _packetsSent) : 0;
 
     if ((acqToNetworkJitter) || (packetSizeStdDev))
     {
@@ -1621,7 +1621,7 @@ eARSTREAM_ERROR ARSTREAM_Sender2_GetMonitoring(ARSTREAM_Sender2_t *sender, uint3
     }
     if (acqToNetworkJitter)
     {
-        *acqToNetworkJitter = (uint32_t)(sqrt((double)acqToNetworkVarSum / _packetsSent));
+        *acqToNetworkJitter = (_packetsSent > 0) ? (uint32_t)(sqrt((double)acqToNetworkVarSum / _packetsSent)) : 0;
     }
     if (bytesSent)
     {
@@ -1633,7 +1633,7 @@ eARSTREAM_ERROR ARSTREAM_Sender2_GetMonitoring(ARSTREAM_Sender2_t *sender, uint3
     }
     if (packetSizeStdDev)
     {
-        *packetSizeStdDev = (uint32_t)(sqrt((double)packetSizeVarSum / _packetsSent));
+        *packetSizeStdDev = (_packetsSent > 0) ? (uint32_t)(sqrt((double)packetSizeVarSum / _packetsSent)) : 0;
     }
     if (packetsSent)
     {

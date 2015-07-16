@@ -1333,8 +1333,8 @@ eARSTREAM_ERROR ARSTREAM_Reader2_GetMonitoring(ARSTREAM_Reader2_t *reader, uint3
     }
 
     endTime = curTime;
-    _meanPacketSize = bytesSum / points;
-    meanReceptionTime = (uint32_t)(receptionTimeSum / points);
+    _meanPacketSize = (points) ? (bytesSum / points) : 0;
+    meanReceptionTime = (points) ? (uint32_t)(receptionTimeSum / points) : 0;
 
     if ((receptionTimeJitter) || (packetSizeStdDev))
     {
@@ -1358,7 +1358,7 @@ eARSTREAM_ERROR ARSTREAM_Reader2_GetMonitoring(ARSTREAM_Reader2_t *reader, uint3
     }
     if (receptionTimeJitter)
     {
-        *receptionTimeJitter = (uint32_t)(sqrt((double)receptionTimeVarSum / points));
+        *receptionTimeJitter = (points) ? (uint32_t)(sqrt((double)receptionTimeVarSum / points)) : 0;
     }
     if (bytesReceived)
     {
@@ -1370,7 +1370,7 @@ eARSTREAM_ERROR ARSTREAM_Reader2_GetMonitoring(ARSTREAM_Reader2_t *reader, uint3
     }
     if (packetSizeStdDev)
     {
-        *packetSizeStdDev = (uint32_t)(sqrt((double)packetSizeVarSum / points));
+        *packetSizeStdDev = (points) ? (uint32_t)(sqrt((double)packetSizeVarSum / points)) : 0;
     }
     if (packetsReceived)
     {
