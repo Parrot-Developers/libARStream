@@ -338,7 +338,7 @@ static int ARSTREAM_Reader2_ResendNalu(ARSTREAM_Reader2_t *reader, uint8_t *nalu
 }
 
 
-ARSTREAM_Reader2_t* ARSTREAM_Reader2_New(ARSTREAM_Reader2_Config_t *config, uint8_t *naluBuffer, int naluBufferSize, void *custom, eARSTREAM_ERROR *error)
+ARSTREAM_Reader2_t* ARSTREAM_Reader2_New(ARSTREAM_Reader2_Config_t *config, void *custom, eARSTREAM_ERROR *error)
 {
     ARSTREAM_Reader2_t *retReader = NULL;
     int streamMutexWasInit = 0;
@@ -348,9 +348,7 @@ ARSTREAM_Reader2_t* ARSTREAM_Reader2_New(ARSTREAM_Reader2_Config_t *config, uint
     /* ARGS Check */
     if ((config == NULL) ||
         (config->recvPort <= 0) || 
-        (config->naluCallback == NULL) ||
-        (naluBuffer == NULL) ||
-        (naluBufferSize == 0))
+        (config->naluCallback == NULL))
     {
         SET_WITH_CHECK(error, ARSTREAM_ERROR_BAD_PARAMETERS);
         return retReader;
@@ -383,8 +381,6 @@ ARSTREAM_Reader2_t* ARSTREAM_Reader2_New(ARSTREAM_Reader2_Config_t *config, uint
         retReader->insertStartCodes = config->insertStartCodes;
         retReader->naluCallback = config->naluCallback;
         retReader->custom = custom;
-        retReader->currentNaluBufferSize = naluBufferSize;
-        retReader->currentNaluBuffer = naluBuffer;
     }
 
     /* Setup internal mutexes/sems */
@@ -928,14 +924,17 @@ static int ARSTREAM_Reader2_CheckBufferSize(ARSTREAM_Reader2_t *reader, int payl
 {
     int ret = 0;
 
-    if (reader->currentNaluSize + payloadSize > reader->currentNaluBufferSize)
+    if ((reader->currentNaluBuffer == NULL) || (reader->currentNaluSize + payloadSize > reader->currentNaluBufferSize))
     {
         uint32_t nextNaluBufferSize = reader->currentNaluSize + payloadSize, dummy = 0;
         uint8_t *nextNaluBuffer = reader->naluCallback(ARSTREAM_READER2_CAUSE_NALU_BUFFER_TOO_SMALL, reader->currentNaluBuffer, 0, 0, 0, 0, 0, &nextNaluBufferSize, reader->custom);
         ret = -1;
-        if ((nextNaluBufferSize > 0) && (nextNaluBufferSize >= reader->currentNaluSize + payloadSize))
+        if ((nextNaluBuffer != NULL) && (nextNaluBufferSize > 0) && (nextNaluBufferSize >= reader->currentNaluSize + payloadSize))
         {
-            memcpy(nextNaluBuffer, reader->currentNaluBuffer, reader->currentNaluSize);
+            if ((reader->currentNaluBuffer != NULL) && (reader->currentNaluSize != 0))
+            {
+                memcpy(nextNaluBuffer, reader->currentNaluBuffer, reader->currentNaluSize);
+            }
             reader->naluCallback(ARSTREAM_READER2_CAUSE_NALU_COPY_COMPLETE, reader->currentNaluBuffer, 0, 0, 0, 0, 0, &dummy, reader->custom);
             ret = 0;
         }
