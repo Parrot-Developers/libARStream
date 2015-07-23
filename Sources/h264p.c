@@ -48,6 +48,8 @@ typedef struct parser_s {
     int oldZeroCount;
     
     //TODO: value per PPS ID or SPS ID
+    int spsSync;
+    int ppsSync;
     int pic_width_in_mbs_minus1;
     int pic_height_in_map_units_minus1;
     int slice_group_change_rate_minus1;
@@ -69,6 +71,8 @@ typedef struct parser_s {
     int pic_struct_present_flag;
     int chroma_format_idc;
     int redundant_pic_cnt_present_flag;
+    int num_ref_idx_l0_default_active_minus1;
+    int num_ref_idx_l1_default_active_minus1;
     int weighted_pred_flag;
     int weighted_bipred_idc;
     int deblocking_filter_control_present_flag;
@@ -1381,6 +1385,7 @@ static int parseSps(parser_t* parser)
     _readBits += ret;
     readBytes += _readBits / 8;
 
+    parser->spsSync = 1;
     return readBytes;
 }
 
@@ -1562,6 +1567,7 @@ static int parsePps(parser_t* parser)
         return ret;
     }
     _readBits += ret;
+    parser->num_ref_idx_l0_default_active_minus1 = val;
     if (parser->config.printLogs) printf("---- num_ref_idx_l0_default_active_minus1 = %d\n", val);
 
     // num_ref_idx_l1_default_active_minus1
@@ -1572,6 +1578,7 @@ static int parsePps(parser_t* parser)
         return ret;
     }
     _readBits += ret;
+    parser->num_ref_idx_l1_default_active_minus1 = val;
     if (parser->config.printLogs) printf("---- num_ref_idx_l1_default_active_minus1 = %d\n", val);
 
     // weighted_pred_flag
@@ -1739,6 +1746,7 @@ static int parsePps(parser_t* parser)
     _readBits += ret;
     readBytes += _readBits / 8;
 
+    parser->ppsSync = 1;
     return readBytes;
 }
 
@@ -2369,9 +2377,9 @@ static int parseFillerData(parser_t* parser)
 }
 
 
-static int parseRefPicListModification(parser_t* parser, int sliceTypeMod5)
+static int parseRefPicListModification(parser_t* parser, int sliceTypeMod5, int num_ref_idx_l0_active_minus1, int num_ref_idx_l1_active_minus1)
 {
-    int ret = 0;
+    int ret = 0, i;
     uint32_t val = 0;
     int _readBits = 0;
     int modification_of_pic_nums_idc;
@@ -2393,6 +2401,7 @@ static int parseRefPicListModification(parser_t* parser, int sliceTypeMod5)
         
         if (val)
         {
+            i = 0;
             do
             {
                 // modification_of_pic_nums_idc
@@ -2405,7 +2414,7 @@ static int parseRefPicListModification(parser_t* parser, int sliceTypeMod5)
                 _readBits += ret;
                 modification_of_pic_nums_idc = val;
                 if (parser->config.printLogs) printf("-------- modification_of_pic_nums_idc = %d\n", val);
-                
+
                 if ((modification_of_pic_nums_idc == 0) || (modification_of_pic_nums_idc == 1))
                 {
                     // abs_diff_pic_num_minus1
@@ -2430,8 +2439,9 @@ static int parseRefPicListModification(parser_t* parser, int sliceTypeMod5)
                     _readBits += ret;
                     if (parser->config.printLogs) printf("-------- long_term_pic_num = %d\n", val);
                 }
+                i++;
             }
-            while (modification_of_pic_nums_idc != 3);
+            while ((modification_of_pic_nums_idc != 3) && (i < num_ref_idx_l0_active_minus1 + 1));
         }
     }
 
@@ -2451,6 +2461,7 @@ static int parseRefPicListModification(parser_t* parser, int sliceTypeMod5)
         {
             do
             {
+                i = 0;
                 // modification_of_pic_nums_idc
                 ret = readBits_expGolomb_ue(parser, &val, 1);
                 if (ret < 0)
@@ -2461,7 +2472,7 @@ static int parseRefPicListModification(parser_t* parser, int sliceTypeMod5)
                 _readBits += ret;
                 modification_of_pic_nums_idc = val;
                 if (parser->config.printLogs) printf("-------- modification_of_pic_nums_idc = %d\n", val);
-                
+
                 if ((modification_of_pic_nums_idc == 0) || (modification_of_pic_nums_idc == 1))
                 {
                     // abs_diff_pic_num_minus1
@@ -2487,7 +2498,7 @@ static int parseRefPicListModification(parser_t* parser, int sliceTypeMod5)
                     if (parser->config.printLogs) printf("-------- long_term_pic_num = %d\n", val);
                 }
             }
-            while (modification_of_pic_nums_idc != 3);
+            while ((modification_of_pic_nums_idc != 3) && (i < num_ref_idx_l1_active_minus1 + 1));
         }
     }
 
@@ -2514,8 +2525,8 @@ static int parsePredWeightTable(parser_t* parser)
     _readBits += ret;
     if (parser->config.printLogs) printf("-------- luma_log2_weight_denom = %d\n", val);
 
-    exit(-1);
     //TODO
+    return -1;
 
     return _readBits;
 }
@@ -2648,11 +2659,18 @@ static int parseSlice(parser_t* parser)
     int32_t val_se = 0;
     int readBytes = 0, _readBits = 0;
     int field_pic_flag = 0, sliceTypeMod5;
+    int num_ref_idx_l0_active_minus1 = parser->num_ref_idx_l0_default_active_minus1;
+    int num_ref_idx_l1_active_minus1 = parser->num_ref_idx_l1_default_active_minus1;
 
     memset(&parser->sliceInfo, 0, sizeof (H264P_SliceInfo_t));
     parser->sliceInfo.idrPicFlag = parser->idrPicFlag;
     parser->sliceInfo.nal_ref_idc = parser->nal_ref_idc;
     parser->sliceInfo.nal_unit_type = parser->nal_unit_type;
+
+    if ((!parser->spsSync) || (!parser->ppsSync))
+    {
+        return readBytes;
+    }
 
     // slice_layer_without_partitioning_rbsp
     if (parser->config.printLogs) printf("-- slice_layer_without_partitioning_rbsp()\n");
@@ -2859,6 +2877,7 @@ static int parseSlice(parser_t* parser)
                 return ret;
             }
             _readBits += ret;
+            num_ref_idx_l0_active_minus1 = val;
             if (parser->config.printLogs) printf("------ num_ref_idx_l0_active_minus1 = %d\n", val);
 
             if (sliceTypeMod5 == SLICE_TYPE_B)
@@ -2871,6 +2890,7 @@ static int parseSlice(parser_t* parser)
                     return ret;
                 }
                 _readBits += ret;
+                num_ref_idx_l1_active_minus1 = val;
                 if (parser->config.printLogs) printf("------ num_ref_idx_l1_active_minus1 = %d\n", val);
             }
         }
@@ -2880,12 +2900,12 @@ static int parseSlice(parser_t* parser)
     {    
         // ref_pic_list_mvc_modification()
         //TODO
-        exit(-1);
+        return -1;
     }
     else
     {
         // ref_pic_list_modification()
-        ret = parseRefPicListModification(parser, sliceTypeMod5);
+        ret = parseRefPicListModification(parser, sliceTypeMod5, num_ref_idx_l0_active_minus1, num_ref_idx_l1_active_minus1);
         if (ret < 0)
         {
             fprintf(stderr, "error: parseRefPicListModification() failed (%d)\n", ret);
