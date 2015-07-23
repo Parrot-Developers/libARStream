@@ -275,7 +275,6 @@ ARSTREAM_Reader_t* ARSTREAM_Reader_New (ARNETWORK_Manager_t *manager, int dataBu
         config.ifaceAddr = NULL;
         config.recvAddr = "192.168.42.1";
         config.recvPort = 5004;
-        config.recvTimeoutSec = 5;
         config.naluCallback = ARSTREAM_Reader_Reader2NaluCallback;
         config.maxPacketSize = maxFragmentSize;
         config.insertStartCodes = 1;

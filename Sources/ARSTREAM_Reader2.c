@@ -135,7 +135,6 @@ struct ARSTREAM_Reader2_t {
     char *ifaceAddr;
     char *recvAddr;
     int recvPort;
-    int recvTimeoutSec;
     int maxPacketSize;
     int insertStartCodes;
     ARSTREAM_Reader2_NaluCallback_t naluCallback;
@@ -337,7 +336,6 @@ ARSTREAM_Reader2_t* ARSTREAM_Reader2_New(ARSTREAM_Reader2_Config_t *config, uint
     /* ARGS Check */
     if ((config == NULL) ||
         (config->recvPort <= 0) || 
-        (config->recvTimeoutSec <= 0) ||
         (config->naluCallback == NULL) ||
         (naluBuffer == NULL) ||
         (naluBufferSize == 0))
@@ -586,7 +584,6 @@ static int ARSTREAM_Reader2_Bind(ARSTREAM_Reader2_t *reader)
     int ret = 0;
 
     struct sockaddr_in recvSin;
-    struct timespec timeout;
     int err;
 
     /* check parameters */
@@ -695,19 +692,6 @@ static int ARSTREAM_Reader2_Bind(ARSTREAM_Reader2_t *reader)
         if (err != 0)
         {
             ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Failed to set socket option SO_REUSEADDR: error=%d (%s)", errno, strerror(errno));
-            ret = -1;
-        }
-    }
-
-    if (ret == 0)
-    {
-        /* set the socket timeout */
-        timeout.tv_sec = reader->recvTimeoutSec;
-        timeout.tv_nsec = 0;
-        err = ARSAL_Socket_Setsockopt(reader->recvSocket, SOL_SOCKET, SO_RCVTIMEO, (char*)&timeout, sizeof(timeout));
-        if (err != 0)
-        {
-            ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Failed to set socket receive timeout: error=%d (%s)", errno, strerror(errno));
             ret = -1;
         }
     }

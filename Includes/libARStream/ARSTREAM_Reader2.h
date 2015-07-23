@@ -93,7 +93,6 @@ typedef struct ARSTREAM_Reader2_Config_t {
     const char *ifaceAddr;
     const char *recvAddr;
     int recvPort;
-    int recvTimeoutSec;
     ARSTREAM_Reader2_NaluCallback_t naluCallback;
     int maxPacketSize;
     int insertStartCodes;
