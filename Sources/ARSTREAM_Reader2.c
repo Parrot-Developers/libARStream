@@ -831,7 +831,7 @@ static int ARSTREAM_Reader2_ReadData(ARSTREAM_Reader2_t *reader, uint8_t *recvBu
         else
         {
             /* read timeout */
-            ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Socket receive timeout");
+            ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_READER2_TAG, "Socket receive timeout");
             ret = -2;
             *recvSize = 0;
         }
@@ -1284,69 +1284,88 @@ void* ARSTREAM_Reader2_GetCustom(ARSTREAM_Reader2_t *reader)
 }
 
 
-eARSTREAM_ERROR ARSTREAM_Reader2_GetMonitoring(ARSTREAM_Reader2_t *reader, uint32_t timeIntervalUs, uint32_t *realTimeIntervalUs, uint32_t *receptionTimeJitter,
+eARSTREAM_ERROR ARSTREAM_Reader2_GetMonitoring(ARSTREAM_Reader2_t *reader, uint64_t startTime, uint32_t timeIntervalUs, uint32_t *realTimeIntervalUs, uint32_t *receptionTimeJitter,
                                                uint32_t *bytesReceived, uint32_t *meanPacketSize, uint32_t *packetSizeStdDev, uint32_t *packetsReceived, uint32_t *packetsMissed)
 {
     eARSTREAM_ERROR ret = ARSTREAM_OK;
-    uint64_t startTime, endTime, curTime, auTimestamp, receptionTimeSum = 0, receptionTimeVarSum = 0, packetSizeVarSum = 0;
-    uint32_t bytes, bytesSum = 0, _meanPacketSize, receptionTime, meanReceptionTime;
-    int currentSeqNum, previousSeqNum, seqNumDelta, gapsInSeqNum;
-    int points = 0, idx, i;
+    uint64_t endTime, curTime, previousTime, auTimestamp, receptionTimeSum = 0, receptionTimeVarSum = 0, packetSizeVarSum = 0;
+    uint32_t bytes, bytesSum = 0, _meanPacketSize = 0, receptionTime = 0, meanReceptionTime = 0, _receptionTimeJitter = 0, _packetSizeStdDev = 0;
+    int currentSeqNum, previousSeqNum = -1, seqNumDelta, gapsInSeqNum;
+    int points = 0, usefulPoints = 0, idx, i, firstUsefulIdx = -1;
 
     if ((reader == NULL) || (timeIntervalUs == 0))
     {
         return ARSTREAM_ERROR_BAD_PARAMETERS;
     }
 
+    if (startTime == 0)
+    {
+        struct timespec t1;
+        ARSAL_Time_GetTime(&t1);
+        startTime = (uint64_t)t1.tv_sec * 1000000 + (uint64_t)t1.tv_nsec / 1000;
+    }
+    endTime = startTime;
+
     ARSAL_Mutex_Lock(&(reader->monitoringMutex));
 
-    if (reader->monitoringCount == 0)
+    if (reader->monitoringCount > 0)
     {
-        ARSAL_Mutex_Unlock(&(reader->monitoringMutex));
-        return ARSTREAM_ERROR_BAD_PARAMETERS;
-    }
+        idx = reader->monitoringIndex;
+        previousTime = startTime;
 
-    idx = reader->monitoringIndex;
-    startTime = curTime = reader->monitoringPoint[idx].recvTimestamp;
-    bytesSum += reader->monitoringPoint[idx].bytes;
-    auTimestamp = (((uint64_t)(reader->monitoringPoint[idx].timestamp - reader->firstTimestamp) * 1000) + 45) / 90; /* 90000 Hz clock to microseconds */
-    receptionTimeSum += (curTime - auTimestamp);
-    previousSeqNum = reader->monitoringPoint[idx].seqNum;
-    gapsInSeqNum = 0;
-    points++;
-
-    while ((startTime - curTime < timeIntervalUs) && (points < reader->monitoringCount))
-    {
-        idx = (idx - 1 >= 0) ? idx - 1 : ARSTREAM_READER2_MONITORING_MAX_POINTS - 1;
-        curTime = reader->monitoringPoint[idx].recvTimestamp;
-        bytes = reader->monitoringPoint[idx].bytes;
-        bytesSum += bytes;
-        auTimestamp = (((uint64_t)(reader->monitoringPoint[idx].timestamp - reader->firstTimestamp) * 1000) + 45) / 90; /* 90000 Hz clock to microseconds */
-        receptionTime = curTime - auTimestamp;
-        receptionTimeSum += receptionTime;
-        currentSeqNum = reader->monitoringPoint[idx].seqNum;
-        seqNumDelta = previousSeqNum - currentSeqNum;
-        if (seqNumDelta < -32768) seqNumDelta += 65536; /* handle seqNum 16 bits loopback */
-        gapsInSeqNum += seqNumDelta - 1;
-        previousSeqNum = currentSeqNum;
-        points++;
-    }
-
-    endTime = curTime;
-    _meanPacketSize = (points) ? (bytesSum / points) : 0;
-    meanReceptionTime = (points) ? (uint32_t)(receptionTimeSum / points) : 0;
-
-    if ((receptionTimeJitter) || (packetSizeStdDev))
-    {
-        for (i = 0, idx = reader->monitoringIndex; i < points; i++)
+        while (points < reader->monitoringCount)
         {
+            curTime = reader->monitoringPoint[idx].recvTimestamp;
+            if (curTime > startTime)
+            {
+                points++;
+                idx = (idx - 1 >= 0) ? idx - 1 : ARSTREAM_READER2_MONITORING_MAX_POINTS - 1;
+                continue;
+            }
+            if (startTime - curTime > timeIntervalUs)
+            {
+                break;
+            }
+            if (firstUsefulIdx == -1)
+            {
+                firstUsefulIdx = idx;
+            }
             idx = (idx - 1 >= 0) ? idx - 1 : ARSTREAM_READER2_MONITORING_MAX_POINTS - 1;
             curTime = reader->monitoringPoint[idx].recvTimestamp;
             bytes = reader->monitoringPoint[idx].bytes;
+            bytesSum += bytes;
             auTimestamp = (((uint64_t)(reader->monitoringPoint[idx].timestamp - reader->firstTimestamp) * 1000) + 45) / 90; /* 90000 Hz clock to microseconds */
             receptionTime = curTime - auTimestamp;
-            packetSizeVarSum += ((bytes - _meanPacketSize) * (bytes - _meanPacketSize));
-            receptionTimeVarSum += ((receptionTime - meanReceptionTime) * (receptionTime - meanReceptionTime));
+            receptionTimeSum += receptionTime;
+            currentSeqNum = reader->monitoringPoint[idx].seqNum;
+            seqNumDelta = (previousSeqNum != -1) ? (previousSeqNum - currentSeqNum) : 1;
+            if (seqNumDelta < -32768) seqNumDelta += 65536; /* handle seqNum 16 bits loopback */
+            gapsInSeqNum += seqNumDelta - 1;
+            previousSeqNum = currentSeqNum;
+            previousTime = curTime;
+            usefulPoints++;
+            points++;
+            idx = (idx - 1 >= 0) ? idx - 1 : ARSTREAM_READER2_MONITORING_MAX_POINTS - 1;
+        }
+
+        endTime = previousTime;
+        _meanPacketSize = (usefulPoints) ? (bytesSum / usefulPoints) : 0;
+        meanReceptionTime = (usefulPoints) ? (uint32_t)(receptionTimeSum / usefulPoints) : 0;
+
+        if ((receptionTimeJitter) || (packetSizeStdDev))
+        {
+            for (i = 0, idx = firstUsefulIdx; i < usefulPoints; i++)
+            {
+                idx = (idx - 1 >= 0) ? idx - 1 : ARSTREAM_READER2_MONITORING_MAX_POINTS - 1;
+                curTime = reader->monitoringPoint[idx].recvTimestamp;
+                bytes = reader->monitoringPoint[idx].bytes;
+                auTimestamp = (((uint64_t)(reader->monitoringPoint[idx].timestamp - reader->firstTimestamp) * 1000) + 45) / 90; /* 90000 Hz clock to microseconds */
+                receptionTime = curTime - auTimestamp;
+                packetSizeVarSum += ((bytes - _meanPacketSize) * (bytes - _meanPacketSize));
+                receptionTimeVarSum += ((receptionTime - meanReceptionTime) * (receptionTime - meanReceptionTime));
+            }
+            _receptionTimeJitter = (usefulPoints) ? (uint32_t)(sqrt((double)receptionTimeVarSum / usefulPoints)) : 0;
+            _packetSizeStdDev = (usefulPoints) ? (uint32_t)(sqrt((double)packetSizeVarSum / usefulPoints)) : 0;
         }
     }
 
@@ -1358,7 +1377,7 @@ eARSTREAM_ERROR ARSTREAM_Reader2_GetMonitoring(ARSTREAM_Reader2_t *reader, uint3
     }
     if (receptionTimeJitter)
     {
-        *receptionTimeJitter = (points) ? (uint32_t)(sqrt((double)receptionTimeVarSum / points)) : 0;
+        *receptionTimeJitter = _receptionTimeJitter;
     }
     if (bytesReceived)
     {
@@ -1370,11 +1389,11 @@ eARSTREAM_ERROR ARSTREAM_Reader2_GetMonitoring(ARSTREAM_Reader2_t *reader, uint3
     }
     if (packetSizeStdDev)
     {
-        *packetSizeStdDev = (points) ? (uint32_t)(sqrt((double)packetSizeVarSum / points)) : 0;
+        *packetSizeStdDev = _packetSizeStdDev;
     }
     if (packetsReceived)
     {
-        *packetsReceived = points;
+        *packetsReceived = usefulPoints;
     }
     if (packetsMissed)
     {

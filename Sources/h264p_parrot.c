@@ -103,6 +103,8 @@ int H264P_parseParrotDragonExtendedUserDataSei(const void* pBuf, unsigned int bu
     userDataSei->streamingMonitorTimeInterval = ntohl(*(pdwBuf++));
     userDataSei->streamingMeanAcqToNetworkTime = ntohl(*(pdwBuf++));
     userDataSei->streamingAcqToNetworkJitter = ntohl(*(pdwBuf++));
+    userDataSei->streamingMeanNetworkTime = ntohl(*(pdwBuf++));
+    userDataSei->streamingNetworkJitter = ntohl(*(pdwBuf++));
     userDataSei->streamingBytesSent = ntohl(*(pdwBuf++));
     userDataSei->streamingMeanPacketSize = ntohl(*(pdwBuf++));
     userDataSei->streamingPacketSizeStdDev = ntohl(*(pdwBuf++));

@@ -263,8 +263,9 @@ ARSTREAM_Reader2Debug_t* ARSTREAM_Reader2Debug_New(int outputRtpStatFile, int ou
         fprintf(rdbg->h264StatsFile, "batteryPercentage latitude longitude altitude absoluteHeight relativeHeight xSpeed ySpeed zSpeed distance heading yaw pitch roll cameraPan cameraTilt ");
         fprintf(rdbg->h264StatsFile, "targetLiveVideoBitrate wifiRssi wifiMcsRate wifiTxRate wifiRxRate wifiTxFailRate wifiTxErrorRate ");
         fprintf(rdbg->h264StatsFile, "postReprojTimestampDelta postEeTimestampDelta postScalingTimestampDelta postLiveEncodingTimestampDelta postNetworkTimestampDelta ");
-        fprintf(rdbg->h264StatsFile, "streamingSrcMeanAcqToNetworkTime streamingSrcAcqToNetworkJitter streamingSrcBytesSent streamingSrcMeanPacketSize streamingSrcPacketSizeStdDev streamingSrcPacketsSent ");
-        fprintf(rdbg->h264StatsFile, "streamingSrcBytesDropped streamingSrcNaluDropped streamingSinkMissingPackets streamingSinkTotalPackets\n");
+        fprintf(rdbg->h264StatsFile, "streamingSrcMeanAcqToNetworkTime streamingSrcAcqToNetworkJitter streamingSrcMeanNetworkTime streamingSrcNetworkJitter streamingSrcBytesSent ");
+        fprintf(rdbg->h264StatsFile, "streamingSrcMeanPacketSize streamingSrcPacketSizeStdDev streamingSrcPacketsSent streamingSrcBytesDropped streamingSrcNaluDropped ");
+        fprintf(rdbg->h264StatsFile, "streamingSinkMissingPackets streamingSinkTotalPackets\n");
     }
 
     pszFilePath = NULL;
@@ -485,8 +486,8 @@ static void ARSTREAM_Reader2Debug_OutputAu(ARSTREAM_Reader2Debug_t *rdbg, uint32
                     0, 0, 0, 0, 0, 0, 0);
             fprintf(rdbg->h264StatsFile, "%lu %lu %lu %lu %lu ", 
                     (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0);
-            fprintf(rdbg->h264StatsFile, "%lu %lu %lu %lu %lu %lu %lu %lu ", 
-                    (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0);
+            fprintf(rdbg->h264StatsFile, "%lu %lu %lu %lu %lu %lu %lu %lu %lu %lu ", 
+                    (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0);
             fprintf(rdbg->h264StatsFile, "%d %d\n", 
                     missingPackets, 
                     totalPackets);
@@ -535,15 +536,25 @@ static void ARSTREAM_Reader2Debug_OutputAu(ARSTREAM_Reader2Debug_t *rdbg, uint32
                     (long unsigned int)parrotDragonExtendedUserData.postScalingTimestampDelta, 
                     (long unsigned int)parrotDragonExtendedUserData.postLiveEncodingTimestampDelta, 
                     (long unsigned int)parrotDragonExtendedUserData.postNetworkTimestampDelta);
-            fprintf(rdbg->h264StatsFile, "%lu %lu %lu %lu %lu %lu %lu %lu ", 
-                    (long unsigned int)(((float)parrotDragonExtendedUserData.streamingMeanAcqToNetworkTime / (float)parrotDragonExtendedUserData.streamingMonitorTimeInterval) * 1000000.), 
-                    (long unsigned int)(((float)parrotDragonExtendedUserData.streamingAcqToNetworkJitter / (float)parrotDragonExtendedUserData.streamingMonitorTimeInterval) * 1000000.), 
-                    (long unsigned int)(((float)parrotDragonExtendedUserData.streamingBytesSent / (float)parrotDragonExtendedUserData.streamingMonitorTimeInterval) * 1000000.), 
-                    (long unsigned int)(((float)parrotDragonExtendedUserData.streamingMeanPacketSize / (float)parrotDragonExtendedUserData.streamingMonitorTimeInterval) * 1000000.), 
-                    (long unsigned int)(((float)parrotDragonExtendedUserData.streamingPacketSizeStdDev / (float)parrotDragonExtendedUserData.streamingMonitorTimeInterval) * 1000000.), 
-                    (long unsigned int)(((float)parrotDragonExtendedUserData.streamingPacketsSent / (float)parrotDragonExtendedUserData.streamingMonitorTimeInterval) * 1000000.), 
-                    (long unsigned int)(((float)parrotDragonExtendedUserData.streamingBytesDropped / (float)parrotDragonExtendedUserData.streamingMonitorTimeInterval) * 1000000.), 
-                    (long unsigned int)(((float)parrotDragonExtendedUserData.streamingNaluDropped / (float)parrotDragonExtendedUserData.streamingMonitorTimeInterval) * 1000000.));
+            if (parrotDragonExtendedUserData.streamingMonitorTimeInterval)
+            {
+                fprintf(rdbg->h264StatsFile, "%lu %lu %lu %lu %lu %lu %lu %lu %lu %lu ", 
+                        (long unsigned int)(((float)parrotDragonExtendedUserData.streamingMeanAcqToNetworkTime / (float)parrotDragonExtendedUserData.streamingMonitorTimeInterval) * 1000000.), 
+                        (long unsigned int)(((float)parrotDragonExtendedUserData.streamingAcqToNetworkJitter / (float)parrotDragonExtendedUserData.streamingMonitorTimeInterval) * 1000000.), 
+                        (long unsigned int)(((float)parrotDragonExtendedUserData.streamingMeanNetworkTime / (float)parrotDragonExtendedUserData.streamingMonitorTimeInterval) * 1000000.), 
+                        (long unsigned int)(((float)parrotDragonExtendedUserData.streamingNetworkJitter / (float)parrotDragonExtendedUserData.streamingMonitorTimeInterval) * 1000000.), 
+                        (long unsigned int)(((float)parrotDragonExtendedUserData.streamingBytesSent / (float)parrotDragonExtendedUserData.streamingMonitorTimeInterval) * 1000000.), 
+                        (long unsigned int)(((float)parrotDragonExtendedUserData.streamingMeanPacketSize / (float)parrotDragonExtendedUserData.streamingMonitorTimeInterval) * 1000000.), 
+                        (long unsigned int)(((float)parrotDragonExtendedUserData.streamingPacketSizeStdDev / (float)parrotDragonExtendedUserData.streamingMonitorTimeInterval) * 1000000.), 
+                        (long unsigned int)(((float)parrotDragonExtendedUserData.streamingPacketsSent / (float)parrotDragonExtendedUserData.streamingMonitorTimeInterval) * 1000000.), 
+                        (long unsigned int)(((float)parrotDragonExtendedUserData.streamingBytesDropped / (float)parrotDragonExtendedUserData.streamingMonitorTimeInterval) * 1000000.), 
+                        (long unsigned int)(((float)parrotDragonExtendedUserData.streamingNaluDropped / (float)parrotDragonExtendedUserData.streamingMonitorTimeInterval) * 1000000.));
+            }
+            else
+            {
+                fprintf(rdbg->h264StatsFile, "%lu %lu %lu %lu %lu %lu %lu %lu %lu %lu ", 
+                        (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0);
+            }
             fprintf(rdbg->h264StatsFile, "%d %d\n", 
                     missingPackets, 
                     totalPackets);
@@ -569,8 +580,8 @@ static void ARSTREAM_Reader2Debug_OutputAu(ARSTREAM_Reader2Debug_t *rdbg, uint32
                     0, 0, 0, 0, 0, 0, 0);
             fprintf(rdbg->h264StatsFile, "%lu %lu %lu %lu %lu ", 
                     (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0);
-            fprintf(rdbg->h264StatsFile, "%lu %lu %lu %lu %lu %lu %lu %lu ", 
-                    (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0);
+            fprintf(rdbg->h264StatsFile, "%lu %lu %lu %lu %lu %lu %lu %lu %lu %lu ", 
+                    (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0);
             fprintf(rdbg->h264StatsFile, "%d %d\n", 
                     missingPackets, 
                     totalPackets);

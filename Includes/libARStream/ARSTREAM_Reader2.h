@@ -188,7 +188,7 @@ void* ARSTREAM_Reader2_RunSendThread (void *ARSTREAM_Reader2_t_Param);
  */
 void* ARSTREAM_Reader2_GetCustom (ARSTREAM_Reader2_t *reader);
 
-eARSTREAM_ERROR ARSTREAM_Reader2_GetMonitoring(ARSTREAM_Reader2_t *reader, uint32_t timeIntervalUs, uint32_t *realTimeIntervalUs, uint32_t *receptionTimeJitter,
+eARSTREAM_ERROR ARSTREAM_Reader2_GetMonitoring(ARSTREAM_Reader2_t *reader, uint64_t startTime, uint32_t timeIntervalUs, uint32_t *realTimeIntervalUs, uint32_t *receptionTimeJitter,
                                                uint32_t *bytesReceived, uint32_t *meanPacketSize, uint32_t *packetSizeStdDev, uint32_t *packetsReceived, uint32_t *packetsMissed);
 
 ARSTREAM_Reader2_Resender_t* ARSTREAM_Reader2_Resender_New (ARSTREAM_Reader2_t *reader, ARSTREAM_Reader2_Resender_Config_t *config, eARSTREAM_ERROR *error);

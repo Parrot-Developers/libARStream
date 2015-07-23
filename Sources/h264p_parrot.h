@@ -94,6 +94,8 @@ typedef struct
     uint32_t streamingMonitorTimeInterval;                                  /**< Streaming monitoring time interval in microseconds */
     uint32_t streamingMeanAcqToNetworkTime;                                 /**< Streaming mean acquisition to network time */
     uint32_t streamingAcqToNetworkJitter;                                   /**< Streaming acquisition to network time jitter */
+    uint32_t streamingMeanNetworkTime;                                      /**< Streaming mean acquisition to network time */
+    uint32_t streamingNetworkJitter;                                        /**< Streaming acquisition to network time jitter */
     uint32_t streamingBytesSent;                                            /**< Streaming bytes sent during the interval */
     uint32_t streamingMeanPacketSize;                                       /**< Streaming mean packet size */
     uint32_t streamingPacketSizeStdDev;                                     /**< Streaming packet size standard deviation */
