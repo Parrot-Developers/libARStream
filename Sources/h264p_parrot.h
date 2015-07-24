@@ -71,13 +71,12 @@ typedef struct
     int32_t ySpeed_fp16;                                                    /**< Y speed (m/s), 16 bits fixed point value */
     int32_t zSpeed_fp16;                                                    /**< Z speed (m/s), 16 bits fixed point value */
     uint32_t distance_fp16;                                                 /**< Distance from home (m), 16 bits fixed point value */
-    int32_t heading_fp16;                                                   /**< Heading (rad), 16 bits fixed point value */
     int32_t yaw_fp16;                                                       /**< Yaw/psi (rad), 16 bits fixed point value */
     int32_t pitch_fp16;                                                     /**< Pitch/theta (rad), 16 bits fixed point value */
     int32_t roll_fp16;                                                      /**< Roll/phi (rad), 16 bits fixed point value */
     int32_t cameraPan_fp16;                                                 /**< Camera pan (rad), 16 bits fixed point value */
     int32_t cameraTilt_fp16;                                                /**< Camera tilt (rad), 16 bits fixed point value */
-    uint32_t targetLiveVideoBitrate;                                        /**< Live encoder target video bitrate (bit/s) */
+    uint32_t videoStreamingTargetBitrate;                                   /**< Video streaming encoder target bitrate (bit/s) */
     int32_t  wifiRssi;                                                      /**< Wifi RSSI (dBm) */
     uint32_t wifiMcsRate;                                                   /**< Wifi MCS rate (bit/s) */
     uint32_t wifiTxRate;                                                    /**< Wifi Tx rate (bit/s) */
@@ -87,7 +86,7 @@ typedef struct
     uint32_t postReprojTimestampDelta;                                      /**< Post-reprojection time */
     uint32_t postEeTimestampDelta;                                          /**< Post-EE time */
     uint32_t postScalingTimestampDelta;                                     /**< Post-scaling time */
-    uint32_t postLiveEncodingTimestampDelta;                                /**< Post-live-encoding time */
+    uint32_t postStreamingEncodingTimestampDelta;                           /**< Post-streaming-encoding time */
     uint32_t postNetworkTimestampDelta;                                     /**< Post-network time */
     uint32_t systemTsH;                                                     /**< Frame acquisition timestamp (high 32 bits) */
     uint32_t systemTsL;                                                     /**< Frame acquisition timestamp (low 32 bits) */

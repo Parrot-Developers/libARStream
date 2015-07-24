@@ -80,13 +80,12 @@ int H264P_parseParrotDragonExtendedUserDataSei(const void* pBuf, unsigned int bu
     userDataSei->ySpeed_fp16 = (int32_t)ntohl(*(pdwBuf++));
     userDataSei->zSpeed_fp16 = (int32_t)ntohl(*(pdwBuf++));
     userDataSei->distance_fp16 = ntohl(*(pdwBuf++));
-    userDataSei->heading_fp16 = (int32_t)ntohl(*(pdwBuf++));
     userDataSei->yaw_fp16 = (int32_t)ntohl(*(pdwBuf++));
     userDataSei->pitch_fp16 = (int32_t)ntohl(*(pdwBuf++));
     userDataSei->roll_fp16 = (int32_t)ntohl(*(pdwBuf++));
     userDataSei->cameraPan_fp16 = (int32_t)ntohl(*(pdwBuf++));
     userDataSei->cameraTilt_fp16 = (int32_t)ntohl(*(pdwBuf++));
-    userDataSei->targetLiveVideoBitrate = ntohl(*(pdwBuf++));
+    userDataSei->videoStreamingTargetBitrate = ntohl(*(pdwBuf++));
     userDataSei->wifiRssi = (int32_t)ntohl(*(pdwBuf++));
     userDataSei->wifiMcsRate = ntohl(*(pdwBuf++));
     userDataSei->wifiTxRate = ntohl(*(pdwBuf++));
@@ -96,7 +95,7 @@ int H264P_parseParrotDragonExtendedUserDataSei(const void* pBuf, unsigned int bu
     userDataSei->postReprojTimestampDelta = ntohl(*(pdwBuf++));
     userDataSei->postEeTimestampDelta = ntohl(*(pdwBuf++));
     userDataSei->postScalingTimestampDelta = ntohl(*(pdwBuf++));
-    userDataSei->postLiveEncodingTimestampDelta = ntohl(*(pdwBuf++));
+    userDataSei->postStreamingEncodingTimestampDelta = ntohl(*(pdwBuf++));
     userDataSei->postNetworkTimestampDelta = ntohl(*(pdwBuf++));
     userDataSei->systemTsH = ntohl(*(pdwBuf++));
     userDataSei->systemTsL = ntohl(*(pdwBuf++));
