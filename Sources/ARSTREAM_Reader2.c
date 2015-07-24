@@ -1432,6 +1432,7 @@ ARSTREAM_Reader2_Resender_t* ARSTREAM_Reader2_Resender_New(ARSTREAM_Reader2_t *r
         senderConfig.targetPacketSize = config->targetPacketSize;
         senderConfig.maxBitrate = config->maxBitrate;
         senderConfig.maxLatencyMs = config->maxLatencyMs;
+        senderConfig.maxNetworkLatencyMs = config->maxNetworkLatencyMs;
         retResender->sender = ARSTREAM_Sender2_New(&senderConfig, (void*)retResender, &error2);
         if (error2 != ARSTREAM_OK)
         {

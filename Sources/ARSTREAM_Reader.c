@@ -310,7 +310,8 @@ ARSTREAM_Reader_t* ARSTREAM_Reader_New (ARNETWORK_Manager_t *manager, int dataBu
             config.maxPacketSize = 1500;
             config.targetPacketSize = 1000;
             config.maxBitrate = 1500000;
-            config.maxLatencyMs = 200;
+            config.maxLatencyMs = 0;
+            config.maxNetworkLatencyMs = 100;
 
             fConf = fopen("/data/skycontroller/resenders.conf", "r");
             if (fConf)
@@ -345,9 +346,9 @@ ARSTREAM_Reader_t* ARSTREAM_Reader_New (ARNETWORK_Manager_t *manager, int dataBu
                             {
                                 config.maxBitrate = atoi(propVal);
                             }
-                            else if (!strncmp(propName, "maxLatencyMs", 12))
+                            else if (!strncmp(propName, "maxNetworkLatencyMs", 19))
                             {
-                                config.maxLatencyMs = atoi(propVal);
+                                config.maxNetworkLatencyMs = atoi(propVal);
                             }
                         }
                     }
@@ -357,8 +358,8 @@ ARSTREAM_Reader_t* ARSTREAM_Reader_New (ARNETWORK_Manager_t *manager, int dataBu
 
             if (config.sendAddr)
             {
-                ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER_TAG, "Creating new resender to %s (sendPort=%d, maxPacketSize=%d, targetPacketSize=%d, maxBitrate=%d, maxLatencyMs=%d)",
-                            config.sendAddr, config.sendPort, config.maxPacketSize, config.targetPacketSize, config.maxBitrate, config.maxLatencyMs);
+                ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER_TAG, "Creating new resender to %s (sendPort=%d, maxPacketSize=%d, targetPacketSize=%d, maxBitrate=%d, maxNetworkLatencyMs=%d)",
+                            config.sendAddr, config.sendPort, config.maxPacketSize, config.targetPacketSize, config.maxBitrate, config.maxNetworkLatencyMs);
                 retReader->resender[i] = ARSTREAM_Reader2_Resender_New (retReader->reader2, &config, &error2);
                 if (error2 != ARSTREAM_OK)
                 {

@@ -148,6 +148,7 @@ struct ARSTREAM_Sender2_t {
     int naluFifoSize;
     int maxBitrate;
     int maxLatencyMs;
+    int maxNetworkLatencyMs;
     void *custom;
 
     uint64_t lastAuTimestamp;
@@ -433,7 +434,8 @@ ARSTREAM_Sender2_t* ARSTREAM_Sender2_New(ARSTREAM_Sender2_Config_t *config, void
         (config->maxPacketSize < 100) ||
         (config->targetPacketSize < 100) ||
         (config->maxBitrate <= 0) ||
-        (config->maxLatencyMs <= 0) ||
+        (config->maxLatencyMs < 0) ||
+        (config->maxNetworkLatencyMs <= 0) ||
         (config->naluFifoSize <= 0))
     {
         SET_WITH_CHECK(error, ARSTREAM_ERROR_BAD_PARAMETERS);
@@ -470,7 +472,8 @@ ARSTREAM_Sender2_t* ARSTREAM_Sender2_New(ARSTREAM_Sender2_Config_t *config, void
         retSender->targetPacketSize = config->targetPacketSize - sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t) - ARSTREAM_NETWORK_UDP_HEADER_SIZE - ARSTREAM_NETWORK_IP_HEADER_SIZE;
         retSender->maxBitrate = config->maxBitrate;
         retSender->maxLatencyMs = config->maxLatencyMs;
-        int totalBufSize = config->maxBitrate * config->maxLatencyMs / 1000 / 8;
+        retSender->maxNetworkLatencyMs = config->maxNetworkLatencyMs;
+        int totalBufSize = config->maxBitrate * config->maxNetworkLatencyMs / 1000 / 8;
         retSender->sendSocketBufferSize = totalBufSize / 2; //TODO: tuning
         retSender->naluFifoBufferSize = totalBufSize / 2; //TODO: tuning
         retSender->custom = custom;
@@ -978,9 +981,9 @@ static int ARSTREAM_Sender2_Connect(ARSTREAM_Sender2_t *sender)
 }
 
 
-static int ARSTREAM_Sender2_SendData(ARSTREAM_Sender2_t *sender, uint8_t *sendBuffer, uint32_t sendSize, uint64_t inputTimestamp, uint64_t auTimestamp, int isLastInAu, int maxLatencyUs)
+static int ARSTREAM_Sender2_SendData(ARSTREAM_Sender2_t *sender, uint8_t *sendBuffer, uint32_t sendSize, uint64_t inputTimestamp, uint64_t auTimestamp, int isLastInAu, int maxLatencyUs, int maxNetworkLatencyUs)
 {
-    int ret = 0;
+    int ret = 0, drop = 0;
     ARSTREAM_NetworkHeaders_DataHeader2_t *header = (ARSTREAM_NetworkHeaders_DataHeader2_t *)sendBuffer;
     uint16_t flags;
     uint32_t rtpTimestamp;
@@ -1007,7 +1010,16 @@ static int ARSTREAM_Sender2_SendData(ARSTREAM_Sender2_t *sender, uint8_t *sendBu
     struct timespec t1;
     ARSAL_Time_GetTime(&t1);
     uint64_t curTime = (uint64_t)t1.tv_sec * 1000000 + (uint64_t)t1.tv_nsec / 1000;
-    if (curTime - inputTimestamp <= maxLatencyUs)
+    if ((maxLatencyUs > 0) && (curTime - auTimestamp > maxLatencyUs))
+    {
+        drop = 1;
+    }
+    else if (curTime - inputTimestamp > maxNetworkLatencyUs)
+    {
+        drop = 1;
+    }
+
+    if (!drop)
     {
         if (sender->sendMulticast)
         {
@@ -1039,7 +1051,7 @@ static int ARSTREAM_Sender2_SendData(ARSTREAM_Sender2_t *sender, uint8_t *sendBu
                 p.fd = sender->sendSocket;
                 p.events = POLLOUT;
                 p.revents = 0;
-                int pollTimeMs = (maxLatencyUs - (int)(curTime - inputTimestamp)) / 1000;
+                int pollTimeMs = (maxNetworkLatencyUs - (int)(curTime - inputTimestamp)) / 1000;
                 int pollRet = poll(&p, 1, pollTimeMs);
                 if (pollRet == 0)
                 {
@@ -1059,7 +1071,16 @@ static int ARSTREAM_Sender2_SendData(ARSTREAM_Sender2_t *sender, uint8_t *sendBu
                 {
                     ARSAL_Time_GetTime(&t1);
                     curTime = (uint64_t)t1.tv_sec * 1000000 + (uint64_t)t1.tv_nsec / 1000;
-                    if (curTime - inputTimestamp <= maxLatencyUs)
+                    if ((maxLatencyUs > 0) && (curTime - auTimestamp > maxLatencyUs))
+                    {
+                        drop = 1;
+                    }
+                    else if (curTime - inputTimestamp > maxNetworkLatencyUs)
+                    {
+                        drop = 1;
+                    }
+
+                    if (!drop)
                     {
                         if (sender->sendMulticast)
                         {
@@ -1133,7 +1154,7 @@ void* ARSTREAM_Sender2_RunSendThread (void *ARSTREAM_Sender2_t_Param)
     int shouldStop;
     int targetPacketSize, maxPacketSize, packetSize, fragmentSize, meanFragmentSize, offset, fragmentOffset, fragmentCount;
     int ret;
-    int stapPending = 0, stapNaluCount = 0, maxLatencyUs;
+    int stapPending = 0, stapNaluCount = 0, maxLatencyUs, maxNetworkLatencyUs;
     uint8_t stapMaxNri = 0;
     uint64_t curTime;
     struct timespec t1;
@@ -1180,7 +1201,8 @@ void* ARSTREAM_Sender2_RunSendThread (void *ARSTREAM_Sender2_t_Param)
             ARSAL_Mutex_Lock(&(sender->streamMutex));
             targetPacketSize = sender->targetPacketSize;
             maxPacketSize = sender->maxPacketSize;
-            maxLatencyUs = sender->maxLatencyMs * 1000 - (int)((uint64_t)sender->sendSocketBufferSize * 8 * 1000000 / sender->maxBitrate);
+            maxLatencyUs = (sender->maxLatencyMs) ? sender->maxLatencyMs * 1000 - (int)((uint64_t)sender->sendSocketBufferSize * 8 * 1000000 / sender->maxBitrate) : 0;
+            maxNetworkLatencyUs = sender->maxNetworkLatencyMs * 1000 - (int)((uint64_t)sender->sendSocketBufferSize * 8 * 1000000 / sender->maxBitrate);
             ARSAL_Mutex_Unlock(&(sender->streamMutex));
 
             if ((previousTimestamp != 0) && (nalu.auTimestamp != previousTimestamp))
@@ -1191,7 +1213,7 @@ void* ARSTREAM_Sender2_RunSendThread (void *ARSTREAM_Sender2_t_Param)
 //ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Time %llu: STAP-A (previous) sendSize=%d, naluCount=%d", nalu.auTimestamp, sendSize, stapNaluCount); //TODO: debug
                     uint8_t stapHeader = ARSTREAM_NETWORK_HEADERS2_NALU_TYPE_STAPA | ((stapMaxNri & 3) << 5);
                     *(sendBuffer + sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t)) = stapHeader;
-                    ret = ARSTREAM_Sender2_SendData(sender, sendBuffer, sendSize, stapFirstNaluInputTimestamp, stapAuTimestamp, 0, maxLatencyUs); // do not set the marker bit
+                    ret = ARSTREAM_Sender2_SendData(sender, sendBuffer, sendSize, stapFirstNaluInputTimestamp, stapAuTimestamp, 0, maxLatencyUs, maxNetworkLatencyUs); // do not set the marker bit
                     if (ret != 0)
                     {
                         //ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_SENDER2_TAG, "Time %llu: STAP-A SendData failed (error %d)", nalu.auTimestamp, ret);
@@ -1220,8 +1242,18 @@ void* ARSTREAM_Sender2_RunSendThread (void *ARSTREAM_Sender2_t_Param)
                 }
             }
 
-            /* check that the NALU has not been flagged for dropping or that it is not older than the max latency */
-            if ((!nalu.drop) && (curTime - nalu.naluInputTimestamp <= maxLatencyUs))
+            /* check that the NALU is not older than the max latency */
+            if ((maxLatencyUs > 0) && (curTime - nalu.auTimestamp > maxLatencyUs))
+            {
+                nalu.drop = 1;
+            }
+            else if (curTime - nalu.naluInputTimestamp > maxNetworkLatencyUs)
+            {
+                nalu.drop = 1;
+            }
+
+            /* check that the NALU has not been flagged for dropping */
+            if (!nalu.drop)
             {
                 /* A NALU is ready to send */
                 fragmentCount = (nalu.naluSize + targetPacketSize / 2) / targetPacketSize;
@@ -1237,7 +1269,7 @@ void* ARSTREAM_Sender2_RunSendThread (void *ARSTREAM_Sender2_t_Param)
 //ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Time %llu: STAP-A (previous) sendSize=%d, naluCount=%d", nalu.auTimestamp, sendSize, stapNaluCount); //TODO: debug
                         uint8_t stapHeader = ARSTREAM_NETWORK_HEADERS2_NALU_TYPE_STAPA | ((stapMaxNri & 3) << 5);
                         *(sendBuffer + sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t)) = stapHeader;
-                        ret = ARSTREAM_Sender2_SendData(sender, sendBuffer, sendSize, stapFirstNaluInputTimestamp, stapAuTimestamp, 0, maxLatencyUs); // do not set the marker bit
+                        ret = ARSTREAM_Sender2_SendData(sender, sendBuffer, sendSize, stapFirstNaluInputTimestamp, stapAuTimestamp, 0, maxLatencyUs, maxNetworkLatencyUs); // do not set the marker bit
                         if (ret != 0)
                         {
                             //ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_SENDER2_TAG, "Time %llu: STAP-A SendData failed (error %d)", nalu.auTimestamp, ret);
@@ -1274,7 +1306,7 @@ void* ARSTREAM_Sender2_RunSendThread (void *ARSTREAM_Sender2_t_Param)
                                 *(sendBuffer + sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t) + 1) = fuHeader | startBit | endBit;
 
 //ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Time %llu: FU-A, sendSize=%d, startBit=%d, endBit=%d, markerBit=%d", nalu.auTimestamp, sendSize, startBit, endBit, ((nalu.isLastInAu) && (endBit)) ? 1 : 0); //TODO: debug
-                                ret = ARSTREAM_Sender2_SendData(sender, sendBuffer, sendSize, nalu.naluInputTimestamp, nalu.auTimestamp, ((nalu.isLastInAu) && (endBit)) ? 1 : 0, maxLatencyUs);
+                                ret = ARSTREAM_Sender2_SendData(sender, sendBuffer, sendSize, nalu.naluInputTimestamp, nalu.auTimestamp, ((nalu.isLastInAu) && (endBit)) ? 1 : 0, maxLatencyUs, maxNetworkLatencyUs);
                                 if (ret != 0)
                                 {
                                     //ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_SENDER2_TAG, "Time %llu: FU-A SendData failed (error %d)", nalu.auTimestamp, ret);
@@ -1303,7 +1335,7 @@ void* ARSTREAM_Sender2_RunSendThread (void *ARSTREAM_Sender2_t_Param)
 //ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Time %llu: STAP-A (previous) sendSize=%d, naluCount=%d", nalu.auTimestamp, sendSize, stapNaluCount); //TODO: debug
                             uint8_t stapHeader = ARSTREAM_NETWORK_HEADERS2_NALU_TYPE_STAPA | ((stapMaxNri & 3) << 5);
                             *(sendBuffer + sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t)) = stapHeader;
-                            ret = ARSTREAM_Sender2_SendData(sender, sendBuffer, sendSize, stapFirstNaluInputTimestamp, stapAuTimestamp, 0, maxLatencyUs); // do not set the marker bit
+                            ret = ARSTREAM_Sender2_SendData(sender, sendBuffer, sendSize, stapFirstNaluInputTimestamp, stapAuTimestamp, 0, maxLatencyUs, maxNetworkLatencyUs); // do not set the marker bit
                             if (ret != 0)
                             {
                                 //ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_SENDER2_TAG, "Time %llu: STAP-A SendData failed (error %d)", nalu.auTimestamp, ret);
@@ -1322,7 +1354,7 @@ void* ARSTREAM_Sender2_RunSendThread (void *ARSTREAM_Sender2_t_Param)
                         sendSize = nalu.naluSize + sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t);
                         
 //ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Time %llu: SingleNALU sendSize=%d", nalu.auTimestamp, sendSize); //TODO: debug
-                        ret = ARSTREAM_Sender2_SendData(sender, sendBuffer, sendSize, nalu.naluInputTimestamp, nalu.auTimestamp, nalu.isLastInAu, maxLatencyUs);
+                        ret = ARSTREAM_Sender2_SendData(sender, sendBuffer, sendSize, nalu.naluInputTimestamp, nalu.auTimestamp, nalu.isLastInAu, maxLatencyUs, maxNetworkLatencyUs);
                         if (ret != 0)
                         {
                             //ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_SENDER2_TAG, "Time %llu: singleNALU SendData failed (error %d)", nalu.auTimestamp, ret);
@@ -1358,7 +1390,7 @@ void* ARSTREAM_Sender2_RunSendThread (void *ARSTREAM_Sender2_t_Param)
 //ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Time %llu: STAP-A (current) sendSize=%d, naluCount=%d", nalu.auTimestamp, sendSize, stapNaluCount); //TODO: debug
                             uint8_t stapHeader = ARSTREAM_NETWORK_HEADERS2_NALU_TYPE_STAPA | ((stapMaxNri & 3) << 5);
                             *(sendBuffer + sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t)) = stapHeader;
-                            ret = ARSTREAM_Sender2_SendData(sender, sendBuffer, sendSize, stapFirstNaluInputTimestamp, stapAuTimestamp, 1, maxLatencyUs); // set the marker bit
+                            ret = ARSTREAM_Sender2_SendData(sender, sendBuffer, sendSize, stapFirstNaluInputTimestamp, stapAuTimestamp, 1, maxLatencyUs, maxNetworkLatencyUs); // set the marker bit
                             if (ret != 0)
                             {
                                 //ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_SENDER2_TAG, "Time %llu: STAP-A SendData failed (error %d)", nalu.auTimestamp, ret);
@@ -1546,10 +1578,23 @@ int ARSTREAM_Sender2_GetMaxLatencyMs(ARSTREAM_Sender2_t *sender)
 }
 
 
-eARSTREAM_ERROR ARSTREAM_Sender2_SetMaxBitrateAndLatencyMs(ARSTREAM_Sender2_t *sender, int maxBitrate, int maxLatencyMs)
+int ARSTREAM_Sender2_GetMaxNetworkLatencyMs(ARSTREAM_Sender2_t *sender)
+{
+    int ret = -1;
+    if (sender != NULL)
+    {
+        ARSAL_Mutex_Lock(&(sender->streamMutex));
+        ret = sender->maxNetworkLatencyMs;
+        ARSAL_Mutex_Unlock(&(sender->streamMutex));
+    }
+    return ret;
+}
+
+
+eARSTREAM_ERROR ARSTREAM_Sender2_SetMaxBitrateAndLatencyMs(ARSTREAM_Sender2_t *sender, int maxBitrate, int maxLatencyMs, int maxNetworkLatencyMs)
 {
     eARSTREAM_ERROR ret = ARSTREAM_OK;
-    if ((sender == NULL) || (maxBitrate == 0) || (maxLatencyMs == 0))
+    if ((sender == NULL) || (maxBitrate <= 0) || (maxLatencyMs < 0) || (maxNetworkLatencyMs <= 0))
     {
         return ARSTREAM_ERROR_BAD_PARAMETERS;
     }
@@ -1557,7 +1602,8 @@ eARSTREAM_ERROR ARSTREAM_Sender2_SetMaxBitrateAndLatencyMs(ARSTREAM_Sender2_t *s
     ARSAL_Mutex_Lock(&(sender->streamMutex));
     sender->maxBitrate = maxBitrate;
     sender->maxLatencyMs = maxLatencyMs;
-    int totalBufSize = maxBitrate * maxLatencyMs / 1000 / 8;
+    sender->maxNetworkLatencyMs = maxNetworkLatencyMs;
+    int totalBufSize = maxBitrate * maxNetworkLatencyMs / 1000 / 8;
     sender->sendSocketBufferSize = totalBufSize / 2;
     sender->naluFifoBufferSize = totalBufSize / 2;
     int err = ARSTREAM_Sender2_SetSocketSendBufferSize(sender, sender->sendSocketBufferSize);

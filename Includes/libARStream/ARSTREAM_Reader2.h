@@ -106,6 +106,7 @@ typedef struct ARSTREAM_Reader2_Resender_Config_t {
     int targetPacketSize;
     int maxBitrate;
     int maxLatencyMs;
+    int maxNetworkLatencyMs;
 } ARSTREAM_Reader2_Resender_Config_t;
 
 /**

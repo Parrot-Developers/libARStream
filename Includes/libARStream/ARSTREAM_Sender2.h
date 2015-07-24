@@ -91,6 +91,7 @@ typedef struct ARSTREAM_Sender2_Config_t {
     int targetPacketSize;
     int maxBitrate;
     int maxLatencyMs;
+    int maxNetworkLatencyMs;
 } ARSTREAM_Sender2_Config_t;
 
 /**
@@ -207,7 +208,9 @@ int ARSTREAM_Sender2_GetMaxBitrate(ARSTREAM_Sender2_t *sender);
 
 int ARSTREAM_Sender2_GetMaxLatencyMs(ARSTREAM_Sender2_t *sender);
 
-eARSTREAM_ERROR ARSTREAM_Sender2_SetMaxBitrateAndLatencyMs(ARSTREAM_Sender2_t *sender, int maxBitrate, int maxLatencyMs);
+int ARSTREAM_Sender2_GetMaxNetworkLatencyMs(ARSTREAM_Sender2_t *sender);
+
+eARSTREAM_ERROR ARSTREAM_Sender2_SetMaxBitrateAndLatencyMs(ARSTREAM_Sender2_t *sender, int maxBitrate, int maxLatencyMs, int maxNetworkLatencyMs);
 
 eARSTREAM_ERROR ARSTREAM_Sender2_GetMonitoring(ARSTREAM_Sender2_t *sender, uint64_t startTime, uint32_t timeIntervalUs, uint32_t *realTimeIntervalUs, uint32_t *meanAcqToNetworkTime,
                                                uint32_t *acqToNetworkJitter, uint32_t *meanNetworkTime, uint32_t *networkJitter, uint32_t *bytesSent, uint32_t *meanPacketSize,
