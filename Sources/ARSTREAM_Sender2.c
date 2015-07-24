@@ -470,6 +470,9 @@ ARSTREAM_Sender2_t* ARSTREAM_Sender2_New(ARSTREAM_Sender2_Config_t *config, void
         retSender->targetPacketSize = config->targetPacketSize - sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t) - ARSTREAM_NETWORK_UDP_HEADER_SIZE - ARSTREAM_NETWORK_IP_HEADER_SIZE;
         retSender->maxBitrate = config->maxBitrate;
         retSender->maxLatencyMs = config->maxLatencyMs;
+        int totalBufSize = config->maxBitrate * config->maxLatencyMs / 1000 / 8;
+        retSender->sendSocketBufferSize = totalBufSize / 2; //TODO: tuning
+        retSender->naluFifoBufferSize = totalBufSize / 2; //TODO: tuning
         retSender->custom = custom;
     }
 
@@ -954,9 +957,6 @@ static int ARSTREAM_Sender2_Connect(ARSTREAM_Sender2_t *sender)
     if (ret == 0)
     {
         /* set the socket buffer size and NALU FIFO buffer size */
-        int totalBufSize = sender->maxBitrate * sender->maxLatencyMs / 1000 / 8;
-        sender->sendSocketBufferSize = totalBufSize / 2;
-        sender->naluFifoBufferSize = totalBufSize / 2;
         err = ARSTREAM_Sender2_SetSocketSendBufferSize(sender, sender->sendSocketBufferSize);
         if (err != 0)
         {
@@ -978,7 +978,7 @@ static int ARSTREAM_Sender2_Connect(ARSTREAM_Sender2_t *sender)
 }
 
 
-static int ARSTREAM_Sender2_SendData(ARSTREAM_Sender2_t *sender, uint8_t *sendBuffer, uint32_t sendSize, uint64_t inputTimestamp, uint64_t auTimestamp, int isLastInAu)
+static int ARSTREAM_Sender2_SendData(ARSTREAM_Sender2_t *sender, uint8_t *sendBuffer, uint32_t sendSize, uint64_t inputTimestamp, uint64_t auTimestamp, int isLastInAu, int maxLatencyUs)
 {
     int ret = 0;
     ARSTREAM_NetworkHeaders_DataHeader2_t *header = (ARSTREAM_NetworkHeaders_DataHeader2_t *)sendBuffer;
@@ -1004,88 +1004,117 @@ static int ARSTREAM_Sender2_SendData(ARSTREAM_Sender2_t *sender, uint8_t *sendBu
 
     /* send to the network layer */
     ssize_t bytes;
-    if (sender->sendMulticast)
+    struct timespec t1;
+    ARSAL_Time_GetTime(&t1);
+    uint64_t curTime = (uint64_t)t1.tv_sec * 1000000 + (uint64_t)t1.tv_nsec / 1000;
+    if (curTime - inputTimestamp <= maxLatencyUs)
     {
-        bytes = ARSAL_Socket_Sendto(sender->sendSocket, sendBuffer, sendSize, 0, (struct sockaddr*)&sender->sendSin, sizeof(sender->sendSin));
-    }
-    else
-    {
-        bytes = ARSAL_Socket_Send(sender->sendSocket, sendBuffer, sendSize, 0);
-    }
-    if (bytes < 0)
-    {
-        switch (errno)
+        if (sender->sendMulticast)
         {
-        case EAGAIN:
-            /* the socket buffer is full - drop some NALUs */
-            ret = ARSTREAM_Sender2_DropFromFifo(sender, sender->naluFifoBufferSize);
-            if (ret < 0)
+            bytes = ARSAL_Socket_Sendto(sender->sendSocket, sendBuffer, sendSize, 0, (struct sockaddr*)&sender->sendSin, sizeof(sender->sendSin));
+        }
+        else
+        {
+            bytes = ARSAL_Socket_Send(sender->sendSocket, sendBuffer, sendSize, 0);
+        }
+        if (bytes < 0)
+        {
+            /* socket send failed */
+            switch (errno)
             {
-                ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Failed to drop NALUs from FIFO (%d)", ret);
-            }
-            else if (ret > 0)
-            {
-                ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Socket buffer full - dropped %d bytes -> polling", ret);
-            }
-            ret = 0;
+            case EAGAIN:
+                /* the socket buffer is full - drop some NALUs */
+                ret = ARSTREAM_Sender2_DropFromFifo(sender, sender->naluFifoBufferSize);
+                if (ret < 0)
+                {
+                    ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Failed to drop NALUs from FIFO (%d)", ret);
+                }
+                else if (ret > 0)
+                {
+                    ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Socket buffer full - dropped %d bytes -> polling", ret);
+                }
+                ret = 0;
 
-            struct pollfd p;
-            p.fd = sender->sendSocket;
-            p.events = POLLOUT;
-            p.revents = 0;
-            int pollTimeMs = sender->naluFifoBufferSize * 8 * 1000 / sender->maxBitrate;
-            int pollRet = poll(&p, 1, pollTimeMs);
-            if (pollRet == 0)
-            {
-                ARSTREAM_Sender2_UpdateMonitoring(sender, inputTimestamp, auTimestamp, rtpTimestamp, sender->seqNum - 1, isLastInAu, 0, sendSize);
-                ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Polling timed out");
-                ret = -2;
-            }
-            else if (pollRet < 0)
-            {
-                ARSTREAM_Sender2_UpdateMonitoring(sender, inputTimestamp, auTimestamp, rtpTimestamp, sender->seqNum - 1, isLastInAu, 0, sendSize);
-                ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Poll error: error=%d (%s)", errno, strerror(errno));
-                ret = -1;
-            }
-            else if (p.revents & POLLOUT)
-            {
-                if (sender->sendMulticast)
+                struct pollfd p;
+                p.fd = sender->sendSocket;
+                p.events = POLLOUT;
+                p.revents = 0;
+                int pollTimeMs = (maxLatencyUs - (int)(curTime - inputTimestamp)) / 1000;
+                int pollRet = poll(&p, 1, pollTimeMs);
+                if (pollRet == 0)
                 {
-                    bytes = ARSAL_Socket_Sendto(sender->sendSocket, sendBuffer, sendSize, 0, (struct sockaddr*)&sender->sendSin, sizeof(sender->sendSin));
-                }
-                else
-                {
-                    bytes = ARSAL_Socket_Send(sender->sendSocket, sendBuffer, sendSize, 0);
-                }
-                if (bytes > -1)
-                {
-                    ARSTREAM_Sender2_UpdateMonitoring(sender, inputTimestamp, auTimestamp, rtpTimestamp, sender->seqNum - 1, isLastInAu, (uint32_t)bytes, 0);
-                    ret = 0;
-                }
-                else if (errno == EAGAIN)
-                {
+                    /* failed: poll timeout */
                     ARSTREAM_Sender2_UpdateMonitoring(sender, inputTimestamp, auTimestamp, rtpTimestamp, sender->seqNum - 1, isLastInAu, 0, sendSize);
-                    ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Socket buffer full #2 - current packet dropped");
+                    ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Polling timed out");
                     ret = -2;
                 }
-                else
+                else if (pollRet < 0)
                 {
+                    /* failed: poll error */
                     ARSTREAM_Sender2_UpdateMonitoring(sender, inputTimestamp, auTimestamp, rtpTimestamp, sender->seqNum - 1, isLastInAu, 0, sendSize);
-                    ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Socket send error #2 error=%d (%s)", errno, strerror(errno));
+                    ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Poll error: error=%d (%s)", errno, strerror(errno));
                     ret = -1;
                 }
+                else if (p.revents & POLLOUT)
+                {
+                    ARSAL_Time_GetTime(&t1);
+                    curTime = (uint64_t)t1.tv_sec * 1000000 + (uint64_t)t1.tv_nsec / 1000;
+                    if (curTime - inputTimestamp <= maxLatencyUs)
+                    {
+                        if (sender->sendMulticast)
+                        {
+                            bytes = ARSAL_Socket_Sendto(sender->sendSocket, sendBuffer, sendSize, 0, (struct sockaddr*)&sender->sendSin, sizeof(sender->sendSin));
+                        }
+                        else
+                        {
+                            bytes = ARSAL_Socket_Send(sender->sendSocket, sendBuffer, sendSize, 0);
+                        }
+                        if (bytes > -1)
+                        {
+                            /* socket send successful */
+                            ARSTREAM_Sender2_UpdateMonitoring(sender, inputTimestamp, auTimestamp, rtpTimestamp, sender->seqNum - 1, isLastInAu, (uint32_t)bytes, 0);
+                            ret = 0;
+                        }
+                        else if (errno == EAGAIN)
+                        {
+                            /* failed: socket buffer full */
+                            ARSTREAM_Sender2_UpdateMonitoring(sender, inputTimestamp, auTimestamp, rtpTimestamp, sender->seqNum - 1, isLastInAu, 0, sendSize);
+                            ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Socket buffer full #2 - current packet dropped");
+                            ret = -2;
+                        }
+                        else
+                        {
+                            /* failed: socket error */
+                            ARSTREAM_Sender2_UpdateMonitoring(sender, inputTimestamp, auTimestamp, rtpTimestamp, sender->seqNum - 1, isLastInAu, 0, sendSize);
+                            ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Socket send error #2 error=%d (%s)", errno, strerror(errno));
+                            ret = -1;
+                        }
+                    }
+                    else
+                    {
+                        /* packet dropped: too late */
+                        ARSTREAM_Sender2_UpdateMonitoring(sender, inputTimestamp, auTimestamp, rtpTimestamp, sender->seqNum - 1, isLastInAu, 0, sendSize);
+                    }
+                }
+                break;
+            default:
+                /* failed: socket error */
+                ARSTREAM_Sender2_UpdateMonitoring(sender, inputTimestamp, auTimestamp, rtpTimestamp, sender->seqNum - 1, isLastInAu, 0, sendSize);
+                ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Socket send error: error=%d (%s)", errno, strerror(errno));
+                ret = -1;
+                break;
             }
-            break;
-        default:
-            ARSTREAM_Sender2_UpdateMonitoring(sender, inputTimestamp, auTimestamp, rtpTimestamp, sender->seqNum - 1, isLastInAu, 0, sendSize);
-            ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Socket send error: error=%d (%s)", errno, strerror(errno));
-            ret = -1;
-            break;
+        }
+        else
+        {
+            /* socket send successful */
+            ARSTREAM_Sender2_UpdateMonitoring(sender, inputTimestamp, auTimestamp, rtpTimestamp, sender->seqNum - 1, isLastInAu, (uint32_t)bytes, 0);
         }
     }
     else
     {
-        ARSTREAM_Sender2_UpdateMonitoring(sender, inputTimestamp, auTimestamp, rtpTimestamp, sender->seqNum - 1, isLastInAu, (uint32_t)bytes, 0);
+        /* packet dropped: too late */
+        ARSTREAM_Sender2_UpdateMonitoring(sender, inputTimestamp, auTimestamp, rtpTimestamp, sender->seqNum - 1, isLastInAu, 0, sendSize);
     }
 
     return ret;
@@ -1151,7 +1180,7 @@ void* ARSTREAM_Sender2_RunSendThread (void *ARSTREAM_Sender2_t_Param)
             ARSAL_Mutex_Lock(&(sender->streamMutex));
             targetPacketSize = sender->targetPacketSize;
             maxPacketSize = sender->maxPacketSize;
-            maxLatencyUs = sender->maxLatencyMs * 1000;
+            maxLatencyUs = sender->maxLatencyMs * 1000 - (int)((uint64_t)sender->sendSocketBufferSize * 8 * 1000000 / sender->maxBitrate);
             ARSAL_Mutex_Unlock(&(sender->streamMutex));
 
             if ((previousTimestamp != 0) && (nalu.auTimestamp != previousTimestamp))
@@ -1162,7 +1191,7 @@ void* ARSTREAM_Sender2_RunSendThread (void *ARSTREAM_Sender2_t_Param)
 //ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Time %llu: STAP-A (previous) sendSize=%d, naluCount=%d", nalu.auTimestamp, sendSize, stapNaluCount); //TODO: debug
                     uint8_t stapHeader = ARSTREAM_NETWORK_HEADERS2_NALU_TYPE_STAPA | ((stapMaxNri & 3) << 5);
                     *(sendBuffer + sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t)) = stapHeader;
-                    ret = ARSTREAM_Sender2_SendData(sender, sendBuffer, sendSize, stapFirstNaluInputTimestamp, stapAuTimestamp, 0); // do not set the marker bit
+                    ret = ARSTREAM_Sender2_SendData(sender, sendBuffer, sendSize, stapFirstNaluInputTimestamp, stapAuTimestamp, 0, maxLatencyUs); // do not set the marker bit
                     if (ret != 0)
                     {
                         //ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_SENDER2_TAG, "Time %llu: STAP-A SendData failed (error %d)", nalu.auTimestamp, ret);
@@ -1208,7 +1237,7 @@ void* ARSTREAM_Sender2_RunSendThread (void *ARSTREAM_Sender2_t_Param)
 //ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Time %llu: STAP-A (previous) sendSize=%d, naluCount=%d", nalu.auTimestamp, sendSize, stapNaluCount); //TODO: debug
                         uint8_t stapHeader = ARSTREAM_NETWORK_HEADERS2_NALU_TYPE_STAPA | ((stapMaxNri & 3) << 5);
                         *(sendBuffer + sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t)) = stapHeader;
-                        ret = ARSTREAM_Sender2_SendData(sender, sendBuffer, sendSize, stapFirstNaluInputTimestamp, stapAuTimestamp, 0); // do not set the marker bit
+                        ret = ARSTREAM_Sender2_SendData(sender, sendBuffer, sendSize, stapFirstNaluInputTimestamp, stapAuTimestamp, 0, maxLatencyUs); // do not set the marker bit
                         if (ret != 0)
                         {
                             //ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_SENDER2_TAG, "Time %llu: STAP-A SendData failed (error %d)", nalu.auTimestamp, ret);
@@ -1245,7 +1274,7 @@ void* ARSTREAM_Sender2_RunSendThread (void *ARSTREAM_Sender2_t_Param)
                                 *(sendBuffer + sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t) + 1) = fuHeader | startBit | endBit;
 
 //ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Time %llu: FU-A, sendSize=%d, startBit=%d, endBit=%d, markerBit=%d", nalu.auTimestamp, sendSize, startBit, endBit, ((nalu.isLastInAu) && (endBit)) ? 1 : 0); //TODO: debug
-                                ret = ARSTREAM_Sender2_SendData(sender, sendBuffer, sendSize, nalu.naluInputTimestamp, nalu.auTimestamp, ((nalu.isLastInAu) && (endBit)) ? 1 : 0);
+                                ret = ARSTREAM_Sender2_SendData(sender, sendBuffer, sendSize, nalu.naluInputTimestamp, nalu.auTimestamp, ((nalu.isLastInAu) && (endBit)) ? 1 : 0, maxLatencyUs);
                                 if (ret != 0)
                                 {
                                     //ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_SENDER2_TAG, "Time %llu: FU-A SendData failed (error %d)", nalu.auTimestamp, ret);
@@ -1274,7 +1303,7 @@ void* ARSTREAM_Sender2_RunSendThread (void *ARSTREAM_Sender2_t_Param)
 //ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Time %llu: STAP-A (previous) sendSize=%d, naluCount=%d", nalu.auTimestamp, sendSize, stapNaluCount); //TODO: debug
                             uint8_t stapHeader = ARSTREAM_NETWORK_HEADERS2_NALU_TYPE_STAPA | ((stapMaxNri & 3) << 5);
                             *(sendBuffer + sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t)) = stapHeader;
-                            ret = ARSTREAM_Sender2_SendData(sender, sendBuffer, sendSize, stapFirstNaluInputTimestamp, stapAuTimestamp, 0); // do not set the marker bit
+                            ret = ARSTREAM_Sender2_SendData(sender, sendBuffer, sendSize, stapFirstNaluInputTimestamp, stapAuTimestamp, 0, maxLatencyUs); // do not set the marker bit
                             if (ret != 0)
                             {
                                 //ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_SENDER2_TAG, "Time %llu: STAP-A SendData failed (error %d)", nalu.auTimestamp, ret);
@@ -1293,7 +1322,7 @@ void* ARSTREAM_Sender2_RunSendThread (void *ARSTREAM_Sender2_t_Param)
                         sendSize = nalu.naluSize + sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t);
                         
 //ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Time %llu: SingleNALU sendSize=%d", nalu.auTimestamp, sendSize); //TODO: debug
-                        ret = ARSTREAM_Sender2_SendData(sender, sendBuffer, sendSize, nalu.naluInputTimestamp, nalu.auTimestamp, nalu.isLastInAu);
+                        ret = ARSTREAM_Sender2_SendData(sender, sendBuffer, sendSize, nalu.naluInputTimestamp, nalu.auTimestamp, nalu.isLastInAu, maxLatencyUs);
                         if (ret != 0)
                         {
                             //ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_SENDER2_TAG, "Time %llu: singleNALU SendData failed (error %d)", nalu.auTimestamp, ret);
@@ -1329,7 +1358,7 @@ void* ARSTREAM_Sender2_RunSendThread (void *ARSTREAM_Sender2_t_Param)
 //ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Time %llu: STAP-A (current) sendSize=%d, naluCount=%d", nalu.auTimestamp, sendSize, stapNaluCount); //TODO: debug
                             uint8_t stapHeader = ARSTREAM_NETWORK_HEADERS2_NALU_TYPE_STAPA | ((stapMaxNri & 3) << 5);
                             *(sendBuffer + sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t)) = stapHeader;
-                            ret = ARSTREAM_Sender2_SendData(sender, sendBuffer, sendSize, stapFirstNaluInputTimestamp, stapAuTimestamp, 1); // set the marker bit
+                            ret = ARSTREAM_Sender2_SendData(sender, sendBuffer, sendSize, stapFirstNaluInputTimestamp, stapAuTimestamp, 1, maxLatencyUs); // set the marker bit
                             if (ret != 0)
                             {
                                 //ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_SENDER2_TAG, "Time %llu: STAP-A SendData failed (error %d)", nalu.auTimestamp, ret);
