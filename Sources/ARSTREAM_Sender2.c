@@ -983,7 +983,7 @@ static int ARSTREAM_Sender2_Connect(ARSTREAM_Sender2_t *sender)
 
 static int ARSTREAM_Sender2_SendData(ARSTREAM_Sender2_t *sender, uint8_t *sendBuffer, uint32_t sendSize, uint64_t inputTimestamp, uint64_t auTimestamp, int isLastInAu, int maxLatencyUs, int maxNetworkLatencyUs)
 {
-    int ret = 0, drop = 0;
+    int ret = 0, totalLatencyDrop = 0, networkLatencyDrop = 0;
     ARSTREAM_NetworkHeaders_DataHeader2_t *header = (ARSTREAM_NetworkHeaders_DataHeader2_t *)sendBuffer;
     uint16_t flags;
     uint32_t rtpTimestamp;
@@ -1012,14 +1012,14 @@ static int ARSTREAM_Sender2_SendData(ARSTREAM_Sender2_t *sender, uint8_t *sendBu
     uint64_t curTime = (uint64_t)t1.tv_sec * 1000000 + (uint64_t)t1.tv_nsec / 1000;
     if ((maxLatencyUs > 0) && (curTime - auTimestamp > maxLatencyUs))
     {
-        drop = 1;
+        totalLatencyDrop = 1;
     }
     else if (curTime - inputTimestamp > maxNetworkLatencyUs)
     {
-        drop = 1;
+        networkLatencyDrop = 1;
     }
 
-    if (!drop)
+    if ((!totalLatencyDrop) && (!networkLatencyDrop))
     {
         if (sender->sendMulticast)
         {
@@ -1057,7 +1057,8 @@ static int ARSTREAM_Sender2_SendData(ARSTREAM_Sender2_t *sender, uint8_t *sendBu
                 {
                     /* failed: poll timeout */
                     ARSTREAM_Sender2_UpdateMonitoring(sender, inputTimestamp, auTimestamp, rtpTimestamp, sender->seqNum - 1, isLastInAu, 0, sendSize);
-                    ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Polling timed out");
+                    ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Time %llu: dropped packet (polling timed out: timeout = %dms) (seqNum = %d)",
+                                auTimestamp, pollTimeMs, header->seqNum); //TODO: debug
                     ret = -2;
                 }
                 else if (pollRet < 0)
@@ -1073,14 +1074,14 @@ static int ARSTREAM_Sender2_SendData(ARSTREAM_Sender2_t *sender, uint8_t *sendBu
                     curTime = (uint64_t)t1.tv_sec * 1000000 + (uint64_t)t1.tv_nsec / 1000;
                     if ((maxLatencyUs > 0) && (curTime - auTimestamp > maxLatencyUs))
                     {
-                        drop = 1;
+                        totalLatencyDrop = 1;
                     }
                     else if (curTime - inputTimestamp > maxNetworkLatencyUs)
                     {
-                        drop = 1;
+                        networkLatencyDrop = 1;
                     }
 
-                    if (!drop)
+                    if ((!totalLatencyDrop) && (!networkLatencyDrop))
                     {
                         if (sender->sendMulticast)
                         {
@@ -1100,7 +1101,8 @@ static int ARSTREAM_Sender2_SendData(ARSTREAM_Sender2_t *sender, uint8_t *sendBu
                         {
                             /* failed: socket buffer full */
                             ARSTREAM_Sender2_UpdateMonitoring(sender, inputTimestamp, auTimestamp, rtpTimestamp, sender->seqNum - 1, isLastInAu, 0, sendSize);
-                            ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Socket buffer full #2 - current packet dropped");
+                            ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Time %llu: dropped packet (socket buffer full #2) (seqNum = %d)",
+                                        auTimestamp, header->seqNum); //TODO: debug
                             ret = -2;
                         }
                         else
@@ -1115,6 +1117,16 @@ static int ARSTREAM_Sender2_SendData(ARSTREAM_Sender2_t *sender, uint8_t *sendBu
                     {
                         /* packet dropped: too late */
                         ARSTREAM_Sender2_UpdateMonitoring(sender, inputTimestamp, auTimestamp, rtpTimestamp, sender->seqNum - 1, isLastInAu, 0, sendSize);
+                        if (totalLatencyDrop)
+                        {
+                            ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Time %llu: dropped packet (after poll total latency %.1fms > %.1fms) (seqNum = %d)",
+                                        auTimestamp, (float)(curTime - auTimestamp) / 1000., (float)maxLatencyUs / 1000., header->seqNum); //TODO: debug
+                        }
+                        if (networkLatencyDrop)
+                        {
+                            ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Time %llu: dropped packet (after poll network latency %.1fms > %.1fms) (seqNum = %d)",
+                                        auTimestamp, (float)(curTime - inputTimestamp) / 1000., (float)maxNetworkLatencyUs / 1000., header->seqNum); //TODO: debug
+                        }
                     }
                 }
                 break;
@@ -1136,6 +1148,16 @@ static int ARSTREAM_Sender2_SendData(ARSTREAM_Sender2_t *sender, uint8_t *sendBu
     {
         /* packet dropped: too late */
         ARSTREAM_Sender2_UpdateMonitoring(sender, inputTimestamp, auTimestamp, rtpTimestamp, sender->seqNum - 1, isLastInAu, 0, sendSize);
+        if (totalLatencyDrop)
+        {
+            ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Time %llu: dropped packet (total latency %.1fms > %.1fms) (seqNum = %d)",
+                        auTimestamp, (float)(curTime - auTimestamp) / 1000., (float)maxLatencyUs / 1000., header->seqNum); //TODO: debug
+        }
+        if (networkLatencyDrop)
+        {
+            ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Time %llu: dropped packet (network latency %.1fms > %.1fms) (seqNum = %d)",
+                        auTimestamp, (float)(curTime - inputTimestamp) / 1000., (float)maxNetworkLatencyUs / 1000., header->seqNum); //TODO: debug
+        }
     }
 
     return ret;
@@ -1153,7 +1175,7 @@ void* ARSTREAM_Sender2_RunSendThread (void *ARSTREAM_Sender2_t_Param)
     void *previousAuUserPtr = NULL;
     int shouldStop;
     int targetPacketSize, maxPacketSize, packetSize, fragmentSize, meanFragmentSize, offset, fragmentOffset, fragmentCount;
-    int ret;
+    int ret, totalLatencyDrop, networkLatencyDrop;
     int stapPending = 0, stapNaluCount = 0, maxLatencyUs, maxNetworkLatencyUs;
     uint8_t stapMaxNri = 0;
     uint64_t curTime;
@@ -1243,17 +1265,18 @@ void* ARSTREAM_Sender2_RunSendThread (void *ARSTREAM_Sender2_t_Param)
             }
 
             /* check that the NALU is not older than the max latency */
+            totalLatencyDrop = networkLatencyDrop = 0;
             if ((maxLatencyUs > 0) && (curTime - nalu.auTimestamp > maxLatencyUs))
             {
-                nalu.drop = 1;
+                totalLatencyDrop = 1;
             }
             else if (curTime - nalu.naluInputTimestamp > maxNetworkLatencyUs)
             {
-                nalu.drop = 1;
+                networkLatencyDrop = 1;
             }
 
             /* check that the NALU has not been flagged for dropping */
-            if (!nalu.drop)
+            if ((!nalu.drop) && (!totalLatencyDrop) && (!networkLatencyDrop))
             {
                 /* A NALU is ready to send */
                 fragmentCount = (nalu.naluSize + targetPacketSize / 2) / targetPacketSize;
@@ -1412,7 +1435,20 @@ void* ARSTREAM_Sender2_RunSendThread (void *ARSTREAM_Sender2_t_Param)
             {
                 uint32_t rtpTimestamp = (uint32_t)(((((nalu.auTimestamp - sender->firstTimestamp) * 90) + 500) / 1000) & 0xFFFFFFFF);
                 ARSTREAM_Sender2_UpdateMonitoring(sender, nalu.naluInputTimestamp, nalu.auTimestamp, rtpTimestamp, sender->seqNum, nalu.isLastInAu, 0, nalu.naluSize);
-                //ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_SENDER2_TAG, "Time %llu: dropped NALU (seqNum = %d)", nalu.auTimestamp, sender->seqNum); //TODO: debug
+                if (nalu.drop)
+                {
+                    ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Time %llu: dropped NALU in FIFO (seqNum = %d)", nalu.auTimestamp, sender->seqNum); //TODO: debug
+                }
+                else if (totalLatencyDrop)
+                {
+                    ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Time %llu: dropped NALU (total latency %.1fms > %.1fms) (seqNum = %d)",
+                                nalu.auTimestamp, (float)(curTime - nalu.auTimestamp) / 1000., (float)maxLatencyUs / 1000., sender->seqNum); //TODO: debug
+                }
+                if (networkLatencyDrop)
+                {
+                    ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Time %llu: dropped NALU (network latency %.1fms > %.1fms) (seqNum = %d)",
+                                nalu.auTimestamp, (float)(curTime - nalu.naluInputTimestamp) / 1000., (float)maxNetworkLatencyUs / 1000., sender->seqNum); //TODO: debug
+                }
                 /* increment the sequence number to let the receiver know that we dropped something */
                 sender->seqNum++;
 
