@@ -61,11 +61,11 @@ typedef struct ARSTREAM_Reader2Debug_t ARSTREAM_Reader2Debug_t;
  * @warning This function allocates memory. An ARSTREAM_Reader2Debug_t muse be deleted by a call to ARSTREAM_Reader2Debug_Delete
  *
  * @param outputRtpStatFile if not null, output RTP stats to a stat file
- * @param outputH264StatFile if not null, output H.264 video stats to a stat file
+ * @param outputFrameStatFile if not null, output video stats to a stat file
  * @param outputVideoFile if not null, output the video stream to a stat file
  * @return A pointer to the new ARSTREAM_Reader2Debug_t, or NULL if an error occured
  */
-ARSTREAM_Reader2Debug_t* ARSTREAM_Reader2Debug_New (int outputRtpStatFile, int outputH264StatFile, int outputVideoFile);
+ARSTREAM_Reader2Debug_t* ARSTREAM_Reader2Debug_New (int outputRtpStatFile, int outputFrameStatFile, int outputVideoFile);
 
 /**
  * @brief Deletes an ARSTREAM_Reader2Debug_t

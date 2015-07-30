@@ -57,16 +57,31 @@
 #define ARSTREAM_READER2DEBUG_PSNR_MAX 48.130803609
 
 
-#define ARSTREAM_READER2DEBUG_STATS_OUTPUT_ALLOW_DRONE
-#define ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_DRONE "/data/ftp/internal_000/streamdebug"
-#define ARSTREAM_READER2DEBUG_STATS_OUTPUT_ALLOW_NAP_USB
-#define ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_NAP_USB "/tmp/mnt/STREAMDEBUG/streamdebug"
-//#define ARSTREAM_READER2DEBUG_STATS_OUTPUT_ALLOW_NAP_INTERNAL
-#define ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_NAP_INTERNAL "/data/skycontroller/streamdebug"
-//#define ARSTREAM_READER2DEBUG_STATS_OUTPUT_ALLOW_ANDROID_INTERNAL
-#define ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_ANDROID_INTERNAL "/storage/emulated/legacy/FF/streamdebug"
-#define ARSTREAM_READER2DEBUG_STATS_OUTPUT_ALLOW_PCLINUX
-#define ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_PCLINUX "./streamdebug"
+#define ARSTREAM_READER2DEBUG_RTPSTATS_OUTPUT_ALLOW_DRONE
+#define ARSTREAM_READER2DEBUG_RTPSTATS_OUTPUT_PATH_DRONE "/data/ftp/internal_000/streamdebug"
+#define ARSTREAM_READER2DEBUG_RTPSTATS_OUTPUT_ALLOW_NAP_USB
+#define ARSTREAM_READER2DEBUG_RTPSTATS_OUTPUT_PATH_NAP_USB "/tmp/mnt/STREAMDEBUG/streamdebug"
+//#define ARSTREAM_READER2DEBUG_RTPSTATS_OUTPUT_ALLOW_NAP_INTERNAL
+#define ARSTREAM_READER2DEBUG_RTPSTATS_OUTPUT_PATH_NAP_INTERNAL "/data/skycontroller/streamdebug"
+//#define ARSTREAM_READER2DEBUG_RTPSTATS_OUTPUT_ALLOW_ANDROID_INTERNAL
+#define ARSTREAM_READER2DEBUG_RTPSTATS_OUTPUT_PATH_ANDROID_INTERNAL "/storage/emulated/legacy/FF/streamdebug"
+#define ARSTREAM_READER2DEBUG_RTPSTATS_OUTPUT_ALLOW_PCLINUX
+#define ARSTREAM_READER2DEBUG_RTPSTATS_OUTPUT_PATH_PCLINUX "./streamdebug"
+
+#define ARSTREAM_READER2DEBUG_RTPSTATS_OUTPUT_FILENAME "reader_monitor"
+
+#define ARSTREAM_READER2DEBUG_FRAMESTATS_OUTPUT_ALLOW_DRONE
+#define ARSTREAM_READER2DEBUG_FRAMESTATS_OUTPUT_PATH_DRONE "/data/ftp/internal_000/frameinfo"
+#define ARSTREAM_READER2DEBUG_FRAMESTATS_OUTPUT_ALLOW_NAP_USB
+#define ARSTREAM_READER2DEBUG_FRAMESTATS_OUTPUT_PATH_NAP_USB "/tmp/mnt/STREAMDEBUG/frameinfo"
+//#define ARSTREAM_READER2DEBUG_FRAMESTATS_OUTPUT_ALLOW_NAP_INTERNAL
+#define ARSTREAM_READER2DEBUG_FRAMESTATS_OUTPUT_PATH_NAP_INTERNAL "/data/skycontroller/frameinfo"
+//#define ARSTREAM_READER2DEBUG_FRAMESTATS_OUTPUT_ALLOW_ANDROID_INTERNAL
+#define ARSTREAM_READER2DEBUG_FRAMESTATS_OUTPUT_PATH_ANDROID_INTERNAL "/storage/emulated/legacy/FF/frameinfo"
+#define ARSTREAM_READER2DEBUG_FRAMESTATS_OUTPUT_ALLOW_PCLINUX
+#define ARSTREAM_READER2DEBUG_FRAMESTATS_OUTPUT_PATH_PCLINUX "./frameinfo"
+
+#define ARSTREAM_READER2DEBUG_FRAMESTATS_OUTPUT_FILENAME "frameinfo_recvstream"
 
 #define ARSTREAM_READER2DEBUG_VIDEO_OUTPUT_ALLOW_DRONE
 #define ARSTREAM_READER2DEBUG_VIDEO_OUTPUT_PATH_DRONE "/data/ftp/internal_000/stream"
@@ -78,6 +93,8 @@
 #define ARSTREAM_READER2DEBUG_VIDEO_OUTPUT_PATH_ANDROID_INTERNAL "/storage/emulated/legacy/FF/stream"
 #define ARSTREAM_READER2DEBUG_VIDEO_OUTPUT_ALLOW_PCLINUX
 #define ARSTREAM_READER2DEBUG_VIDEO_OUTPUT_PATH_PCLINUX "./stream"
+
+#define ARSTREAM_READER2DEBUG_VIDEO_OUTPUT_FILENAME "stream"
 
 
 struct ARSTREAM_Reader2Debug_t {
@@ -91,12 +108,12 @@ struct ARSTREAM_Reader2Debug_t {
     uint32_t previousFrameIndex;
     H264P_Handle h264p;
     FILE* rtpStatsFile;
-    FILE* h264StatsFile;
+    FILE* frameStatsFile;
     FILE* videoFile;
 };
 
 
-ARSTREAM_Reader2Debug_t* ARSTREAM_Reader2Debug_New(int outputRtpStatFile, int outputH264StatFile, int outputVideoFile)
+ARSTREAM_Reader2Debug_t* ARSTREAM_Reader2Debug_New(int outputRtpStatFile, int outputFrameStatFile, int outputVideoFile)
 {
     int i;
     char szFileName[128];
@@ -131,41 +148,41 @@ ARSTREAM_Reader2Debug_t* ARSTREAM_Reader2Debug_New(int outputRtpStatFile, int ou
         if (0)
         {
         }
-#ifdef ARSTREAM_READER2DEBUG_STATS_OUTPUT_ALLOW_DRONE
-        else if ((access(ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_DRONE, F_OK) == 0) && (access(ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_DRONE, W_OK) == 0))
+#ifdef ARSTREAM_READER2DEBUG_RTPSTATS_OUTPUT_ALLOW_DRONE
+        else if ((access(ARSTREAM_READER2DEBUG_RTPSTATS_OUTPUT_PATH_DRONE, F_OK) == 0) && (access(ARSTREAM_READER2DEBUG_RTPSTATS_OUTPUT_PATH_DRONE, W_OK) == 0))
         {
-            pszFilePath = ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_DRONE;
+            pszFilePath = ARSTREAM_READER2DEBUG_RTPSTATS_OUTPUT_PATH_DRONE;
         }
 #endif
-#ifdef ARSTREAM_READER2DEBUG_STATS_OUTPUT_ALLOW_NAP_USB
-        else if ((access(ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_NAP_USB, F_OK) == 0) && (access(ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_NAP_USB, W_OK) == 0))
+#ifdef ARSTREAM_READER2DEBUG_RTPSTATS_OUTPUT_ALLOW_NAP_USB
+        else if ((access(ARSTREAM_READER2DEBUG_RTPSTATS_OUTPUT_PATH_NAP_USB, F_OK) == 0) && (access(ARSTREAM_READER2DEBUG_RTPSTATS_OUTPUT_PATH_NAP_USB, W_OK) == 0))
         {
-            pszFilePath = ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_NAP_USB;
+            pszFilePath = ARSTREAM_READER2DEBUG_RTPSTATS_OUTPUT_PATH_NAP_USB;
         }
 #endif
-#ifdef ARSTREAM_READER2DEBUG_STATS_OUTPUT_ALLOW_NAP_INTERNAL
-        else if ((access(ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_NAP_INTERNAL, F_OK) == 0) && (access(ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_NAP_INTERNAL, W_OK) == 0))
+#ifdef ARSTREAM_READER2DEBUG_RTPSTATS_OUTPUT_ALLOW_NAP_INTERNAL
+        else if ((access(ARSTREAM_READER2DEBUG_RTPSTATS_OUTPUT_PATH_NAP_INTERNAL, F_OK) == 0) && (access(ARSTREAM_READER2DEBUG_RTPSTATS_OUTPUT_PATH_NAP_INTERNAL, W_OK) == 0))
         {
-            pszFilePath = ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_NAP_INTERNAL;
+            pszFilePath = ARSTREAM_READER2DEBUG_RTPSTATS_OUTPUT_PATH_NAP_INTERNAL;
         }
 #endif
-#ifdef ARSTREAM_READER2DEBUG_STATS_OUTPUT_ALLOW_ANDROID_INTERNAL
-        else if ((access(ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_ANDROID_INTERNAL, F_OK) == 0) && (access(ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_ANDROID_INTERNAL, W_OK) == 0))
+#ifdef ARSTREAM_READER2DEBUG_RTPSTATS_OUTPUT_ALLOW_ANDROID_INTERNAL
+        else if ((access(ARSTREAM_READER2DEBUG_RTPSTATS_OUTPUT_PATH_ANDROID_INTERNAL, F_OK) == 0) && (access(ARSTREAM_READER2DEBUG_RTPSTATS_OUTPUT_PATH_ANDROID_INTERNAL, W_OK) == 0))
         {
-            pszFilePath = ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_ANDROID_INTERNAL;
+            pszFilePath = ARSTREAM_READER2DEBUG_RTPSTATS_OUTPUT_PATH_ANDROID_INTERNAL;
         }
 #endif
-#ifdef ARSTREAM_READER2DEBUG_STATS_OUTPUT_ALLOW_PCLINUX
-        else if ((access(ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_PCLINUX, F_OK) == 0) && (access(ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_PCLINUX, W_OK) == 0))
+#ifdef ARSTREAM_READER2DEBUG_RTPSTATS_OUTPUT_ALLOW_PCLINUX
+        else if ((access(ARSTREAM_READER2DEBUG_RTPSTATS_OUTPUT_PATH_PCLINUX, F_OK) == 0) && (access(ARSTREAM_READER2DEBUG_RTPSTATS_OUTPUT_PATH_PCLINUX, W_OK) == 0))
         {
-            pszFilePath = ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_PCLINUX;
+            pszFilePath = ARSTREAM_READER2DEBUG_RTPSTATS_OUTPUT_PATH_PCLINUX;
         }
 #endif
         if (pszFilePath)
         {
             for (i = 0; i < 1000; i++)
             {
-                snprintf(szFileName, 128, "%s/reader_monitor_%03d.dat", pszFilePath, i);
+                snprintf(szFileName, 128, "%s/%s_%03d.dat", pszFilePath, ARSTREAM_READER2DEBUG_RTPSTATS_OUTPUT_FILENAME, i);
                 if (access(szFileName, F_OK) == -1)
                 {
                     // file does not exist
@@ -195,46 +212,46 @@ ARSTREAM_Reader2Debug_t* ARSTREAM_Reader2Debug_New(int outputRtpStatFile, int ou
 
     pszFilePath = NULL;
     szFileName[0] = '\0';
-    if (outputH264StatFile)
+    if (outputFrameStatFile)
     {
         if (0)
         {
         }
-#ifdef ARSTREAM_READER2DEBUG_STATS_OUTPUT_ALLOW_DRONE
-        else if ((access(ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_DRONE, F_OK) == 0) && (access(ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_DRONE, W_OK) == 0))
+#ifdef ARSTREAM_READER2DEBUG_FRAMESTATS_OUTPUT_ALLOW_DRONE
+        else if ((access(ARSTREAM_READER2DEBUG_FRAMESTATS_OUTPUT_PATH_DRONE, F_OK) == 0) && (access(ARSTREAM_READER2DEBUG_FRAMESTATS_OUTPUT_PATH_DRONE, W_OK) == 0))
         {
-            pszFilePath = ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_DRONE;
+            pszFilePath = ARSTREAM_READER2DEBUG_FRAMESTATS_OUTPUT_PATH_DRONE;
         }
 #endif
-#ifdef ARSTREAM_READER2DEBUG_STATS_OUTPUT_ALLOW_NAP_USB
-        else if ((access(ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_NAP_USB, F_OK) == 0) && (access(ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_NAP_USB, W_OK) == 0))
+#ifdef ARSTREAM_READER2DEBUG_FRAMESTATS_OUTPUT_ALLOW_NAP_USB
+        else if ((access(ARSTREAM_READER2DEBUG_FRAMESTATS_OUTPUT_PATH_NAP_USB, F_OK) == 0) && (access(ARSTREAM_READER2DEBUG_FRAMESTATS_OUTPUT_PATH_NAP_USB, W_OK) == 0))
         {
-            pszFilePath = ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_NAP_USB;
+            pszFilePath = ARSTREAM_READER2DEBUG_FRAMESTATS_OUTPUT_PATH_NAP_USB;
         }
 #endif
-#ifdef ARSTREAM_READER2DEBUG_STATS_OUTPUT_ALLOW_NAP_INTERNAL
-        else if ((access(ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_NAP_INTERNAL, F_OK) == 0) && (access(ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_NAP_INTERNAL, W_OK) == 0))
+#ifdef ARSTREAM_READER2DEBUG_FRAMESTATS_OUTPUT_ALLOW_NAP_INTERNAL
+        else if ((access(ARSTREAM_READER2DEBUG_FRAMESTATS_OUTPUT_PATH_NAP_INTERNAL, F_OK) == 0) && (access(ARSTREAM_READER2DEBUG_FRAMESTATS_OUTPUT_PATH_NAP_INTERNAL, W_OK) == 0))
         {
-            pszFilePath = ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_NAP_INTERNAL;
+            pszFilePath = ARSTREAM_READER2DEBUG_FRAMESTATS_OUTPUT_PATH_NAP_INTERNAL;
         }
 #endif
-#ifdef ARSTREAM_READER2DEBUG_STATS_OUTPUT_ALLOW_ANDROID_INTERNAL
-        else if ((access(ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_ANDROID_INTERNAL, F_OK) == 0) && (access(ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_ANDROID_INTERNAL, W_OK) == 0))
+#ifdef ARSTREAM_READER2DEBUG_FRAMESTATS_OUTPUT_ALLOW_ANDROID_INTERNAL
+        else if ((access(ARSTREAM_READER2DEBUG_FRAMESTATS_OUTPUT_PATH_ANDROID_INTERNAL, F_OK) == 0) && (access(ARSTREAM_READER2DEBUG_FRAMESTATS_OUTPUT_PATH_ANDROID_INTERNAL, W_OK) == 0))
         {
-            pszFilePath = ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_ANDROID_INTERNAL;
+            pszFilePath = ARSTREAM_READER2DEBUG_FRAMESTATS_OUTPUT_PATH_ANDROID_INTERNAL;
         }
 #endif
-#ifdef ARSTREAM_READER2DEBUG_STATS_OUTPUT_ALLOW_PCLINUX
-        else if ((access(ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_PCLINUX, F_OK) == 0) && (access(ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_PCLINUX, W_OK) == 0))
+#ifdef ARSTREAM_READER2DEBUG_FRAMESTATS_OUTPUT_ALLOW_PCLINUX
+        else if ((access(ARSTREAM_READER2DEBUG_FRAMESTATS_OUTPUT_PATH_PCLINUX, F_OK) == 0) && (access(ARSTREAM_READER2DEBUG_FRAMESTATS_OUTPUT_PATH_PCLINUX, W_OK) == 0))
         {
-            pszFilePath = ARSTREAM_READER2DEBUG_STATS_OUTPUT_PATH_PCLINUX;
+            pszFilePath = ARSTREAM_READER2DEBUG_FRAMESTATS_OUTPUT_PATH_PCLINUX;
         }
 #endif
         if (pszFilePath)
         {
             for (i = 0; i < 1000; i++)
             {
-                snprintf(szFileName, 128, "%s/sei_monitor_%03d.dat", pszFilePath, i);
+                snprintf(szFileName, 128, "%s/%s_%03d.dat", pszFilePath, ARSTREAM_READER2DEBUG_FRAMESTATS_OUTPUT_FILENAME, i);
                 if (access(szFileName, F_OK) == -1)
                 {
                     // file does not exist
@@ -247,25 +264,27 @@ ARSTREAM_Reader2Debug_t* ARSTREAM_Reader2Debug_New(int outputRtpStatFile, int ou
 
     if (strlen(szFileName))
     {
-        rdbg->h264StatsFile = fopen(szFileName, "w");
-        if (!rdbg->h264StatsFile)
+        rdbg->frameStatsFile = fopen(szFileName, "w");
+        if (!rdbg->frameStatsFile)
         {
             ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2DEBUG_TAG, "unable to open stats file '%s' in %s", szFileName, __FUNCTION__);
         }
     }
     else
     {
-        rdbg->h264StatsFile = NULL;
+        rdbg->frameStatsFile = NULL;
     }
-    if (rdbg->h264StatsFile)
+    if (rdbg->frameStatsFile)
     {
-        fprintf(rdbg->h264StatsFile, "frameIndex acquisitionTs rtpTs receptionTs systemTs frameSize psnr estimatedLostFrames ");
-        fprintf(rdbg->h264StatsFile, "batteryPercentage latitude longitude altitude absoluteHeight relativeHeight xSpeed ySpeed zSpeed distance yaw pitch roll cameraPan cameraTilt ");
-        fprintf(rdbg->h264StatsFile, "videoStreamingTargetBitrate wifiRssi wifiMcsRate wifiTxRate wifiRxRate wifiTxFailRate wifiTxErrorRate ");
-        fprintf(rdbg->h264StatsFile, "postReprojTimestampDelta postEeTimestampDelta postScalingTimestampDelta postStreamingEncodingTimestampDelta postNetworkTimestampDelta ");
-        fprintf(rdbg->h264StatsFile, "streamingSrcMeanAcqToNetworkTime streamingSrcAcqToNetworkJitter streamingSrcMeanNetworkTime streamingSrcNetworkJitter streamingSrcBytesSent ");
-        fprintf(rdbg->h264StatsFile, "streamingSrcMeanPacketSize streamingSrcPacketSizeStdDev streamingSrcPacketsSent streamingSrcBytesDropped streamingSrcNaluDropped ");
-        fprintf(rdbg->h264StatsFile, "streamingSinkMissingPackets streamingSinkTotalPackets\n");
+        fprintf(rdbg->frameStatsFile, "frameIndex acquisitionTs rtpTs receptionTs systemTs frameSize estimatedLostFrames ");
+        fprintf(rdbg->frameStatsFile, "batteryPercentage latitude longitude altitude absoluteHeight relativeHeight xSpeed ySpeed zSpeed distance yaw pitch roll cameraPan cameraTilt ");
+        fprintf(rdbg->frameStatsFile, "videoStreamingTargetBitrate videoStreamingDecimation videoStreamingGopLength videoStreamingFrameType videoStreamingFrameSize videoStreamingFramePsnrY ");
+        fprintf(rdbg->frameStatsFile, "videoRecordingFrameType videoRecordingFrameSize videoRecordingFramePsnrY ");
+        fprintf(rdbg->frameStatsFile, "wifiRssi wifiMcsRate wifiTxRate wifiRxRate wifiTxFailRate wifiTxErrorRate ");
+        fprintf(rdbg->frameStatsFile, "preReprojTimestampDelta postReprojTimestampDelta postEeTimestampDelta postScalingTimestampDelta postStreamingEncodingTimestampDelta postRecordingEncodingTimestampDelta postNetworkTimestampDelta ");
+        fprintf(rdbg->frameStatsFile, "streamingSrcMonitorTimeInterval streamingSrcMeanAcqToNetworkTime streamingSrcAcqToNetworkJitter streamingSrcMeanNetworkTime streamingSrcNetworkJitter ");
+        fprintf(rdbg->frameStatsFile, "streamingSrcBytesSent streamingSrcMeanPacketSize streamingSrcPacketSizeStdDev streamingSrcPacketsSent streamingSrcBytesDropped streamingSrcNaluDropped ");
+        fprintf(rdbg->frameStatsFile, "streamingSinkMissingPackets streamingSinkTotalPackets\n");
     }
 
     pszFilePath = NULL;
@@ -309,7 +328,7 @@ ARSTREAM_Reader2Debug_t* ARSTREAM_Reader2Debug_New(int outputRtpStatFile, int ou
         {
             for (i = 0; i < 1000; i++)
             {
-                snprintf(szFileName, 128, "%s/stream_%03d.264", pszFilePath, i);
+                snprintf(szFileName, 128, "%s/%s_%03d.264", pszFilePath, ARSTREAM_READER2DEBUG_VIDEO_OUTPUT_FILENAME, i);
                 if (access(szFileName, F_OK) == -1)
                 {
                     // file does not exist
@@ -355,9 +374,9 @@ void ARSTREAM_Reader2Debug_Delete(ARSTREAM_Reader2Debug_t **rdbg)
         fclose((*rdbg)->rtpStatsFile);
     }
 
-    if ((*rdbg)->h264StatsFile)
+    if ((*rdbg)->frameStatsFile)
     {
-        fclose((*rdbg)->h264StatsFile);
+        fclose((*rdbg)->frameStatsFile);
     }
 
     if ((*rdbg)->videoFile)
@@ -379,8 +398,8 @@ static void ARSTREAM_Reader2Debug_OutputAu(ARSTREAM_Reader2Debug_t *rdbg, uint32
     uint64_t acquisitionTs = 0, systemTs = 0;
     int estimatedLostFrames = 0, curFrameIdx = 0;
     H264P_SliceInfo_t sliceInfo;
-    H264P_ParrotDragonBasicUserDataSei_t parrotDragonBasicUserData;
-    H264P_ParrotDragonExtendedUserDataSei_t parrotDragonExtendedUserData;
+    H264P_ParrotDragonBasicUserDataSeiV2_t parrotDragonBasicUserData;
+    H264P_ParrotDragonExtendedUserDataSeiV2_t parrotDragonExtendedUserData;
     H264P_ParrotUserDataSeiTypes_t parrotUserDataType = H264P_UNKNOWN_USER_DATA_SEI;
 
     memset(&sliceInfo, 0, sizeof(sliceInfo));
@@ -413,8 +432,8 @@ static void ARSTREAM_Reader2Debug_OutputAu(ARSTREAM_Reader2Debug_t *rdbg, uint32
         
         switch (parrotUserDataType)
         {
-            case H264P_PARROT_DRAGON_BASIC_USER_DATA_SEI:
-                ret = H264P_parseParrotDragonBasicUserDataSei(pUserDataBuf, userDataSize, &parrotDragonBasicUserData);
+            case H264P_PARROT_DRAGON_BASIC_USER_DATA_SEI_V2:
+                ret = H264P_parseParrotDragonBasicUserDataSeiV2(pUserDataBuf, userDataSize, &parrotDragonBasicUserData);
                 if (ret >= 0)
                 {
                     acquisitionTs = ((uint64_t)parrotDragonBasicUserData.acquisitionTsH << 32) + (uint64_t)parrotDragonBasicUserData.acquisitionTsL;
@@ -423,18 +442,14 @@ static void ARSTREAM_Reader2Debug_OutputAu(ARSTREAM_Reader2Debug_t *rdbg, uint32
                         estimatedLostFrames = parrotDragonBasicUserData.frameIndex - rdbg->previousFrameIndex - 1;
                     }
                     rdbg->previousFrameIndex = parrotDragonBasicUserData.frameIndex;
-                    if (parrotDragonBasicUserData.prevMse_fp8)
-                    {
-                        psnr = ARSTREAM_READER2DEBUG_PSNR_MAX - 10. * log10((double)parrotDragonBasicUserData.prevMse_fp8 / 256.);
-                    }
                 }
                 else
                 {
-                    ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2DEBUG_TAG, "H264P_parseParrotDragonBasicUserDataSei() failed (%d)", ret);
+                    ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2DEBUG_TAG, "H264P_parseParrotDragonBasicUserDataSeiV2() failed (%d)", ret);
                 }
                 break;
-            case H264P_PARROT_DRAGON_EXTENDED_USER_DATA_SEI:
-                ret = H264P_parseParrotDragonExtendedUserDataSei(pUserDataBuf, userDataSize, &parrotDragonExtendedUserData);
+            case H264P_PARROT_DRAGON_EXTENDED_USER_DATA_SEI_V2:
+                ret = H264P_parseParrotDragonExtendedUserDataSeiV2(pUserDataBuf, userDataSize, &parrotDragonExtendedUserData);
                 if (ret >= 0)
                 {
                     acquisitionTs = ((uint64_t)parrotDragonExtendedUserData.acquisitionTsH << 32) + (uint64_t)parrotDragonExtendedUserData.acquisitionTsL;
@@ -444,14 +459,14 @@ static void ARSTREAM_Reader2Debug_OutputAu(ARSTREAM_Reader2Debug_t *rdbg, uint32
                         estimatedLostFrames = parrotDragonExtendedUserData.frameIndex - rdbg->previousFrameIndex - 1;
                     }
                     rdbg->previousFrameIndex = parrotDragonExtendedUserData.frameIndex;
-                    if (parrotDragonExtendedUserData.prevMse_fp8)
+                    if (parrotDragonExtendedUserData.videoStreamingPrevFrameMseY_fp8)
                     {
-                        psnr = ARSTREAM_READER2DEBUG_PSNR_MAX - 10. * log10((double)parrotDragonExtendedUserData.prevMse_fp8 / 256.);
+                        psnr = ARSTREAM_READER2DEBUG_PSNR_MAX - 10. * log10((double)parrotDragonExtendedUserData.videoStreamingPrevFrameMseY_fp8 / 256.);
                     }
                 }
                 else
                 {
-                    ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2DEBUG_TAG, "H264P_parseParrotDragonExtendedUserDataSei() failed (%d)", ret);
+                    ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2DEBUG_TAG, "H264P_parseParrotDragonExtendedUserDataSeiV2() failed (%d)", ret);
                 }
                 break;
             default:
@@ -466,78 +481,96 @@ static void ARSTREAM_Reader2Debug_OutputAu(ARSTREAM_Reader2Debug_t *rdbg, uint32
     setlocale(LC_ALL, "C");
     switch (parrotUserDataType)
     {
-        case H264P_PARROT_DRAGON_BASIC_USER_DATA_SEI:
-            fprintf(rdbg->h264StatsFile, "%lu ", (long unsigned int)parrotDragonBasicUserData.frameIndex);
-            fprintf(rdbg->h264StatsFile, "%llu ", (long long unsigned int)acquisitionTs);
-            fprintf(rdbg->h264StatsFile, "%llu ", (long long unsigned int)timestamp);
-            fprintf(rdbg->h264StatsFile, "%llu ", (long long unsigned int)receptionTs);
-            fprintf(rdbg->h264StatsFile, "%llu ", (long long unsigned int)0);
-            fprintf(rdbg->h264StatsFile, "%lu %.3f %d ", 
+        case H264P_PARROT_DRAGON_BASIC_USER_DATA_SEI_V2:
+            fprintf(rdbg->frameStatsFile, "%lu ", (long unsigned int)parrotDragonBasicUserData.frameIndex);
+            fprintf(rdbg->frameStatsFile, "%llu ", (long long unsigned int)acquisitionTs);
+            fprintf(rdbg->frameStatsFile, "%llu ", (long long unsigned int)timestamp);
+            fprintf(rdbg->frameStatsFile, "%llu ", (long long unsigned int)receptionTs);
+            fprintf(rdbg->frameStatsFile, "%llu ", (long long unsigned int)0);
+            fprintf(rdbg->frameStatsFile, "%lu %d ", 
                     (long unsigned int)auSize, 
-                    psnr, 
                     estimatedLostFrames);
-            fprintf(rdbg->h264StatsFile, "%lu %.8f %.8f %.3f ", 
+            fprintf(rdbg->frameStatsFile, "%lu %.8f %.8f %.3f ", 
                     (long unsigned int)0, 0., 0., 0.);
-            fprintf(rdbg->h264StatsFile, "%.3f %.3f %.3f %.3f %.3f %.3f ", 
+            fprintf(rdbg->frameStatsFile, "%.3f %.3f %.3f %.3f %.3f %.3f ", 
                     0., 0., 0., 0., 0., 0.);
-            fprintf(rdbg->h264StatsFile, "%.3f %.3f %.3f %.3f %.3f ", 
+            fprintf(rdbg->frameStatsFile, "%.3f %.3f %.3f %.3f %.3f ", 
                     0., 0., 0., 0., 0.);
-            fprintf(rdbg->h264StatsFile, "%d %d %d %d %d %d %d ", 
-                    0, 0, 0, 0, 0, 0, 0);
-            fprintf(rdbg->h264StatsFile, "%lu %lu %lu %lu %lu ", 
-                    (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0);
-            fprintf(rdbg->h264StatsFile, "%lu %lu %lu %lu %lu %lu %lu %lu %lu %lu ", 
+            fprintf(rdbg->frameStatsFile, "%d %d %d %d %d %.3f ", 
+                    0, 0, 0, 0, 0, 0.);
+            fprintf(rdbg->frameStatsFile, "%d %d %.3f ", 
+                    0, 0, 0.);
+            fprintf(rdbg->frameStatsFile, "%d %d %d %d %d %d ", 
+                    0, 0, 0, 0, 0, 0);
+            fprintf(rdbg->frameStatsFile, "%lu %lu %lu %lu %lu %lu %lu ", 
+                    (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0);
+            fprintf(rdbg->frameStatsFile, "%lu ", 
+                    (long unsigned int)0);
+            fprintf(rdbg->frameStatsFile, "%lu %lu %lu %lu %lu %lu %lu %lu %lu %lu ", 
                     (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0);
-            fprintf(rdbg->h264StatsFile, "%d %d\n", 
+            fprintf(rdbg->frameStatsFile, "%d %d\n", 
                     missingPackets, 
                     totalPackets);
-            fflush(rdbg->h264StatsFile);
+            fflush(rdbg->frameStatsFile);
             break;
-        case H264P_PARROT_DRAGON_EXTENDED_USER_DATA_SEI:
-            fprintf(rdbg->h264StatsFile, "%lu ", (long unsigned int)parrotDragonExtendedUserData.frameIndex);
-            fprintf(rdbg->h264StatsFile, "%llu ", (long long unsigned int)acquisitionTs);
-            fprintf(rdbg->h264StatsFile, "%llu ", (long long unsigned int)timestamp);
-            fprintf(rdbg->h264StatsFile, "%llu ", (long long unsigned int)receptionTs);
-            fprintf(rdbg->h264StatsFile, "%llu ", (long long unsigned int)systemTs);
-            fprintf(rdbg->h264StatsFile, "%lu %.3f %d ", 
+        case H264P_PARROT_DRAGON_EXTENDED_USER_DATA_SEI_V2:
+            fprintf(rdbg->frameStatsFile, "%lu ", (long unsigned int)parrotDragonExtendedUserData.frameIndex);
+            fprintf(rdbg->frameStatsFile, "%llu ", (long long unsigned int)acquisitionTs);
+            fprintf(rdbg->frameStatsFile, "%llu ", (long long unsigned int)timestamp);
+            fprintf(rdbg->frameStatsFile, "%llu ", (long long unsigned int)receptionTs);
+            fprintf(rdbg->frameStatsFile, "%llu ", (long long unsigned int)systemTs);
+            fprintf(rdbg->frameStatsFile, "%lu %d ", 
                     (long unsigned int)auSize,
-                    psnr, 
                     estimatedLostFrames);
-            fprintf(rdbg->h264StatsFile, "%lu %.8f %.8f %.3f ", 
+            fprintf(rdbg->frameStatsFile, "%lu %.8f %.8f %.3f ", 
                     (long unsigned int)parrotDragonExtendedUserData.batteryPercentage, 
                     (double)parrotDragonExtendedUserData.latitude_fp20 / 1048576., 
                     (double)parrotDragonExtendedUserData.longitude_fp20 / 1048576., 
                     (double)parrotDragonExtendedUserData.altitude_fp16 / 65536.);
-            fprintf(rdbg->h264StatsFile, "%.3f %.3f %.3f %.3f %.3f %.3f ", 
+            fprintf(rdbg->frameStatsFile, "%.3f %.3f %.3f %.3f %.3f %.3f ", 
                     (float)parrotDragonExtendedUserData.absoluteHeight_fp16 / 65536., 
                     (float)parrotDragonExtendedUserData.relativeHeight_fp16 / 65536., 
                     (float)parrotDragonExtendedUserData.xSpeed_fp16 / 65536., 
                     (float)parrotDragonExtendedUserData.ySpeed_fp16 / 65536., 
                     (float)parrotDragonExtendedUserData.zSpeed_fp16 / 65536., 
                     (float)parrotDragonExtendedUserData.distance_fp16 / 65536.);
-            fprintf(rdbg->h264StatsFile, "%.3f %.3f %.3f %.3f %.3f ", 
+            fprintf(rdbg->frameStatsFile, "%.3f %.3f %.3f %.3f %.3f ", 
                     (float)parrotDragonExtendedUserData.yaw_fp16 / 65536., 
                     (float)parrotDragonExtendedUserData.pitch_fp16 / 65536., 
                     (float)parrotDragonExtendedUserData.roll_fp16 / 65536., 
                     (float)parrotDragonExtendedUserData.cameraPan_fp16 / 65536., 
                     (float)parrotDragonExtendedUserData.cameraTilt_fp16 / 65536.);
-            fprintf(rdbg->h264StatsFile, "%d %d %d %d %d %d %d ", 
+            fprintf(rdbg->frameStatsFile, "%d %d %d %d %d %.3f ", 
                     parrotDragonExtendedUserData.videoStreamingTargetBitrate,
+                    parrotDragonExtendedUserData.videoStreamingDecimation,
+                    parrotDragonExtendedUserData.videoStreamingGopLength,
+                    parrotDragonExtendedUserData.videoStreamingPrevFrameType,
+                    parrotDragonExtendedUserData.videoStreamingPrevFrameSize,
+                    psnr);
+            fprintf(rdbg->frameStatsFile, "%d %d %.3f ", 
+                    parrotDragonExtendedUserData.videoRecordingPrevFrameType,
+                    parrotDragonExtendedUserData.videoRecordingPrevFrameSize,
+                    0.);
+            fprintf(rdbg->frameStatsFile, "%d %d %d %d %d %d ", 
                     parrotDragonExtendedUserData.wifiRssi, 
                     parrotDragonExtendedUserData.wifiMcsRate, 
                     parrotDragonExtendedUserData.wifiTxRate,
                     parrotDragonExtendedUserData.wifiRxRate,
                     parrotDragonExtendedUserData.wifiTxFailRate,
                     parrotDragonExtendedUserData.wifiTxErrorRate);
-            fprintf(rdbg->h264StatsFile, "%lu %lu %lu %lu %lu ", 
+            fprintf(rdbg->frameStatsFile, "%lu %lu %lu %lu %lu %lu %lu ", 
+                    (long unsigned int)parrotDragonExtendedUserData.preReprojTimestampDelta, 
                     (long unsigned int)parrotDragonExtendedUserData.postReprojTimestampDelta, 
                     (long unsigned int)parrotDragonExtendedUserData.postEeTimestampDelta, 
                     (long unsigned int)parrotDragonExtendedUserData.postScalingTimestampDelta, 
                     (long unsigned int)parrotDragonExtendedUserData.postStreamingEncodingTimestampDelta, 
-                    (long unsigned int)parrotDragonExtendedUserData.postNetworkTimestampDelta);
+                    (long unsigned int)parrotDragonExtendedUserData.postRecordingEncodingTimestampDelta, 
+                    (long unsigned int)parrotDragonExtendedUserData.postNetworkInputTimestampDelta);
+            fprintf(rdbg->frameStatsFile, "%lu ", 
+                    (long unsigned int)parrotDragonExtendedUserData.streamingMonitorTimeInterval);
             if (parrotDragonExtendedUserData.streamingMonitorTimeInterval)
             {
-                fprintf(rdbg->h264StatsFile, "%lu %lu %lu %lu %lu %lu %lu %lu %lu %lu ", 
+                fprintf(rdbg->frameStatsFile, "%lu %lu %lu %lu %lu %lu %lu %lu %lu %lu ", 
                         (long unsigned int)(((float)parrotDragonExtendedUserData.streamingMeanAcqToNetworkTime / (float)parrotDragonExtendedUserData.streamingMonitorTimeInterval) * 1000000.), 
                         (long unsigned int)(((float)parrotDragonExtendedUserData.streamingAcqToNetworkJitter / (float)parrotDragonExtendedUserData.streamingMonitorTimeInterval) * 1000000.), 
                         (long unsigned int)(((float)parrotDragonExtendedUserData.streamingMeanNetworkTime / (float)parrotDragonExtendedUserData.streamingMonitorTimeInterval) * 1000000.), 
@@ -551,40 +584,45 @@ static void ARSTREAM_Reader2Debug_OutputAu(ARSTREAM_Reader2Debug_t *rdbg, uint32
             }
             else
             {
-                fprintf(rdbg->h264StatsFile, "%lu %lu %lu %lu %lu %lu %lu %lu %lu %lu ", 
+                fprintf(rdbg->frameStatsFile, "%lu %lu %lu %lu %lu %lu %lu %lu %lu %lu ", 
                         (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0);
             }
-            fprintf(rdbg->h264StatsFile, "%d %d\n", 
+            fprintf(rdbg->frameStatsFile, "%d %d\n", 
                     missingPackets, 
                     totalPackets);
-            fflush(rdbg->h264StatsFile);
+            fflush(rdbg->frameStatsFile);
             break;
         default:
-            fprintf(rdbg->h264StatsFile, "%lu ", (long unsigned int)0);
-            fprintf(rdbg->h264StatsFile, "%llu ", (long long unsigned int)0);
-            fprintf(rdbg->h264StatsFile, "%llu ", (long long unsigned int)timestamp);
-            fprintf(rdbg->h264StatsFile, "%llu ", (long long unsigned int)receptionTs);
-            fprintf(rdbg->h264StatsFile, "%llu ", (long long unsigned int)0);
-            fprintf(rdbg->h264StatsFile, "%lu %.3f %d ", 
+            fprintf(rdbg->frameStatsFile, "%lu ", (long unsigned int)0);
+            fprintf(rdbg->frameStatsFile, "%llu ", (long long unsigned int)0);
+            fprintf(rdbg->frameStatsFile, "%llu ", (long long unsigned int)timestamp);
+            fprintf(rdbg->frameStatsFile, "%llu ", (long long unsigned int)receptionTs);
+            fprintf(rdbg->frameStatsFile, "%llu ", (long long unsigned int)0);
+            fprintf(rdbg->frameStatsFile, "%lu %d ", 
                     (long unsigned int)auSize, 
-                    0., 
                     0);
-            fprintf(rdbg->h264StatsFile, "%lu %.8f %.8f %.3f ", 
+            fprintf(rdbg->frameStatsFile, "%lu %.8f %.8f %.3f ", 
                     (long unsigned int)0, 0., 0., 0.);
-            fprintf(rdbg->h264StatsFile, "%.3f %.3f %.3f %.3f %.3f %.3f ", 
+            fprintf(rdbg->frameStatsFile, "%.3f %.3f %.3f %.3f %.3f %.3f ", 
                     0., 0., 0., 0., 0., 0.);
-            fprintf(rdbg->h264StatsFile, "%.3f %.3f %.3f %.3f %.3f ", 
+            fprintf(rdbg->frameStatsFile, "%.3f %.3f %.3f %.3f %.3f ", 
                     0., 0., 0., 0., 0.);
-            fprintf(rdbg->h264StatsFile, "%d %d %d %d %d %d %d ", 
-                    0, 0, 0, 0, 0, 0, 0);
-            fprintf(rdbg->h264StatsFile, "%lu %lu %lu %lu %lu ", 
-                    (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0);
-            fprintf(rdbg->h264StatsFile, "%lu %lu %lu %lu %lu %lu %lu %lu %lu %lu ", 
+            fprintf(rdbg->frameStatsFile, "%d %d %d %d %d %.3f ", 
+                    0, 0, 0, 0, 0, 0.);
+            fprintf(rdbg->frameStatsFile, "%d %d %.3f ", 
+                    0, 0, 0.);
+            fprintf(rdbg->frameStatsFile, "%d %d %d %d %d %d ", 
+                    0, 0, 0, 0, 0, 0);
+            fprintf(rdbg->frameStatsFile, "%lu %lu %lu %lu %lu %lu %lu ", 
+                    (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0);
+            fprintf(rdbg->frameStatsFile, "%lu ", 
+                    (long unsigned int)0);
+            fprintf(rdbg->frameStatsFile, "%lu %lu %lu %lu %lu %lu %lu %lu %lu %lu ", 
                     (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0, (long unsigned int)0);
-            fprintf(rdbg->h264StatsFile, "%d %d\n", 
+            fprintf(rdbg->frameStatsFile, "%d %d\n", 
                     missingPackets, 
                     totalPackets);
-            fflush(rdbg->h264StatsFile);
+            fflush(rdbg->frameStatsFile);
             break;
     }
     setlocale(LC_ALL, "");
@@ -595,29 +633,22 @@ void ARSTREAM_Reader2Debug_ProcessAu(ARSTREAM_Reader2Debug_t *rdbg, uint8_t* pAu
 {
     int ret;
     unsigned int offset = 0, nextStartCodeOffset = 0;
-    void* pUserDataBuf;
-    unsigned int userDataSize;
-    double psnr = 0.0;
-    uint64_t acquisitionTs = 0, systemTs = 0;
-    int estimatedLostFrames = 0, curFrameIdx = 0;
-    H264P_SliceInfo_t sliceInfo;
-    H264P_ParrotDragonBasicUserDataSei_t parrotDragonBasicUserData;
-    H264P_ParrotDragonExtendedUserDataSei_t parrotDragonExtendedUserData;
-    H264P_ParrotUserDataSeiTypes_t parrotUserDataType = H264P_UNKNOWN_USER_DATA_SEI;
 
     if ((!rdbg) || (!pAu) || (!auSize))
     {
         return;
     }
 
-    if (!rdbg->h264StatsFile)
+    if (rdbg->videoFile)
+    {
+        fwrite(pAu, auSize, 1, rdbg->videoFile);
+        fflush(rdbg->videoFile);
+    }
+
+    if (!rdbg->frameStatsFile)
     {
         return;
     }
-
-    memset(&sliceInfo, 0, sizeof(sliceInfo));
-    memset(&parrotDragonBasicUserData, 0, sizeof(parrotDragonBasicUserData));
-    memset(&parrotDragonExtendedUserData, 0, sizeof(parrotDragonExtendedUserData));
 
     do
     {
@@ -638,12 +669,6 @@ void ARSTREAM_Reader2Debug_ProcessAu(ARSTREAM_Reader2Debug_t *rdbg, uint8_t* pAu
     while (nextStartCodeOffset);
     
     ARSTREAM_Reader2Debug_OutputAu(rdbg, auSize, timestamp, receptionTs, missingPackets, totalPackets);
-
-    if (rdbg->videoFile)
-    {
-        fwrite(pAu, auSize, 1, rdbg->videoFile);
-        fflush(rdbg->videoFile);
-    }
 }
 
 
@@ -656,7 +681,13 @@ void ARSTREAM_Reader2Debug_ProcessNalu(ARSTREAM_Reader2Debug_t *rdbg, uint8_t* p
         return;
     }
 
-    if (!rdbg->h264StatsFile)
+    if (rdbg->videoFile)
+    {
+        fwrite(pNalu, naluSize, 1, rdbg->videoFile);
+        fflush(rdbg->videoFile);
+    }
+
+    if (!rdbg->frameStatsFile)
     {
         return;
     }
@@ -694,12 +725,6 @@ void ARSTREAM_Reader2Debug_ProcessNalu(ARSTREAM_Reader2Debug_t *rdbg, uint8_t* p
         rdbg->auSize = 0;
         rdbg->auMissingPackets = 0;
         rdbg->auTotalPackets = 0;
-    }
-
-    if (rdbg->videoFile)
-    {
-        fwrite(pNalu, naluSize, 1, rdbg->videoFile);
-        fflush(rdbg->videoFile);
     }
 }
 
