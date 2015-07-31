@@ -491,7 +491,7 @@ static void ARSTREAM_Sender_CallCallback (ARSTREAM_Sender_t *sender, eARSTREAM_S
 
 void ARSTREAM_Sender_InitStreamDataBuffer (ARNETWORK_IOBufferParam_t *bufferParams, int bufferID, int maxFragmentSize, uint32_t maxFragmentPerFrame)
 {
-    ARSTREAM_Buffers_InitStreamDataBuffer (bufferParams, bufferID, 0, maxFragmentSize, maxFragmentPerFrame);
+    ARSTREAM_Buffers_InitStreamDataBuffer (bufferParams, bufferID, sizeof (ARSTREAM_NetworkHeaders_DataHeader_t), maxFragmentSize, maxFragmentPerFrame);
 }
 
 void ARSTREAM_Sender_InitStreamAckBuffer (ARNETWORK_IOBufferParam_t *bufferParams, int bufferID)
