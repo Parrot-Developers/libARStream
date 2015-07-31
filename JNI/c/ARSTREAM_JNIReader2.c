@@ -40,7 +40,8 @@ static jmethodID g_cbWrapper_id = 0;
 static JavaVM *g_vm = NULL;
 
 static uint8_t* ARSTREAM_Reader2_NaluCallback(eARSTREAM_READER2_CAUSE cause, uint8_t *naluBuffer, int naluSize,
-        uint64_t auTimestamp, int isFirstNaluInAu, int isLastNaluInAu, int missingPacketsBefore, int *newNaluBufferSize, void *thizz);
+        uint64_t auTimestamp, int isFirstNaluInAu, int isLastNaluInAu, int missingPacketsBefore, eARSTREAM_READER2_H264_SLICE_TYPE sliceType,
+        int *newNaluBufferSize, void *thizz);
 
 
 JNIEXPORT void JNICALL
@@ -79,7 +80,6 @@ Java_com_parrot_arsdk_arstream_ARStreamReader2_nativeConstructor (JNIEnv *env, j
     (*env)->ReleaseStringUTFChars (env, remoteAddress, c_remoteAddress);
     return (jlong)(intptr_t)retReader;
 }
-
 
 static uint8_t* ARSTREAM_Reader2_NaluCallback(eARSTREAM_READER2_CAUSE cause, uint8_t *naluBuffer, int naluSize,
         uint64_t auTimestamp, int isFirstNaluInAu, int isLastNaluInAu, int missingPacketsBefore, eARSTREAM_READER2_H264_SLICE_TYPE sliceType,

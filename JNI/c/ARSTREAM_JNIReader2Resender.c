@@ -84,7 +84,8 @@ JNIEXPORT jboolean JNICALL
 Java_com_parrot_arsdk_arstream_ARStreamReader2Resender_nativeDispose (JNIEnv *env, jobject thizz, jlong cResender)
 {
     jboolean retVal = JNI_TRUE;
-    eARSTREAM_ERROR err = ARSTREAM_Reader2_Resender_Delete (&cResender);
+    ARSTREAM_Reader2_Resender_t *resender = (ARSTREAM_Reader2_Resender_t *)(intptr_t)cResender;
+    eARSTREAM_ERROR err = ARSTREAM_Reader2_Resender_Delete (&resender);
     if (err != ARSTREAM_OK)
     {
         ARSAL_PRINT (ARSAL_PRINT_ERROR, JNI_READER_TAG, "Unable to delete resender : %s", ARSTREAM_Error_ToString (err));
