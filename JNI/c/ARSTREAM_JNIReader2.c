@@ -82,7 +82,8 @@ Java_com_parrot_arsdk_arstream_ARStreamReader2_nativeConstructor (JNIEnv *env, j
 
 
 static uint8_t* ARSTREAM_Reader2_NaluCallback(eARSTREAM_READER2_CAUSE cause, uint8_t *naluBuffer, int naluSize,
-        uint64_t auTimestamp, int isFirstNaluInAu, int isLastNaluInAu, int missingPacketsBefore, int *newNaluBufferSize, void *thizz)
+        uint64_t auTimestamp, int isFirstNaluInAu, int isLastNaluInAu, int missingPacketsBefore, eARSTREAM_READER2_H264_SLICE_TYPE sliceType,
+        int *newNaluBufferSize, void *thizz)
 {
     JNIEnv *env = NULL;
     int wasAlreadyAttached = 1;

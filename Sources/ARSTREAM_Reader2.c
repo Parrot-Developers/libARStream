@@ -56,6 +56,7 @@
  */
 
 #include "ARSTREAM_NetworkHeaders.h"
+#include "h264p.h"
 
 /*
  * ARSDK Headers
@@ -145,6 +146,7 @@ struct ARSTREAM_Reader2_t {
     int currentNaluSize;       // Actual data length
     uint8_t *currentNaluBuffer;
     uint32_t firstTimestamp;
+    H264P_Handle h264p;
 
     /* Thread status */
     ARSAL_Mutex_t streamMutex;
@@ -373,6 +375,19 @@ ARSTREAM_Reader2_t* ARSTREAM_Reader2_New(ARSTREAM_Reader2_Config_t *config, uint
         retReader->custom = custom;
         retReader->currentNaluBufferSize = naluBufferSize;
         retReader->currentNaluBuffer = naluBuffer;
+
+        //TODO: using H264P is a workaround for iOS. We should do something better
+        H264P_Config_t h264pConfig;
+        memset(&h264pConfig, 0, sizeof(h264pConfig));
+
+        h264pConfig.extractUserDataSei = 0;
+        h264pConfig.printLogs = 0;
+
+        int ret = H264P_Init(&retReader->h264p, &h264pConfig);
+        if (ret < 0)
+        {
+            ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "H264P_Init() failed (%d)", ret);
+        }
     }
 
     /* Setup internal mutexes/sems */
@@ -536,6 +551,8 @@ eARSTREAM_ERROR ARSTREAM_Reader2_Delete(ARSTREAM_Reader2_t **reader)
             {
                 free((*reader)->ifaceAddr);
             }
+            H264P_Free((*reader)->h264p);
+            (*reader)->h264p = NULL;
             free(*reader);
             *reader = NULL;
             retVal = ARSTREAM_OK;
@@ -832,12 +849,12 @@ static int ARSTREAM_Reader2_CheckBufferSize(ARSTREAM_Reader2_t *reader, int payl
     if (reader->currentNaluSize + payloadSize > reader->currentNaluBufferSize)
     {
         uint32_t nextNaluBufferSize = reader->currentNaluSize + payloadSize, dummy = 0;
-        uint8_t *nextNaluBuffer = reader->naluCallback(ARSTREAM_READER2_CAUSE_NALU_BUFFER_TOO_SMALL, reader->currentNaluBuffer, 0, 0, 0, 0, 0, &nextNaluBufferSize, reader->custom);
+        uint8_t *nextNaluBuffer = reader->naluCallback(ARSTREAM_READER2_CAUSE_NALU_BUFFER_TOO_SMALL, reader->currentNaluBuffer, 0, 0, 0, 0, 0, 0, &nextNaluBufferSize, reader->custom);
         ret = -1;
         if ((nextNaluBufferSize > 0) && (nextNaluBufferSize >= reader->currentNaluSize + payloadSize))
         {
             memcpy(nextNaluBuffer, reader->currentNaluBuffer, reader->currentNaluSize);
-            reader->naluCallback(ARSTREAM_READER2_CAUSE_NALU_COPY_COMPLETE, reader->currentNaluBuffer, 0, 0, 0, 0, 0, &dummy, reader->custom);
+            reader->naluCallback(ARSTREAM_READER2_CAUSE_NALU_COPY_COMPLETE, reader->currentNaluBuffer, 0, 0, 0, 0, 0, 0, &dummy, reader->custom);
             ret = 0;
         }
         reader->currentNaluBuffer = nextNaluBuffer;
@@ -845,6 +862,66 @@ static int ARSTREAM_Reader2_CheckBufferSize(ARSTREAM_Reader2_t *reader, int payl
     }
 
     return ret;
+}
+
+
+static void ARSTREAM_Reader2_OutputNalu(ARSTREAM_Reader2_t *reader, uint64_t receptionTs, uint64_t auTimestamp, int isFirstNaluInAu, int isLastNaluInAu, int missingPacketsBefore)
+{
+    eARSTREAM_READER2_H264_SLICE_TYPE sliceType = ARSTREAM_READER2_H264_NON_VCL;
+
+    int ret = H264P_ReadNextNalu_buffer(reader->h264p, reader->currentNaluBuffer, reader->currentNaluSize, NULL);
+    if (ret < 0)
+    {
+        ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_READER2_TAG, "H264P_ReadNextNalu_buffer() failed (%d)", ret);
+    }
+    else
+    {
+        ret = H264P_ParseNalu(reader->h264p);
+        if (ret < 0)
+        {
+            ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_READER2_TAG, "H264P_ParseNalu() failed (%d)", ret);
+        }
+        else
+        {
+            int naluType = H264P_GetLastNaluType(reader->h264p);
+            if ((naluType == 1) || (naluType == 5))
+            {
+                H264P_SliceInfo_t sliceInfo;
+                memset(&sliceInfo, 0, sizeof(sliceInfo));
+                ret = H264P_GetSliceInfo(reader->h264p, &sliceInfo);
+                if (ret < 0)
+                {
+                    ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "H264P_GetSliceInfo() failed (%d)", ret);
+                }
+                else
+                {
+                    if (sliceInfo.sliceTypeMod5 == 2)
+                    {
+                        sliceType = ARSTREAM_READER2_H264_SLICE_I;
+                    }
+                    else if (sliceInfo.sliceTypeMod5 == 0)
+                    {
+                        sliceType = ARSTREAM_READER2_H264_SLICE_P;
+                    }
+                }
+            }
+        }
+    }
+
+#ifdef ARSTREAM_READER2_DEBUG
+    ARSTREAM_Reader2Debug_ProcessNalu(reader->rdbg, reader->currentNaluBuffer, reader->currentNaluSize, auTimestamp, receptionTs,
+                                      missingPacketsBefore, 1, isFirstNaluInAu, isLastNaluInAu);
+#endif
+    if (reader->resenderCount > 0)
+    {
+        int resendRet = ARSTREAM_Reader2_ResendNalu(reader, reader->currentNaluBuffer, reader->currentNaluSize, auTimestamp, isLastNaluInAu);
+        if (resendRet != 0)
+        {
+            //ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Failed to resend NALU (%d)", resendRet); //TODO debug
+        }
+    }
+    reader->currentNaluBuffer = reader->naluCallback(ARSTREAM_READER2_CAUSE_NALU_COMPLETE, reader->currentNaluBuffer, reader->currentNaluSize, auTimestamp,
+                                                     isFirstNaluInAu, isLastNaluInAu, missingPacketsBefore, sliceType, &(reader->currentNaluBufferSize), reader->custom);
 }
 
 
@@ -1031,20 +1108,7 @@ void* ARSTREAM_Reader2_RunRecvThread(void *ARSTREAM_Reader2_t_Param)
                                         }
                                         /*ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Output FU-A NALU (seqNum %d->%d) isFirst=%d isLast=%d gapsInSeqNum=%d",
                                                     naluStartSeqNum, currentSeqNum, isFirst, isLast, gapsInSeqNum);*/ //TODO debug
-#ifdef ARSTREAM_READER2_DEBUG
-                                        ARSTREAM_Reader2Debug_ProcessNalu(reader->rdbg, reader->currentNaluBuffer, reader->currentNaluSize, currentTimestamp, receptionTs,
-                                                                          gapsInSeqNum, currentSeqNum - naluStartSeqNum + 1, isFirst, isLast);
-#endif
-                                        if (reader->resenderCount > 0)
-                                        {
-                                            int resendRet = ARSTREAM_Reader2_ResendNalu(reader, reader->currentNaluBuffer, reader->currentNaluSize, currentTimestamp, isLast);
-                                            if (resendRet != 0)
-                                            {
-                                                //ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Failed to resend NALU (%d)", resendRet); //TODO: debug
-                                            }
-                                        }
-                                        reader->currentNaluBuffer = reader->naluCallback(ARSTREAM_READER2_CAUSE_NALU_COMPLETE, reader->currentNaluBuffer, reader->currentNaluSize, currentTimestamp,
-                                                                                         isFirst, isLast, gapsInSeqNum, &(reader->currentNaluBufferSize), reader->custom);
+                                        ARSTREAM_Reader2_OutputNalu(reader, receptionTs, currentTimestamp, isFirst, isLast, gapsInSeqNum);
                                         gapsInSeqNum = 0;
                                     }
                                 }
@@ -1109,20 +1173,7 @@ void* ARSTREAM_Reader2_RunRecvThread(void *ARSTREAM_Reader2_t_Param)
                                     currentAuSize += naluSize;
                                     /*ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Output STAP-A NALU (seqNum %d) isFirst=%d isLast=%d gapsInSeqNum=%d",
                                                 currentSeqNum, isFirst, isLast, gapsInSeqNum);*/ //TODO debug
-#ifdef ARSTREAM_READER2_DEBUG
-                                    ARSTREAM_Reader2Debug_ProcessNalu(reader->rdbg, reader->currentNaluBuffer, reader->currentNaluSize, currentTimestamp, receptionTs,
-                                                                      gapsInSeqNum, 1, isFirst, isLast);
-#endif
-                                    if (reader->resenderCount > 0)
-                                    {
-                                        int resendRet = ARSTREAM_Reader2_ResendNalu(reader, reader->currentNaluBuffer, reader->currentNaluSize, currentTimestamp, isLast);
-                                        if (resendRet != 0)
-                                        {
-                                            //ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Failed to resend NALU (%d)", resendRet); //TODO debug
-                                        }
-                                    }
-                                    reader->currentNaluBuffer = reader->naluCallback(ARSTREAM_READER2_CAUSE_NALU_COMPLETE, reader->currentNaluBuffer, reader->currentNaluSize, currentTimestamp,
-                                                                                     isFirst, isLast, gapsInSeqNum, &(reader->currentNaluBufferSize), reader->custom);
+                                    ARSTREAM_Reader2_OutputNalu(reader, receptionTs, currentTimestamp, isFirst, isLast, gapsInSeqNum);
                                     gapsInSeqNum = 0;
                                 }
                                 else
@@ -1170,20 +1221,7 @@ void* ARSTREAM_Reader2_RunRecvThread(void *ARSTREAM_Reader2_t_Param)
                             currentAuSize += payloadSize;
                             /*ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Output single NALU (seqNum %d) isFirst=%d isLast=%d gapsInSeqNum=%d",
                                         currentSeqNum, isFirst, isLast, gapsInSeqNum);*/ //TODO debug
-#ifdef ARSTREAM_READER2_DEBUG
-                            ARSTREAM_Reader2Debug_ProcessNalu(reader->rdbg, reader->currentNaluBuffer, reader->currentNaluSize, currentTimestamp, receptionTs,
-                                                              gapsInSeqNum, 1, isFirst, isLast);
-#endif
-                            if (reader->resenderCount > 0)
-                            {
-                                int resendRet = ARSTREAM_Reader2_ResendNalu(reader, reader->currentNaluBuffer, reader->currentNaluSize, currentTimestamp, isLast);
-                                if (resendRet != 0)
-                                {
-                                    //ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Failed to resend NALU (%d)", resendRet); //TODO debug
-                                }
-                            }
-                            reader->currentNaluBuffer = reader->naluCallback(ARSTREAM_READER2_CAUSE_NALU_COMPLETE, reader->currentNaluBuffer, reader->currentNaluSize, currentTimestamp,
-                                                                             isFirst, isLast, gapsInSeqNum, &(reader->currentNaluBufferSize), reader->custom);
+                            ARSTREAM_Reader2_OutputNalu(reader, receptionTs, currentTimestamp, isFirst, isLast, gapsInSeqNum);
                             gapsInSeqNum = 0;
                         }
                         else
@@ -1222,7 +1260,7 @@ void* ARSTREAM_Reader2_RunRecvThread(void *ARSTREAM_Reader2_t_Param)
         ARSAL_Mutex_Unlock(&(reader->streamMutex));
     }
 
-    reader->naluCallback(ARSTREAM_READER2_CAUSE_CANCEL, reader->currentNaluBuffer, 0, 0, 0, 0, 0, &(reader->currentNaluBufferSize), reader->custom);
+    reader->naluCallback(ARSTREAM_READER2_CAUSE_CANCEL, reader->currentNaluBuffer, 0, 0, 0, 0, 0, 0, &(reader->currentNaluBufferSize), reader->custom);
 
     ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Stream reader receiving thread ended");
     ARSAL_Mutex_Lock(&(reader->streamMutex));
