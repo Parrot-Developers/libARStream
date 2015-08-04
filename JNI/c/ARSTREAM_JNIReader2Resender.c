@@ -51,6 +51,7 @@ Java_com_parrot_arsdk_arstream_ARStreamReader2Resender_nativeConstructor (JNIEnv
     config.targetPacketSize = ARSTREAM2_RESENDER_TARGET_PACKET_SIZE;
     config.maxBitrate = ARSTREAM2_RESENDER_MAX_BITRATE;
     config.maxLatencyMs = ARSTREAM2_RESENDER_MAX_LATENCY_MS;
+    config.maxNetworkLatencyMs = ARSTREAM2_RESENDER_MAX_NETWORK_LATENCY_MS;
     ARSTREAM_Reader2_Resender_t *resender = ARSTREAM_Reader2_Resender_New((ARSTREAM_Reader2_t *)(intptr_t)cReader, &config, &err);
 
     (*env)->ReleaseStringUTFChars (env, targetAddress, c_targetAddress);
