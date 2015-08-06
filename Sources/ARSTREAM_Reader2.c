@@ -49,6 +49,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <fcntl.h>
+#include <poll.h>
 #include <math.h>
 
 /*
@@ -783,59 +784,77 @@ static void ARSTREAM_Reader2_UpdateMonitoring(ARSTREAM_Reader2_t *reader, uint32
 
 static int ARSTREAM_Reader2_ReadData(ARSTREAM_Reader2_t *reader, uint8_t *recvBuffer, int recvBufferSize, int *recvSize)
 {
-    int ret = 0;
+    int ret = 0, pollRet;
+    ssize_t bytes;
+    struct pollfd p;
 
     if ((!recvBuffer) || (!recvSize))
     {
         return -1;
     }
 
-    fd_set set;
-    FD_ZERO(&set);
-    FD_SET(reader->recvSocket, &set);
-    int maxFd = reader->recvSocket + 1;
-    struct timeval tv = { 0, ARSTREAM_READER2_DATAREAD_TIMEOUT_MS * 1000 };
-    int err = select(maxFd, &set, NULL, NULL, &tv);
-    if (err < 0)
+    bytes = ARSAL_Socket_Recv(reader->recvSocket, recvBuffer, recvBufferSize, 0);
+    if (bytes < 0)
     {
-        /* read error */
-        ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Error on select: error=%d (%s)", errno, strerror(errno));
-        ret = -1;
-        *recvSize = 0;
-    }
-    else
-    {
-        /* no read error (timeout or FD ready) */
-        if (FD_ISSET(reader->recvSocket, &set))
+        /* socket receive failed */
+        switch (errno)
         {
-            int size;
-            size = ARSAL_Socket_Recv(reader->recvSocket, recvBuffer, recvBufferSize, 0);
-            if (size > 0)
-            {
-                /* save the number of bytes read */
-                *recvSize = size;
-            }
-            else if (size == 0)
-            {
-                /* this should never happen (if the socket is ready, data must be available) */
-                ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Socket received size is null");
-                ret = -2;
-                *recvSize = 0;
-            }
-            else
-            {
+            case EAGAIN:
+                /* poll */
+                p.fd = reader->recvSocket;
+                p.events = POLLIN;
+                p.revents = 0;
+                pollRet = poll(&p, 1, ARSTREAM_READER2_DATAREAD_TIMEOUT_MS);
+                if (pollRet == 0)
+                {
+                    /* failed: poll timeout */
+                    ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_READER2_TAG, "Polling timed out"); //TODO: debug
+                    ret = -2;
+                    *recvSize = 0;
+                }
+                else if (pollRet < 0)
+                {
+                    /* failed: poll error */
+                    ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Poll error: error=%d (%s)", errno, strerror(errno));
+                    ret = -1;
+                    *recvSize = 0;
+                }
+                else if (p.revents & POLLIN)
+                {
+                    bytes = ARSAL_Socket_Recv(reader->recvSocket, recvBuffer, recvBufferSize, 0);
+                    if (bytes >= 0)
+                    {
+                        /* success: save the number of bytes read */
+                        *recvSize = bytes;
+                    }
+                    else if (errno == EAGAIN)
+                    {
+                        /* failed: socket not ready (this should not happen) */
+                        ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_READER2_TAG, "Socket not ready for reading");
+                        ret = -2;
+                        *recvSize = 0;
+                    }
+                    else
+                    {
+                        /* failed: socket error */
+                        ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Socket receive error #2 %d ('%s')", errno, strerror(errno));
+                        ret = -1;
+                        *recvSize = 0;
+                    }
+                }
+                break;
+            default:
+                /* failed: socket error */
                 ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Socket receive error %d ('%s')", errno, strerror(errno));
                 ret = -1;
                 *recvSize = 0;
-            }
+                break;
         }
-        else
-        {
-            /* read timeout */
-            ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_READER2_TAG, "Socket receive timeout");
-            ret = -2;
-            *recvSize = 0;
-        }
+    }
+    else
+    {
+        /* success: save the number of bytes read */
+        *recvSize = bytes;
     }
 
     return ret;
