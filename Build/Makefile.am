@@ -15,7 +15,7 @@ HEADER_FILES                                                =   ../Includes/libA
 SOURCE_FILES                                                =   $(HEADER_FILES)                          \
                                                                 ../Sources/ARSTREAM_NetworkHeaders.h     \
                                                                 ../Sources/ARSTREAM_Buffers.h            \
-                                                                ../Sources/ARSTREAM_Error.c              \
+                                                                ../gen/Sources/ARSTREAM_Error.c              \
                                                                 ../Sources/ARSTREAM_Sender.c             \
                                                                 ../Sources/ARSTREAM_Sender2.c            \
                                                                 ../Sources/ARSTREAM_Reader.c             \
