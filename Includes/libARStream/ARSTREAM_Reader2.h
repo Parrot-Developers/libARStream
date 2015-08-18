@@ -52,6 +52,9 @@
  * Types
  */
 
+#define ARSTREAM_READER2_DEFAULT_CLIENT_STREAM_PORT     (6004)
+#define ARSTREAM_READER2_DEFAULT_CLIENT_CONTROL_PORT    (6005)
+
 /**
  * @brief Causes for FrameComplete callback
  */
@@ -89,21 +92,33 @@ typedef enum {
  */
 typedef uint8_t* (*ARSTREAM_Reader2_NaluCallback_t) (eARSTREAM_READER2_CAUSE cause, uint8_t *naluBuffer, int naluSize, uint64_t auTimestamp,
                                                      uint64_t auTimestampShifted, int isFirstNaluInAu, int isLastNaluInAu,
-                                                     int missingPacketsBefore, int *newNaluBufferSize, void *custom);
+                                                     int missingPacketsBefore, int *newNaluBufferSize, void *userPtr);
 
 typedef struct ARSTREAM_Reader2_Config_t {
-    const char *ifaceAddr;
-    const char *recvAddr;
-    int recvPort;
+    const char *serverAddr;
+    const char *mcastAddr;
+    const char *mcastIfaceAddr;
+    int serverStreamPort;
+    int serverControlPort;
+    int clientStreamPort;
+    int clientControlPort;
     ARSTREAM_Reader2_NaluCallback_t naluCallback;
+    void *naluCallbackUserPtr;
     int maxPacketSize;
+    int maxBitrate;
+    int maxLatencyMs;
+    int maxNetworkLatencyMs;
     int insertStartCodes;
 } ARSTREAM_Reader2_Config_t;
 
 typedef struct ARSTREAM_Reader2_Resender_Config_t {
-    const char *ifaceAddr;
-    const char *sendAddr;
-    int sendPort;
+    const char *clientAddr;
+    const char *mcastAddr;
+    const char *mcastIfaceAddr;
+    int serverStreamPort;
+    int serverControlPort;
+    int clientStreamPort;
+    int clientControlPort;
     int maxPacketSize;
     int targetPacketSize;
     int maxBitrate;
@@ -141,7 +156,7 @@ typedef struct ARSTREAM_Reader2_Resender_t ARSTREAM_Reader2_Resender_t;
  * @see ARSTREAM_Reader2_StopReader()
  * @see ARSTREAM_Reader2_Delete()
  */
-ARSTREAM_Reader2_t* ARSTREAM_Reader2_New (ARSTREAM_Reader2_Config_t *config, void *custom, eARSTREAM_ERROR *error);
+ARSTREAM_Reader2_t* ARSTREAM_Reader2_New (ARSTREAM_Reader2_Config_t *config, eARSTREAM_ERROR *error);
 
 /**
  * @brief Stops a running ARSTREAM_Reader2_t
@@ -173,7 +188,7 @@ eARSTREAM_ERROR ARSTREAM_Reader2_Delete (ARSTREAM_Reader2_t **reader);
  * @post Stop the ARSTREAM_Reader2_t by calling ARSTREAM_Reader2_StopReader() before joining the thread calling this function
  * @param[in] ARSTREAM_Reader2_t_Param A valid (ARSTREAM_Reader2_t *) casted as a (void *)
  */
-void* ARSTREAM_Reader2_RunRecvThread (void *ARSTREAM_Reader2_t_Param);
+void* ARSTREAM_Reader2_RunStreamThread (void *ARSTREAM_Reader2_t_Param);
 
 /**
  * @brief Runs the acknowledge loop of the ARSTREAM_Reader2_t
@@ -181,14 +196,14 @@ void* ARSTREAM_Reader2_RunRecvThread (void *ARSTREAM_Reader2_t_Param);
  * @post Stop the ARSTREAM_Reader_t by calling ARSTREAM_Reader2_StopReader() before joining the thread calling this function
  * @param[in] ARSTREAM_Reader2_t_Param A valid (ARSTREAM_Reader2_t *) casted as a (void *)
  */
-void* ARSTREAM_Reader2_RunSendThread (void *ARSTREAM_Reader2_t_Param);
+void* ARSTREAM_Reader2_RunControlThread (void *ARSTREAM_Reader2_t_Param);
 
 /**
- * @brief Gets the custom pointer associated with the reader
+ * @brief Gets the user pointer associated with the reader NAL unit callback
  * @param[in] reader The ARSTREAM_Reader2_t
- * @return The custom pointer associated with this reader, or NULL if reader does not point to a valid reader
+ * @return The user pointer associated with the NALU callback, or NULL if reader does not point to a valid reader
  */
-void* ARSTREAM_Reader2_GetCustom (ARSTREAM_Reader2_t *reader);
+void* ARSTREAM_Reader2_GetNaluCallbackUserPtr (ARSTREAM_Reader2_t *reader);
 
 eARSTREAM_ERROR ARSTREAM_Reader2_GetMonitoring(ARSTREAM_Reader2_t *reader, uint64_t startTime, uint32_t timeIntervalUs, uint32_t *realTimeIntervalUs, uint32_t *receptionTimeJitter,
                                                uint32_t *bytesReceived, uint32_t *meanPacketSize, uint32_t *packetSizeStdDev, uint32_t *packetsReceived, uint32_t *packetsMissed);
@@ -199,8 +214,8 @@ void ARSTREAM_Reader2_Resender_Stop (ARSTREAM_Reader2_Resender_t *resender);
 
 eARSTREAM_ERROR ARSTREAM_Reader2_Resender_Delete (ARSTREAM_Reader2_Resender_t **resender);
 
-void* ARSTREAM_Reader2_Resender_RunSendThread (void *ARSTREAM_Reader2_Resender_t_Param);
+void* ARSTREAM_Reader2_Resender_RunStreamThread (void *ARSTREAM_Reader2_Resender_t_Param);
 
-void* ARSTREAM_Reader2_Resender_RunRecvThread (void *ARSTREAM_Reader2_Resender_t_Param);
+void* ARSTREAM_Reader2_Resender_RunControlThread (void *ARSTREAM_Reader2_Resender_t_Param);
 
 #endif /* _ARSTREAM_READER2_H_ */

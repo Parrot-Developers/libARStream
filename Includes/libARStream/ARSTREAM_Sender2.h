@@ -56,6 +56,10 @@
  * Types
  */
 
+#define ARSTREAM_SENDER2_DEFAULT_SERVER_STREAM_PORT     (5004)
+#define ARSTREAM_SENDER2_DEFAULT_SERVER_CONTROL_PORT    (5005)
+#define ARSTREAM_SENDER2_DEFAULT_NALU_FIFO_SIZE         (1024)
+
 /**
  * @brief Callback status values
  */
@@ -76,16 +80,22 @@ typedef enum {
  * @param[in] custom Custom pointer passed during ARSTREAM_Sender2_New
  * @see eARSTREAM_SENDER2_STATUS
  */
-typedef void (*ARSTREAM_Sender2_AuCallback_t)(eARSTREAM_SENDER2_STATUS status, void *auUserPtr, void *custom);
+typedef void (*ARSTREAM_Sender2_AuCallback_t)(eARSTREAM_SENDER2_STATUS status, void *auUserPtr, void *userPtr);
 
-typedef void (*ARSTREAM_Sender2_NaluCallback_t)(eARSTREAM_SENDER2_STATUS status, void *naluUserPtr, void *custom);
+typedef void (*ARSTREAM_Sender2_NaluCallback_t)(eARSTREAM_SENDER2_STATUS status, void *naluUserPtr, void *userPtr);
 
 typedef struct ARSTREAM_Sender2_Config_t {
-    const char *ifaceAddr;
-    const char *sendAddr;
-    int sendPort;
+    const char *clientAddr;
+    const char *mcastAddr;
+    const char *mcastIfaceAddr;
+    int serverStreamPort;
+    int serverControlPort;
+    int clientStreamPort;
+    int clientControlPort;
     ARSTREAM_Sender2_AuCallback_t auCallback;
+    void *auCallbackUserPtr;
     ARSTREAM_Sender2_NaluCallback_t naluCallback;
+    void *naluCallbackUserPtr;
     int naluFifoSize;
     int maxPacketSize;
     int targetPacketSize;
@@ -127,7 +137,7 @@ typedef struct ARSTREAM_Sender2_t ARSTREAM_Sender2_t;
  * @see ARSTREAM_Sender2_StopSender()
  * @see ARSTREAM_Sender2_Delete()
  */
-ARSTREAM_Sender2_t* ARSTREAM_Sender2_New (ARSTREAM_Sender2_Config_t *config, void *custom, eARSTREAM_ERROR *error);
+ARSTREAM_Sender2_t* ARSTREAM_Sender2_New (ARSTREAM_Sender2_Config_t *config, eARSTREAM_ERROR *error);
 
 /**
  * @brief Stops a running ARSTREAM_Sender2_t
@@ -183,7 +193,7 @@ eARSTREAM_ERROR ARSTREAM_Sender2_FlushNaluQueue (ARSTREAM_Sender2_t *sender);
  * @post Stop the ARSTREAM_Sender2_t by calling ARSTREAM_Sender2_StopSender() before joining the thread calling this function
  * @param[in] ARSTREAM_Sender2_t_Param A valid (ARSTREAM_Sender2_t *) casted as a (void *)
  */
-void* ARSTREAM_Sender2_RunSendThread (void *ARSTREAM_Sender2_t_Param);
+void* ARSTREAM_Sender2_RunStreamThread (void *ARSTREAM_Sender2_t_Param);
 
 /**
  * @brief Runs the acknowledge loop of the ARSTREAM_Sender2_t
@@ -191,14 +201,21 @@ void* ARSTREAM_Sender2_RunSendThread (void *ARSTREAM_Sender2_t_Param);
  * @post Stop the ARSTREAM_Sender2_t by calling ARSTREAM_Sender2_StopSender() before joining the thread calling this function
  * @param[in] ARSTREAM_Sender2_t_Param A valid (ARSTREAM_Sender2_t *) casted as a (void *)
  */
-void* ARSTREAM_Sender2_RunRecvThread (void *ARSTREAM_Sender2_t_Param);
+void* ARSTREAM_Sender2_RunControlThread (void *ARSTREAM_Sender2_t_Param);
 
 /**
- * @brief Gets the custom pointer associated with the sender
+ * @brief Gets the user pointer associated with the sender access unit callback
  * @param[in] sender The ARSTREAM_Sender2_t
- * @return The custom pointer associated with this sender, or NULL if sender does not point to a valid sender
+ * @return The user pointer associated with the AU callback, or NULL if sender does not point to a valid sender
  */
-void* ARSTREAM_Sender2_GetCustom (ARSTREAM_Sender2_t *sender);
+void* ARSTREAM_Sender2_GetAuCallbackUserPtr (ARSTREAM_Sender2_t *sender);
+
+/**
+ * @brief Gets the user pointer associated with the sender NAL unit callback
+ * @param[in] sender The ARSTREAM_Sender2_t
+ * @return The user pointer associated with the NALU callback, or NULL if sender does not point to a valid sender
+ */
+void* ARSTREAM_Sender2_GetNaluCallbackUserPtr (ARSTREAM_Sender2_t *sender);
 
 int ARSTREAM_Sender2_GetTargetPacketSize(ARSTREAM_Sender2_t *sender);
 
