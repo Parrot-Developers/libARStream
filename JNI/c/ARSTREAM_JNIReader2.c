@@ -39,10 +39,9 @@
 static jmethodID g_cbWrapper_id = 0;
 static JavaVM *g_vm = NULL;
 
-static uint8_t* ARSTREAM_Reader2_NaluCallback(eARSTREAM_READER2_CAUSE cause, uint8_t *naluBuffer, int naluSize,
-        uint64_t auTimestamp, int isFirstNaluInAu, int isLastNaluInAu, int missingPacketsBefore, eARSTREAM_READER2_H264_SLICE_TYPE sliceType,
-        int *newNaluBufferSize, void *thizz);
-
+static uint8_t* ARSTREAM_Reader2_NaluCallback(eARSTREAM_READER2_CAUSE cause, uint8_t *naluBuffer, int naluSize, uint64_t auTimestamp,
+                                              uint64_t auTimestampShifted, int isFirstNaluInAu, int isLastNaluInAu,
+                                              int missingPacketsBefore, int *newNaluBufferSize, void *thizz);
 
 JNIEXPORT void JNICALL
 Java_com_parrot_arsdk_arstream_ARStreamReader2_nativeInitClass (JNIEnv *env, jclass clazz)
@@ -57,33 +56,42 @@ Java_com_parrot_arsdk_arstream_ARStreamReader2_nativeInitClass (JNIEnv *env, jcl
 
 
 JNIEXPORT jlong JNICALL
-Java_com_parrot_arsdk_arstream_ARStreamReader2_nativeConstructor (JNIEnv *env, jobject thizz, jstring remoteAddress, jlong naluBuffer, jint naluBufferSize)
+Java_com_parrot_arsdk_arstream_ARStreamReader2_nativeConstructor (JNIEnv *env, jobject thizz, jstring serverAddress, jint serverStreamPort, jint serverControlPort, jint maxPacketSize, jint maxBitrate, jint maxLatency, jint maxNetworkLatency)
 {
     eARSTREAM_ERROR err = ARSTREAM_OK;
     jobject g_thizz = (*env)->NewGlobalRef(env, thizz);
-    const char *c_remoteAddress = (*env)->GetStringUTFChars (env, remoteAddress, NULL);
+    const char *c_serverAddress = (*env)->GetStringUTFChars (env, serverAddress, NULL);
 
     ARSTREAM_Reader2_Config_t config;
-    config.ifaceAddr = NULL;
-    config.recvAddr = c_remoteAddress;
-    config.recvPort = ARSTREAM2_PORT;
+    memset(&config, 0, sizeof(config));
+    config.serverAddr = c_remoteAddress;
+    config.mcastAddr = NULL;
+    config.mcastIfaceAddr = NULL;
+    config.serverStreamPort = serverStreamPort;
+    config.serverControlPort = serverControlPort;
+    config.clientStreamPort = 0;
+    config.clientControlPort = 0;
     config.naluCallback = &ARSTREAM_Reader2_NaluCallback;
-    config.maxPacketSize = ARSTREAM2_MAX_PACKET_SIZE;
+    config.naluCallbackUserPtr = (void *)g_thizz;
+    config.maxPacketSize = maxPacketSize;
+    config.maxBitrate = maxBitrate;
+    config.maxLatencyMs = maxLatency;
+    config.maxNetworkLatencyMs = maxNetworkLatency;
     config.insertStartCodes = 1;
 
-    ARSTREAM_Reader2_t *retReader = ARSTREAM_Reader2_New(&config, (uint8_t *)(intptr_t)naluBuffer, naluBufferSize, (void *)g_thizz, &err);
-
+    ARSTREAM_Reader2_t *retReader = ARSTREAM_Reader2_New(&config, &err);
     if (err != ARSTREAM_OK)
     {
         ARSAL_PRINT (ARSAL_PRINT_ERROR, JNI_READER_TAG, "Error while creating reader : %s", ARSTREAM_Error_ToString (err));
     }
-    (*env)->ReleaseStringUTFChars (env, remoteAddress, c_remoteAddress);
+
+    (*env)->ReleaseStringUTFChars (env, serverAddress, c_serverAddress);
     return (jlong)(intptr_t)retReader;
 }
 
-static uint8_t* ARSTREAM_Reader2_NaluCallback(eARSTREAM_READER2_CAUSE cause, uint8_t *naluBuffer, int naluSize,
-        uint64_t auTimestamp, int isFirstNaluInAu, int isLastNaluInAu, int missingPacketsBefore, eARSTREAM_READER2_H264_SLICE_TYPE sliceType,
-        int *newNaluBufferSize, void *thizz)
+static uint8_t* ARSTREAM_Reader2_NaluCallback(eARSTREAM_READER2_CAUSE cause, uint8_t *naluBuffer, int naluSize, uint64_t auTimestamp,
+                                              uint64_t auTimestampShifted, int isFirstNaluInAu, int isLastNaluInAu,
+                                              int missingPacketsBefore, int *newNaluBufferSize, void *thizz)
 {
     JNIEnv *env = NULL;
     int wasAlreadyAttached = 1;
@@ -128,9 +136,15 @@ static uint8_t* ARSTREAM_Reader2_NaluCallback(eARSTREAM_READER2_CAUSE cause, uin
 }
 
 JNIEXPORT void JNICALL
-Java_com_parrot_arsdk_arstream_ARStreamReader2_nativeRunDataThread (JNIEnv *env, jobject thizz, jlong cReader)
+Java_com_parrot_arsdk_arstream_ARStreamReader2_nativeRunStreamThread (JNIEnv *env, jobject thizz, jlong cReader)
 {
-    ARSTREAM_Reader2_RunRecvThread ((void *)(intptr_t)cReader);
+    ARSTREAM_Reader2_RunStreamThread ((void *)(intptr_t)cReader);
+}
+
+JNIEXPORT void JNICALL
+Java_com_parrot_arsdk_arstream_ARStreamReader2_nativeRunControlThread (JNIEnv *env, jobject thizz, jlong cReader)
+{
+    ARSTREAM_Reader2_RunControlThread ((void *)(intptr_t)cReader);
 }
 
 JNIEXPORT void JNICALL
@@ -144,7 +158,7 @@ Java_com_parrot_arsdk_arstream_ARStreamReader2_nativeDispose (JNIEnv *env, jobje
 {
     jboolean retVal = JNI_TRUE;
     ARSTREAM_Reader2_t *reader = (ARSTREAM_Reader2_t *)(intptr_t)cReader;
-    void *ref = ARSTREAM_Reader2_GetCustom(reader);
+    void *ref = ARSTREAM_Reader2_GetNaluCallbackUserPtr(reader);
     eARSTREAM_ERROR err = ARSTREAM_Reader2_Delete (&reader);
     if (err != ARSTREAM_OK)
     {

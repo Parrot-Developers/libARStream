@@ -50,8 +50,8 @@ public class ARStreamReader2Resender
      * Storage of the C pointer
      */
     final private long cResender;
-    private Thread sendThread;
-    private Thread recvThread;
+    private Thread streamThread;
+    private Thread controlThread;
 
     /**
      * Check validity before all function calls
@@ -71,35 +71,35 @@ public class ARStreamReader2Resender
      * @param naluBufferSize buffer size
      * @param listener ARStream 2 listener
       */
-    public ARStreamReader2Resender(ARStreamReader2 reader, String targetIp)
+    public ARStreamReader2Resender(ARStreamReader2 reader, String clientAddress, int clientStreamPort, int clientControlPort, int maxBitrate, int maxLatency, int maxNetworkLatency)
     {
         Log.e(TAG, "ARStreamReader2Resender " + targetIp);
-        this.cResender = nativeConstructor(reader.getCReader(), targetIp);
+        this.cResender = nativeConstructor(reader.getCReader(), clientAddress, clientStreamPort, clientControlPort, maxBitrate, maxLatency, maxNetworkLatency);
         this.valid =  (this.cResender != 0);
         if (this.valid) {
-            sendThread = new Thread(new Runnable()
+            streamThread = new Thread(new Runnable()
             {
                 @Override
                 public void run()
                 {
-                    Log.e(TAG, "RunSendThread running");
-                    nativeRunSendThread(cResender);
-                    Log.e(TAG, "RunSendThread terminated");
+                    Log.e(TAG, "streamThread running");
+                    nativeRunStreamThread(cResender);
+                    Log.e(TAG, "streamThread terminated");
                 }
-            }, "Resender RunSendThread");
-            recvThread = new Thread(new Runnable()
+            }, "Resender streamThread");
+            controlThread = new Thread(new Runnable()
             {
                 @Override
                 public void run()
                 {
-                    Log.e(TAG, "RunRecvThread running");
-                    nativeRunRecvThread(cResender);
-                    Log.e(TAG, "RunRecvThread terminated");
+                    Log.e(TAG, "controlThread running");
+                    nativeRunControlThread(cResender);
+                    Log.e(TAG, "controlThread terminated");
                 }
-            }, "Resender RunRecvThread");
+            }, "Resender controlThread");
 
-            sendThread.start();
-            recvThread.start();
+            streamThread.start();
+            controlThread.start();
         }
         else
         {
@@ -151,13 +151,13 @@ public class ARStreamReader2Resender
         nativeStop(cResender);
         try
         {
-            if (sendThread != null)
+            if (streamThread != null)
             {
-                sendThread.join();
+                streamThread.join();
             }
-            if (recvThread != null)
+            if (controlThread != null)
             {
-                recvThread.join();
+                controlThread.join();
             }
         }
         catch (InterruptedException e)
@@ -193,16 +193,21 @@ public class ARStreamReader2Resender
      * @param targetIp
      * @return C-Pointer to the ARSTREAM_Reader object (or null if any error occured)
      */
-    private native long nativeConstructor(long cReader, String targetIp);
+    private native long nativeConstructor(long cReader, String clientAddress, int clientStreamPort, int clientControlPort, int maxBitrate, int maxLatency, int maxNetworkLatency);
 
     /**
-     * Entry point for the data thread<br>
+     * Entry point for the stream thread<br>
      * This function never returns until <code>stop</code> is called
      * @param cReader C-Pointer to the ARSTREAM_Reader C object
      */
-    private native void nativeRunSendThread (long cReader);
+    private native void nativeRunStreamThread (long cReader);
 
-    private native void nativeRunRecvThread (long cReader);
+    /**
+     * Entry point for the control thread<br>
+     * This function never returns until <code>stop</code> is called
+     * @param cReader C-Pointer to the ARSTREAM_Reader C object
+     */
+    private native void nativeRunControlThread (long cReader);
 
     /**
      * Stops the internal thread loops

@@ -38,23 +38,29 @@
 
 
 JNIEXPORT jlong JNICALL
-Java_com_parrot_arsdk_arstream_ARStreamReader2Resender_nativeConstructor (JNIEnv *env, jobject thizz, jlong cReader, jstring targetAddress)
+Java_com_parrot_arsdk_arstream_ARStreamReader2Resender_nativeConstructor (JNIEnv *env, jobject thizz, jlong cReader, jstring clientAddress, jint clientStreamPort, jint clientControlPort, jint maxBitrate, jint maxLatency, jint maxNetworkLatency)
 {
     eARSTREAM_ERROR err = ARSTREAM_OK;
-    const char *c_targetAddress = (*env)->GetStringUTFChars (env, targetAddress, NULL);
+    const char *c_clientAddress = (*env)->GetStringUTFChars (env, clientAddress, NULL);
 
     ARSTREAM_Reader2_Resender_Config_t config;
-    config.ifaceAddr = NULL;
-    config.sendAddr = c_targetAddress;
-    config.sendPort = ARSTREAM2_PORT;
-    config.maxPacketSize = ARSTREAM2_MAX_PACKET_SIZE;
+    memset(&config, 0, sizeof(config));
+    config.clientAddr = c_clientAddress;
+    config.mcastAddr = NULL;
+    config.mcastIfaceAddr = NULL;
+    config.serverStreamPort = 0;
+    config.serverControlPort = 0;
+    config.clientStreamPort = clientStreamPort;
+    config.clientControlPort = clientControlPort;
+    config.maxPacketSize = ARSTREAM2_RESENDER_MAX_PACKET_SIZE;
     config.targetPacketSize = ARSTREAM2_RESENDER_TARGET_PACKET_SIZE;
-    config.maxBitrate = ARSTREAM2_RESENDER_MAX_BITRATE;
-    config.maxLatencyMs = ARSTREAM2_RESENDER_MAX_LATENCY_MS;
-    config.maxNetworkLatencyMs = ARSTREAM2_RESENDER_MAX_NETWORK_LATENCY_MS;
+    config.maxBitrate = maxBitrate;
+    config.maxLatencyMs = maxLatency;
+    config.maxNetworkLatencyMs = maxNetworkLatency;
+
     ARSTREAM_Reader2_Resender_t *resender = ARSTREAM_Reader2_Resender_New((ARSTREAM_Reader2_t *)(intptr_t)cReader, &config, &err);
 
-    (*env)->ReleaseStringUTFChars (env, targetAddress, c_targetAddress);
+    (*env)->ReleaseStringUTFChars (env, clientAddress, c_clientAddress);
 
     if (err != ARSTREAM_OK)
     {
@@ -64,15 +70,15 @@ Java_com_parrot_arsdk_arstream_ARStreamReader2Resender_nativeConstructor (JNIEnv
 }
 
 JNIEXPORT void JNICALL
-Java_com_parrot_arsdk_arstream_ARStreamReader2Resender_nativeRunSendThread (JNIEnv *env, jobject thizz, jlong cResender)
+Java_com_parrot_arsdk_arstream_ARStreamReader2Resender_nativeRunStreamThread (JNIEnv *env, jobject thizz, jlong cResender)
 {
-    ARSTREAM_Reader2_Resender_RunSendThread ((void *)(intptr_t)cResender);
+    ARSTREAM_Reader2_Resender_RunStreamThread ((void *)(intptr_t)cResender);
 }
 
 JNIEXPORT void JNICALL
-Java_com_parrot_arsdk_arstream_ARStreamReader2Resender_nativeRunRecvThread (JNIEnv *env, jobject thizz, jlong cResender)
+Java_com_parrot_arsdk_arstream_ARStreamReader2Resender_nativeRunControlThread (JNIEnv *env, jobject thizz, jlong cResender)
 {
-    ARSTREAM_Reader2_Resender_RunRecvThread ((void *)(intptr_t)cResender);
+    ARSTREAM_Reader2_Resender_RunControlThread ((void *)(intptr_t)cResender);
 }
 
 JNIEXPORT void JNICALL
