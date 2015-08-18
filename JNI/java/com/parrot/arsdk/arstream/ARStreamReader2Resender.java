@@ -71,10 +71,12 @@ public class ARStreamReader2Resender
      * @param naluBufferSize buffer size
      * @param listener ARStream 2 listener
       */
-    public ARStreamReader2Resender(ARStreamReader2 reader, String clientAddress, int clientStreamPort, int clientControlPort, int maxBitrate, int maxLatency, int maxNetworkLatency)
+    public ARStreamReader2Resender(ARStreamReader2 reader, String clientAddress, int clientStreamPort, int clientControlPort, int serverStreamPort, int serverControlPort,
+                                   int maxPacketSize, int targetPacketSize, int maxBitrate, int maxLatency, int maxNetworkLatency)
     {
         Log.e(TAG, "ARStreamReader2Resender " + clientAddress);
-        this.cResender = nativeConstructor(reader.getCReader(), clientAddress, clientStreamPort, clientControlPort, maxBitrate, maxLatency, maxNetworkLatency);
+        this.cResender = nativeConstructor(reader.getCReader(), clientAddress, clientStreamPort, clientControlPort, serverStreamPort, serverControlPort,
+                                           maxPacketSize, targetPacketSize, maxBitrate, maxLatency, maxNetworkLatency);
         this.valid =  (this.cResender != 0);
         if (this.valid) {
             streamThread = new Thread(new Runnable()
@@ -193,7 +195,8 @@ public class ARStreamReader2Resender
      * @param targetIp
      * @return C-Pointer to the ARSTREAM_Reader object (or null if any error occured)
      */
-    private native long nativeConstructor(long cReader, String clientAddress, int clientStreamPort, int clientControlPort, int maxBitrate, int maxLatency, int maxNetworkLatency);
+    private native long nativeConstructor(long cReader, String clientAddress, int clientStreamPort, int clientControlPort, int serverStreamPort, int serverControlPort,
+                                          int maxPacketSize, int targetPacketSize, int maxBitrate, int maxLatency, int maxNetworkLatency);
 
     /**
      * Entry point for the stream thread<br>

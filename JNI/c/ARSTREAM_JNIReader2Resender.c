@@ -38,7 +38,8 @@
 
 
 JNIEXPORT jlong JNICALL
-Java_com_parrot_arsdk_arstream_ARStreamReader2Resender_nativeConstructor (JNIEnv *env, jobject thizz, jlong cReader, jstring clientAddress, jint clientStreamPort, jint clientControlPort, jint maxBitrate, jint maxLatency, jint maxNetworkLatency)
+Java_com_parrot_arsdk_arstream_ARStreamReader2Resender_nativeConstructor (JNIEnv *env, jobject thizz, jlong cReader, jstring clientAddress, jint clientStreamPort, jint clientControlPort,
+                                                                          jint serverStreamPort, jint serverControlPort, jint maxPacketSize, jint targetPacketSize, jint maxBitrate, jint maxLatency, jint maxNetworkLatency)
 {
     eARSTREAM_ERROR err = ARSTREAM_OK;
     const char *c_clientAddress = (*env)->GetStringUTFChars (env, clientAddress, NULL);
@@ -48,12 +49,12 @@ Java_com_parrot_arsdk_arstream_ARStreamReader2Resender_nativeConstructor (JNIEnv
     config.clientAddr = c_clientAddress;
     config.mcastAddr = NULL;
     config.mcastIfaceAddr = NULL;
-    config.serverStreamPort = 0;
-    config.serverControlPort = 0;
+    config.serverStreamPort = serverStreamPort;
+    config.serverControlPort = serverControlPort;
     config.clientStreamPort = clientStreamPort;
     config.clientControlPort = clientControlPort;
-    config.maxPacketSize = ARSTREAM2_RESENDER_MAX_PACKET_SIZE;
-    config.targetPacketSize = ARSTREAM2_RESENDER_TARGET_PACKET_SIZE;
+    config.maxPacketSize = maxPacketSize;
+    config.targetPacketSize = targetPacketSize;
     config.maxBitrate = maxBitrate;
     config.maxLatencyMs = maxLatency;
     config.maxNetworkLatencyMs = maxNetworkLatency;

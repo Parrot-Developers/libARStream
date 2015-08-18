@@ -89,12 +89,12 @@ public class ARStreamReader2
      * @param naluBufferSize buffer size
      * @param listener ARStream 2 listener
       */
-    public ARStreamReader2(String serverAddress, int serverStreamPort, int serverControlPort, int maxPacketSize, int maxBitrate, int maxLatency, int maxNetworkLatency, int naluBufferSize, ARStreamReader2Listener listener)
+    public ARStreamReader2(String serverAddress, int serverStreamPort, int serverControlPort, int clientStreamPort, int clientControlPort,
+                           int maxPacketSize, int maxBitrate, int maxLatency, int maxNetworkLatency, int naluBufferSize, ARStreamReader2Listener listener)
     {
         this.listener = listener;
         this.naluBuffer = new ARNativeData(naluBufferSize); //TODO
-        /*this.cReader = nativeConstructor(remoteAddress, this.naluBuffer.getData(), this.naluBuffer.getCapacity());*/
-        this.cReader = nativeConstructor(serverAddress, serverStreamPort, serverControlPort, maxPacketSize, maxBitrate, maxLatency, maxNetworkLatency);
+        this.cReader = nativeConstructor(serverAddress, serverStreamPort, serverControlPort, clientStreamPort, clientControlPort, maxPacketSize, maxBitrate, maxLatency, maxNetworkLatency);
         this.valid =  (this.cReader != 0);
     }
 
@@ -242,7 +242,8 @@ public class ARStreamReader2
      * @param naluBufferSize size of the initial nalu buffer
      * @return C-Pointer to the ARSTREAM_Reader2 object (or null if any error occured)
      */
-    private native long nativeConstructor (String serverAddress, int serverStreamPort, int serverControlPort, int maxPacketSize, int maxBitrate, int maxLatency, int maxNetworkLatency);
+    private native long nativeConstructor (String serverAddress, int serverStreamPort, int serverControlPort, int clientStreamPort, int clientControlPort,
+                                           int maxPacketSize, int maxBitrate, int maxLatency, int maxNetworkLatency);
 
     /**
      * Entry point for the data thread<br>

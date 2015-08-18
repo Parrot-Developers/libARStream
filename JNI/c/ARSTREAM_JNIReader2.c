@@ -56,7 +56,8 @@ Java_com_parrot_arsdk_arstream_ARStreamReader2_nativeInitClass (JNIEnv *env, jcl
 
 
 JNIEXPORT jlong JNICALL
-Java_com_parrot_arsdk_arstream_ARStreamReader2_nativeConstructor (JNIEnv *env, jobject thizz, jstring serverAddress, jint serverStreamPort, jint serverControlPort, jint maxPacketSize, jint maxBitrate, jint maxLatency, jint maxNetworkLatency)
+Java_com_parrot_arsdk_arstream_ARStreamReader2_nativeConstructor (JNIEnv *env, jobject thizz, jstring serverAddress, jint serverStreamPort, jint serverControlPort,
+                                                                  jint clientStreamPort, jint clientControlPort, jint maxPacketSize, jint maxBitrate, jint maxLatency, jint maxNetworkLatency)
 {
     eARSTREAM_ERROR err = ARSTREAM_OK;
     jobject g_thizz = (*env)->NewGlobalRef(env, thizz);
@@ -69,8 +70,8 @@ Java_com_parrot_arsdk_arstream_ARStreamReader2_nativeConstructor (JNIEnv *env, j
     config.mcastIfaceAddr = NULL;
     config.serverStreamPort = serverStreamPort;
     config.serverControlPort = serverControlPort;
-    config.clientStreamPort = 0;
-    config.clientControlPort = 0;
+    config.clientStreamPort = clientStreamPort;
+    config.clientControlPort = clientControlPort;
     config.naluCallback = &ARSTREAM_Reader2_NaluCallback;
     config.naluCallbackUserPtr = (void *)g_thizz;
     config.maxPacketSize = maxPacketSize;

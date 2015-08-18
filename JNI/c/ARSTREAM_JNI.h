@@ -29,16 +29,7 @@
     SUCH DAMAGE.
 */
 
-/**
- * ARStream 2 configuration
- *
- * TODO: clarify if those values need to be negotiated with the drone/controller
- */
-
 #ifndef _ARSTREAM_JNI_H_
 #define _ARSTREAM_JNI_H_
-
-#define ARSTREAM2_RESENDER_MAX_PACKET_SIZE          1500
-#define ARSTREAM2_RESENDER_TARGET_PACKET_SIZE       1000
 
 #endif
