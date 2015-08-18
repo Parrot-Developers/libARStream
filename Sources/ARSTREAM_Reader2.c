@@ -57,7 +57,6 @@
  */
 
 #include "ARSTREAM_NetworkHeaders.h"
-#include "h264p.h"
 
 /*
  * ARSDK Headers
@@ -84,9 +83,22 @@
 #define ARSTREAM_H264_STARTCODE 0x00000001
 #define ARSTREAM_H264_STARTCODE_LENGTH 4
 
-#define ARSTREAM_READER2_DEBUG
-#ifdef ARSTREAM_READER2_DEBUG
-    #include "ARSTREAM_Reader2Debug.h"
+#define ARSTREAM_READER2_MONITORING_OUTPUT
+#ifdef ARSTREAM_READER2_MONITORING_OUTPUT
+    #include <stdio.h>
+
+    #define ARSTREAM_READER2_MONITORING_OUTPUT_ALLOW_DRONE
+    #define ARSTREAM_READER2_MONITORING_OUTPUT_PATH_DRONE "/data/ftp/internal_000/streamdebug"
+    #define ARSTREAM_READER2_MONITORING_OUTPUT_ALLOW_NAP_USB
+    #define ARSTREAM_READER2_MONITORING_OUTPUT_PATH_NAP_USB "/tmp/mnt/STREAMDEBUG/streamdebug"
+    //#define ARSTREAM_READER2_MONITORING_OUTPUT_ALLOW_NAP_INTERNAL
+    #define ARSTREAM_READER2_MONITORING_OUTPUT_PATH_NAP_INTERNAL "/data/skycontroller/streamdebug"
+    #define ARSTREAM_READER2_MONITORING_OUTPUT_ALLOW_ANDROID_INTERNAL
+    #define ARSTREAM_READER2_MONITORING_OUTPUT_PATH_ANDROID_INTERNAL "/storage/emulated/legacy/FF/streamdebug"
+    #define ARSTREAM_READER2_MONITORING_OUTPUT_ALLOW_PCLINUX
+    #define ARSTREAM_READER2_MONITORING_OUTPUT_PATH_PCLINUX "./streamdebug"
+
+    #define ARSTREAM_READER2_MONITORING_OUTPUT_FILENAME "reader_monitor"
 #endif
 
 
@@ -147,7 +159,6 @@ struct ARSTREAM_Reader2_t {
     int currentNaluSize;       // Actual data length
     uint8_t *currentNaluBuffer;
     uint32_t firstTimestamp;
-    H264P_Handle h264p;
 
     /* Thread status */
     ARSAL_Mutex_t streamMutex;
@@ -172,11 +183,9 @@ struct ARSTREAM_Reader2_t {
     ARSAL_Mutex_t naluBufferMutex;
     ARSTREAM_Reader2_NaluBuffer_t naluBuffer[ARSTREAM_READER2_RESENDER_MAX_NALU_BUFFER_COUNT];
     int naluBufferCount;
-    
 
-#ifdef ARSTREAM_READER2_DEBUG
-    /* Debug */
-    ARSTREAM_Reader2Debug_t* rdbg;
+#ifdef ARSTREAM_READER2_MONITORING_OUTPUT
+    FILE* fMonitorOut;
 #endif
 };
 
@@ -376,19 +385,6 @@ ARSTREAM_Reader2_t* ARSTREAM_Reader2_New(ARSTREAM_Reader2_Config_t *config, uint
         retReader->custom = custom;
         retReader->currentNaluBufferSize = naluBufferSize;
         retReader->currentNaluBuffer = naluBuffer;
-
-        //TODO: using H264P is a workaround for iOS. We should do something better
-        H264P_Config_t h264pConfig;
-        memset(&h264pConfig, 0, sizeof(h264pConfig));
-
-        h264pConfig.extractUserDataSei = 0;
-        h264pConfig.printLogs = 0;
-
-        int ret = H264P_Init(&retReader->h264p, &h264pConfig);
-        if (ret < 0)
-        {
-            ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "H264P_Init() failed (%d)", ret);
-        }
     }
 
     /* Setup internal mutexes/sems */
@@ -429,18 +425,75 @@ ARSTREAM_Reader2_t* ARSTREAM_Reader2_New(ARSTREAM_Reader2_Config_t *config, uint
         }
     }
 
-#ifdef ARSTREAM_READER2_DEBUG
-    /* Setup debug */
+#ifdef ARSTREAM_READER2_MONITORING_OUTPUT
     if (internalError == ARSTREAM_OK)
     {
-        retReader->rdbg = ARSTREAM_Reader2Debug_New(1, 1, 1);
-        if (!retReader->rdbg)
+        int i;
+        char szOutputFileName[128];
+        char *pszFilePath = NULL;
+        szOutputFileName[0] = '\0';
+        if (0)
         {
-            ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_READER2_TAG, "ARSTREAM_Reader2Debug_New() failed");
-            internalError = ARSTREAM_ERROR_ALLOC;
+        }
+#ifdef ARSTREAM_READER2_MONITORING_OUTPUT_ALLOW_DRONE
+        else if ((access(ARSTREAM_READER2_MONITORING_OUTPUT_PATH_DRONE, F_OK) == 0) && (access(ARSTREAM_READER2_MONITORING_OUTPUT_PATH_DRONE, W_OK) == 0))
+        {
+            pszFilePath = ARSTREAM_READER2_MONITORING_OUTPUT_PATH_DRONE;
+        }
+#endif
+#ifdef ARSTREAM_READER2_MONITORING_OUTPUT_ALLOW_NAP_USB
+        else if ((access(ARSTREAM_READER2_MONITORING_OUTPUT_PATH_NAP_USB, F_OK) == 0) && (access(ARSTREAM_READER2_MONITORING_OUTPUT_PATH_NAP_USB, W_OK) == 0))
+        {
+            pszFilePath = ARSTREAM_READER2_MONITORING_OUTPUT_PATH_NAP_USB;
+        }
+#endif
+#ifdef ARSTREAM_READER2_MONITORING_OUTPUT_ALLOW_NAP_INTERNAL
+        else if ((access(ARSTREAM_READER2_MONITORING_OUTPUT_PATH_NAP_INTERNAL, F_OK) == 0) && (access(ARSTREAM_READER2_MONITORING_OUTPUT_PATH_NAP_INTERNAL, W_OK) == 0))
+        {
+            pszFilePath = ARSTREAM_READER2_MONITORING_OUTPUT_PATH_NAP_INTERNAL;
+        }
+#endif
+#ifdef ARSTREAM_READER2_MONITORING_OUTPUT_ALLOW_ANDROID_INTERNAL
+        else if ((access(ARSTREAM_READER2_MONITORING_OUTPUT_PATH_ANDROID_INTERNAL, F_OK) == 0) && (access(ARSTREAM_READER2_MONITORING_OUTPUT_PATH_ANDROID_INTERNAL, W_OK) == 0))
+        {
+            pszFilePath = ARSTREAM_READER2_MONITORING_OUTPUT_PATH_ANDROID_INTERNAL;
+        }
+#endif
+#ifdef ARSTREAM_READER2_MONITORING_OUTPUT_ALLOW_PCLINUX
+        else if ((access(ARSTREAM_READER2_MONITORING_OUTPUT_PATH_PCLINUX, F_OK) == 0) && (access(ARSTREAM_READER2_MONITORING_OUTPUT_PATH_PCLINUX, W_OK) == 0))
+        {
+            pszFilePath = ARSTREAM_READER2_MONITORING_OUTPUT_PATH_PCLINUX;
+        }
+#endif
+        if (pszFilePath)
+        {
+            for (i = 0; i < 1000; i++)
+            {
+                snprintf(szOutputFileName, 128, "%s/%s_%03d.dat", pszFilePath, ARSTREAM_READER2_MONITORING_OUTPUT_FILENAME, i);
+                if (access(szOutputFileName, F_OK) == -1)
+                {
+                    // file does not exist
+                    break;
+                }
+                szOutputFileName[0] = '\0';
+            }
+        }
+
+        if (strlen(szOutputFileName))
+        {
+            retReader->fMonitorOut = fopen(szOutputFileName, "w");
+            if (!retReader->fMonitorOut)
+            {
+                ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_READER2_TAG, "Unable to open monitor output file '%s'", szOutputFileName);
+            }
+        }
+
+        if (retReader->fMonitorOut)
+        {
+            fprintf(retReader->fMonitorOut, "recvTimestamp rtpTimestamp rtpSeqNum rtpMarkerBit bytes\n");
         }
     }
-#endif
+#endif //#ifdef ARSTREAM_READER2_MONITORING_OUTPUT
 
     if ((internalError != ARSTREAM_OK) &&
         (retReader != NULL))
@@ -465,6 +518,12 @@ ARSTREAM_Reader2_t* ARSTREAM_Reader2_New(ARSTREAM_Reader2_Config_t *config, uint
         {
             free(retReader->ifaceAddr);
         }
+#ifdef ARSTREAM_READER2_MONITORING_OUTPUT
+        if ((retReader) && (retReader->fMonitorOut))
+        {
+            fclose(retReader->fMonitorOut);
+        }
+#endif
         free(retReader);
         retReader = NULL;
     }
@@ -528,8 +587,11 @@ eARSTREAM_ERROR ARSTREAM_Reader2_Delete(ARSTREAM_Reader2_t **reader)
                     free(naluBuf->naluBuffer);
                 }
             }
-#ifdef ARSTREAM_READER2_DEBUG
-            ARSTREAM_Reader2Debug_Delete(&(*reader)->rdbg);
+#ifdef ARSTREAM_READER2_MONITORING_OUTPUT
+            if ((*reader)->fMonitorOut)
+            {
+                fclose((*reader)->fMonitorOut);
+            }
 #endif
             ARSAL_Mutex_Destroy(&((*reader)->streamMutex));
             ARSAL_Mutex_Destroy(&((*reader)->monitoringMutex));
@@ -552,8 +614,6 @@ eARSTREAM_ERROR ARSTREAM_Reader2_Delete(ARSTREAM_Reader2_t **reader)
             {
                 free((*reader)->ifaceAddr);
             }
-            H264P_Free((*reader)->h264p);
-            (*reader)->h264p = NULL;
             free(*reader);
             *reader = NULL;
             retVal = ARSTREAM_OK;
@@ -776,8 +836,11 @@ static void ARSTREAM_Reader2_UpdateMonitoring(ARSTREAM_Reader2_t *reader, uint32
         *receptionTs = curTime;
     }
 
-#ifdef ARSTREAM_READER2_DEBUG
-    ARSTREAM_Reader2Debug_ProcessPacket(reader->rdbg, curTime, timestamp, seqNum, markerBit, bytes);
+#ifdef ARSTREAM_READER2_MONITORING_OUTPUT
+    if (reader->fMonitorOut)
+    {
+        fprintf(reader->fMonitorOut, "%llu %lu %u %u %lu\n", (long long unsigned int)curTime, (long unsigned int)timestamp, seqNum, markerBit, (long unsigned int)bytes);
+    }
 #endif
 }
 
@@ -868,12 +931,12 @@ static int ARSTREAM_Reader2_CheckBufferSize(ARSTREAM_Reader2_t *reader, int payl
     if (reader->currentNaluSize + payloadSize > reader->currentNaluBufferSize)
     {
         uint32_t nextNaluBufferSize = reader->currentNaluSize + payloadSize, dummy = 0;
-        uint8_t *nextNaluBuffer = reader->naluCallback(ARSTREAM_READER2_CAUSE_NALU_BUFFER_TOO_SMALL, reader->currentNaluBuffer, 0, 0, 0, 0, 0, 0, &nextNaluBufferSize, reader->custom);
+        uint8_t *nextNaluBuffer = reader->naluCallback(ARSTREAM_READER2_CAUSE_NALU_BUFFER_TOO_SMALL, reader->currentNaluBuffer, 0, 0, 0, 0, 0, &nextNaluBufferSize, reader->custom);
         ret = -1;
         if ((nextNaluBufferSize > 0) && (nextNaluBufferSize >= reader->currentNaluSize + payloadSize))
         {
             memcpy(nextNaluBuffer, reader->currentNaluBuffer, reader->currentNaluSize);
-            reader->naluCallback(ARSTREAM_READER2_CAUSE_NALU_COPY_COMPLETE, reader->currentNaluBuffer, 0, 0, 0, 0, 0, 0, &dummy, reader->custom);
+            reader->naluCallback(ARSTREAM_READER2_CAUSE_NALU_COPY_COMPLETE, reader->currentNaluBuffer, 0, 0, 0, 0, 0, &dummy, reader->custom);
             ret = 0;
         }
         reader->currentNaluBuffer = nextNaluBuffer;
@@ -886,51 +949,6 @@ static int ARSTREAM_Reader2_CheckBufferSize(ARSTREAM_Reader2_t *reader, int payl
 
 static void ARSTREAM_Reader2_OutputNalu(ARSTREAM_Reader2_t *reader, uint64_t receptionTs, uint64_t auTimestamp, int isFirstNaluInAu, int isLastNaluInAu, int missingPacketsBefore)
 {
-    eARSTREAM_READER2_H264_SLICE_TYPE sliceType = ARSTREAM_READER2_H264_NON_VCL;
-
-    int ret = H264P_ReadNextNalu_buffer(reader->h264p, reader->currentNaluBuffer, reader->currentNaluSize, NULL);
-    if (ret < 0)
-    {
-        ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_READER2_TAG, "H264P_ReadNextNalu_buffer() failed (%d)", ret);
-    }
-    else
-    {
-        ret = H264P_ParseNalu(reader->h264p);
-        if (ret < 0)
-        {
-            ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_READER2_TAG, "H264P_ParseNalu() failed (%d)", ret);
-        }
-        else
-        {
-            int naluType = H264P_GetLastNaluType(reader->h264p);
-            if ((naluType == 1) || (naluType == 5))
-            {
-                H264P_SliceInfo_t sliceInfo;
-                memset(&sliceInfo, 0, sizeof(sliceInfo));
-                ret = H264P_GetSliceInfo(reader->h264p, &sliceInfo);
-                if (ret < 0)
-                {
-                    ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "H264P_GetSliceInfo() failed (%d)", ret);
-                }
-                else
-                {
-                    if (sliceInfo.sliceTypeMod5 == 2)
-                    {
-                        sliceType = ARSTREAM_READER2_H264_SLICE_I;
-                    }
-                    else if (sliceInfo.sliceTypeMod5 == 0)
-                    {
-                        sliceType = ARSTREAM_READER2_H264_SLICE_P;
-                    }
-                }
-            }
-        }
-    }
-
-#ifdef ARSTREAM_READER2_DEBUG
-    ARSTREAM_Reader2Debug_ProcessNalu(reader->rdbg, reader->currentNaluBuffer, reader->currentNaluSize, auTimestamp, receptionTs,
-                                      missingPacketsBefore, 1, isFirstNaluInAu, isLastNaluInAu);
-#endif
     if (reader->resenderCount > 0)
     {
         int resendRet = ARSTREAM_Reader2_ResendNalu(reader, reader->currentNaluBuffer, reader->currentNaluSize, auTimestamp, isLastNaluInAu);
@@ -940,7 +958,7 @@ static void ARSTREAM_Reader2_OutputNalu(ARSTREAM_Reader2_t *reader, uint64_t rec
         }
     }
     reader->currentNaluBuffer = reader->naluCallback(ARSTREAM_READER2_CAUSE_NALU_COMPLETE, reader->currentNaluBuffer, reader->currentNaluSize, auTimestamp,
-                                                     isFirstNaluInAu, isLastNaluInAu, missingPacketsBefore, sliceType, &(reader->currentNaluBufferSize), reader->custom);
+                                                     isFirstNaluInAu, isLastNaluInAu, missingPacketsBefore, &(reader->currentNaluBufferSize), reader->custom);
 }
 
 
@@ -1279,7 +1297,7 @@ void* ARSTREAM_Reader2_RunRecvThread(void *ARSTREAM_Reader2_t_Param)
         ARSAL_Mutex_Unlock(&(reader->streamMutex));
     }
 
-    reader->naluCallback(ARSTREAM_READER2_CAUSE_CANCEL, reader->currentNaluBuffer, 0, 0, 0, 0, 0, 0, &(reader->currentNaluBufferSize), reader->custom);
+    reader->naluCallback(ARSTREAM_READER2_CAUSE_CANCEL, reader->currentNaluBuffer, 0, 0, 0, 0, 0, &(reader->currentNaluBufferSize), reader->custom);
 
     ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Stream reader receiving thread ended");
     ARSAL_Mutex_Lock(&(reader->streamMutex));

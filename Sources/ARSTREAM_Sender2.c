@@ -96,16 +96,19 @@
 #define ARSTREAM_SENDER2_MONITORING_OUTPUT
 #ifdef ARSTREAM_SENDER2_MONITORING_OUTPUT
     #include <stdio.h>
+
     #define ARSTREAM_SENDER2_MONITORING_OUTPUT_ALLOW_DRONE
     #define ARSTREAM_SENDER2_MONITORING_OUTPUT_PATH_DRONE "/data/ftp/internal_000/streamdebug"
     #define ARSTREAM_SENDER2_MONITORING_OUTPUT_ALLOW_NAP_USB
     #define ARSTREAM_SENDER2_MONITORING_OUTPUT_PATH_NAP_USB "/tmp/mnt/STREAMDEBUG/streamdebug"
     //#define ARSTREAM_SENDER2_MONITORING_OUTPUT_ALLOW_NAP_INTERNAL
     #define ARSTREAM_SENDER2_MONITORING_OUTPUT_PATH_NAP_INTERNAL "/data/skycontroller/streamdebug"
-    //#define ARSTREAM_SENDER2_MONITORING_OUTPUT_ALLOW_ANDROID_INTERNAL
+    #define ARSTREAM_SENDER2_MONITORING_OUTPUT_ALLOW_ANDROID_INTERNAL
     #define ARSTREAM_SENDER2_MONITORING_OUTPUT_PATH_ANDROID_INTERNAL "/storage/emulated/legacy/FF/streamdebug"
     #define ARSTREAM_SENDER2_MONITORING_OUTPUT_ALLOW_PCLINUX
     #define ARSTREAM_SENDER2_MONITORING_OUTPUT_PATH_PCLINUX "./streamdebug"
+
+    #define ARSTREAM_SENDER2_MONITORING_OUTPUT_FILENAME "sender_monitor"
 #endif
 
 
@@ -589,7 +592,7 @@ ARSTREAM_Sender2_t* ARSTREAM_Sender2_New(ARSTREAM_Sender2_Config_t *config, void
         {
             for (i = 0; i < 1000; i++)
             {
-                snprintf(szOutputFileName, 128, "%s/sender_monitor_%03d.dat", pszFilePath, i);
+                snprintf(szOutputFileName, 128, "%s/%s_%03d.dat", pszFilePath, ARSTREAM_SENDER2_MONITORING_OUTPUT_FILENAME, i);
                 if (access(szOutputFileName, F_OK) == -1)
                 {
                     // file does not exist
@@ -646,6 +649,12 @@ ARSTREAM_Sender2_t* ARSTREAM_Sender2_New(ARSTREAM_Sender2_Config_t *config, void
         {
             free(retSender->ifaceAddr);
         }
+#ifdef ARSTREAM_SENDER2_MONITORING_OUTPUT
+        if ((retSender) && (retSender->fMonitorOut))
+        {
+            fclose(retSender->fMonitorOut);
+        }
+#endif
         free(retSender);
         retSender = NULL;
     }
@@ -819,10 +828,10 @@ static void ARSTREAM_Sender2_UpdateMonitoring(ARSTREAM_Sender2_t *sender, uint64
 #ifdef ARSTREAM_SENDER2_MONITORING_OUTPUT
     if (sender->fMonitorOut)
     {
-        fprintf(sender->fMonitorOut, "%llu ", curTime);
-        fprintf(sender->fMonitorOut, "%llu ", inputTimestamp);
-        fprintf(sender->fMonitorOut, "%llu ", auTimestamp);
-        fprintf(sender->fMonitorOut, "%lu %u %u %lu %lu\n", rtpTimestamp, seqNum, markerBit, bytesSent, bytesDropped);
+        fprintf(sender->fMonitorOut, "%llu ", (long long unsigned int)curTime);
+        fprintf(sender->fMonitorOut, "%llu ", (long long unsigned int)inputTimestamp);
+        fprintf(sender->fMonitorOut, "%llu ", (long long unsigned int)auTimestamp);
+        fprintf(sender->fMonitorOut, "%lu %u %u %lu %lu\n", (long unsigned int)rtpTimestamp, seqNum, markerBit, (long unsigned int)bytesSent, (long unsigned int)bytesDropped);
     }
 #endif
 }
