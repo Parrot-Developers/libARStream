@@ -87,7 +87,9 @@ typedef enum {
  * @warning If the cause is ARSTREAM_READER2_CAUSE_FRAME_TOO_SMALL, returning a buffer shorter than 'frameSize' will cause the library to skip the current frame
  * @warning In any case, returning a NULL buffer is not supported.
  */
-typedef uint8_t* (*ARSTREAM_Reader2_NaluCallback_t) (eARSTREAM_READER2_CAUSE cause, uint8_t *naluBuffer, int naluSize, uint64_t auTimestamp, int isFirstNaluInAu, int isLastNaluInAu, int missingPacketsBefore, int *newNaluBufferSize, void *custom);
+typedef uint8_t* (*ARSTREAM_Reader2_NaluCallback_t) (eARSTREAM_READER2_CAUSE cause, uint8_t *naluBuffer, int naluSize, uint64_t auTimestamp,
+                                                     uint64_t auTimestampShifted, int isFirstNaluInAu, int isLastNaluInAu,
+                                                     int missingPacketsBefore, int *newNaluBufferSize, void *custom);
 
 typedef struct ARSTREAM_Reader2_Config_t {
     const char *ifaceAddr;

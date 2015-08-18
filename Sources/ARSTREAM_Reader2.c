@@ -120,6 +120,7 @@
 
 typedef struct ARSTREAM_Reader2_MonitoringPoint_s {
     uint64_t recvTimestamp;
+    uint64_t timestampShifted;
     uint32_t timestamp;
     uint16_t seqNum;
     uint16_t markerBit;
@@ -158,7 +159,7 @@ struct ARSTREAM_Reader2_t {
     int currentNaluBufferSize; // Usable length of the buffer
     int currentNaluSize;       // Actual data length
     uint8_t *currentNaluBuffer;
-    uint32_t firstTimestamp;
+    uint64_t clockDelta;
 
     /* Thread status */
     ARSAL_Mutex_t streamMutex;
@@ -486,7 +487,7 @@ ARSTREAM_Reader2_t* ARSTREAM_Reader2_New(ARSTREAM_Reader2_Config_t *config, void
 
         if (retReader->fMonitorOut)
         {
-            fprintf(retReader->fMonitorOut, "recvTimestamp rtpTimestamp rtpSeqNum rtpMarkerBit bytes\n");
+            fprintf(retReader->fMonitorOut, "recvTimestamp rtpTimestamp rtpTimestampShifted rtpSeqNum rtpMarkerBit bytes\n");
         }
     }
 #endif //#ifdef ARSTREAM_READER2_MONITORING_OUTPUT
@@ -667,7 +668,7 @@ static int ARSTREAM_Reader2_Bind(ARSTREAM_Reader2_t *reader)
     reader->recvSocket = ARSAL_Socket_Create(AF_INET, SOCK_DGRAM, 0);
     if (reader->recvSocket < 0)
     {
-        ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Failed to create socket");
+        ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Failed to create receive socket");
         ret = -1;
     }
 
@@ -784,7 +785,7 @@ static int ARSTREAM_Reader2_Bind(ARSTREAM_Reader2_t *reader)
     if (ret == 0)
     {
         /* set the socket buffer size */
-        err = ARSTREAM_Reader2_SetSocketReceiveBufferSize(reader, 600 * 1024); //TODO
+        err = ARSTREAM_Reader2_SetSocketReceiveBufferSize(reader, 75000); //TODO
         if (err != 0)
         {
             ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Failed to set the socket buffer size (%d)", err);
@@ -805,12 +806,100 @@ static int ARSTREAM_Reader2_Bind(ARSTREAM_Reader2_t *reader)
 }
 
 
-static void ARSTREAM_Reader2_UpdateMonitoring(ARSTREAM_Reader2_t *reader, uint32_t timestamp, uint16_t seqNum, uint16_t markerBit, uint32_t bytes, uint64_t *receptionTs)
+static int ARSTREAM_Reader2_SendSocketSetup(ARSTREAM_Reader2_t *reader)
 {
-    uint64_t curTime;
+    int ret = 0;
+
+    struct sockaddr_in sendSin;
+    int err;
+
+    /* check parameters */
+    //TODO
+    if ((!reader->recvAddr) || (!strlen(reader->recvAddr)))
+    {
+        ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Wrong peer address");
+        ret = -1;
+    }
+
+    if (ret == 0)
+    {
+        /* create socket */
+        reader->sendSocket = ARSAL_Socket_Create(AF_INET, SOCK_DGRAM, 0);
+        if (reader->sendSocket < 0)
+        {
+            ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Failed to create send socket");
+            ret = -1;
+        }
+    }
+
+    if (ret == 0)
+    {
+        /* send address */
+        memset(&sendSin, 0, sizeof(struct sockaddr_in));
+        sendSin.sin_family = AF_INET;
+        sendSin.sin_port = htons(5005); //TODO
+        err = inet_pton(AF_INET, reader->recvAddr, &(sendSin.sin_addr));
+        if (err <= 0)
+        {
+            ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Failed to convert address '%s'", reader->recvAddr);
+            ret = -1;
+        }
+    }
+
+    if (ret == 0)
+    {
+        /* set to non-blocking */
+        int flags = fcntl(reader->sendSocket, F_GETFL, 0);
+        fcntl(reader->sendSocket, F_SETFL, flags | O_NONBLOCK);
+
+        int addrFirst = atoi(reader->recvAddr);
+        if ((addrFirst >= 224) && (addrFirst <= 239))
+        {
+            /* multicast: not supported */
+
+            ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Cannot send to multicast peer address '%s'", reader->recvAddr);
+            ret = -1;
+        }
+        else
+        {
+            /* unicast */
+
+            /* connect the socket */
+            err = ARSAL_Socket_Connect(reader->sendSocket, (struct sockaddr*)&sendSin, sizeof(sendSin));
+            if (err != 0)
+            {
+                ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Error on socket connect to addr='%s' port=%d: error=%d (%s)", reader->recvAddr, 5005 /*TODO*/, errno, strerror(errno));
+                ret = -1;
+            }
+            else
+            {
+                ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_READER2_TAG, "Socket connected to addr='%s' port=%d", reader->recvAddr, 5005 /*TODO*/);
+            }
+        }
+    }
+
+    if (ret != 0)
+    {
+        if (reader->sendSocket >= 0)
+        {
+            ARSAL_Socket_Close(reader->sendSocket);
+        }
+        reader->sendSocket = -1;
+    }
+
+    return ret;
+}
+
+
+static void ARSTREAM_Reader2_UpdateMonitoring(ARSTREAM_Reader2_t *reader, uint32_t timestamp, uint16_t seqNum, uint16_t markerBit, uint32_t bytes)
+{
+    uint64_t curTime, timestampShifted;
     struct timespec t1;
     ARSAL_Time_GetTime(&t1);
     curTime = (uint64_t)t1.tv_sec * 1000000 + (uint64_t)t1.tv_nsec / 1000;
+
+    //TODO: handle the timestamp 32 bits loopback
+    timestampShifted = (reader->clockDelta != 0) ? (((((uint64_t)timestamp * 1000) + 45) / 90) - reader->clockDelta) : 0; /* 90000 Hz clock to microseconds */
 
     ARSAL_Mutex_Lock(&(reader->monitoringMutex));
 
@@ -821,21 +910,17 @@ static void ARSTREAM_Reader2_UpdateMonitoring(ARSTREAM_Reader2_t *reader, uint32
     reader->monitoringIndex = (reader->monitoringIndex + 1) % ARSTREAM_READER2_MONITORING_MAX_POINTS;
     reader->monitoringPoint[reader->monitoringIndex].bytes = bytes;
     reader->monitoringPoint[reader->monitoringIndex].timestamp = timestamp;
+    reader->monitoringPoint[reader->monitoringIndex].timestampShifted = timestampShifted;
     reader->monitoringPoint[reader->monitoringIndex].seqNum = seqNum;
     reader->monitoringPoint[reader->monitoringIndex].markerBit = markerBit;
     reader->monitoringPoint[reader->monitoringIndex].recvTimestamp = curTime;
 
     ARSAL_Mutex_Unlock(&(reader->monitoringMutex));
 
-    if (receptionTs)
-    {
-        *receptionTs = curTime;
-    }
-
 #ifdef ARSTREAM_READER2_MONITORING_OUTPUT
     if (reader->fMonitorOut)
     {
-        fprintf(reader->fMonitorOut, "%llu %lu %u %u %lu\n", (long long unsigned int)curTime, (long unsigned int)timestamp, seqNum, markerBit, (long unsigned int)bytes);
+        fprintf(reader->fMonitorOut, "%llu %lu %llu %u %u %lu\n", (long long unsigned int)curTime, (long unsigned int)timestamp, (long long unsigned int)timestampShifted, seqNum, markerBit, (long unsigned int)bytes);
     }
 #endif
 }
@@ -901,6 +986,16 @@ static int ARSTREAM_Reader2_ReadData(ARSTREAM_Reader2_t *reader, uint8_t *recvBu
                         *recvSize = 0;
                     }
                 }
+                else
+                {
+                    /* no poll error, no timeout, but socket is not ready */
+                    int error = 0;
+                    socklen_t errlen = sizeof(error);
+                    ARSAL_Socket_Getsockopt(reader->recvSocket, SOL_SOCKET, SO_ERROR, (void *)&error, &errlen);
+                    ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "No poll error, no timeout, but socket is not ready (revents = %d, error = %d)", p.revents, error);
+                    ret = -1;
+                    *recvSize = 0;
+                }
                 break;
             default:
                 /* failed: socket error */
@@ -927,7 +1022,7 @@ static int ARSTREAM_Reader2_CheckBufferSize(ARSTREAM_Reader2_t *reader, int payl
     if ((reader->currentNaluBuffer == NULL) || (reader->currentNaluSize + payloadSize > reader->currentNaluBufferSize))
     {
         uint32_t nextNaluBufferSize = reader->currentNaluSize + payloadSize, dummy = 0;
-        uint8_t *nextNaluBuffer = reader->naluCallback(ARSTREAM_READER2_CAUSE_NALU_BUFFER_TOO_SMALL, reader->currentNaluBuffer, 0, 0, 0, 0, 0, &nextNaluBufferSize, reader->custom);
+        uint8_t *nextNaluBuffer = reader->naluCallback(ARSTREAM_READER2_CAUSE_NALU_BUFFER_TOO_SMALL, reader->currentNaluBuffer, 0, 0, 0, 0, 0, 0, &nextNaluBufferSize, reader->custom);
         ret = -1;
         if ((nextNaluBuffer != NULL) && (nextNaluBufferSize > 0) && (nextNaluBufferSize >= reader->currentNaluSize + payloadSize))
         {
@@ -935,7 +1030,7 @@ static int ARSTREAM_Reader2_CheckBufferSize(ARSTREAM_Reader2_t *reader, int payl
             {
                 memcpy(nextNaluBuffer, reader->currentNaluBuffer, reader->currentNaluSize);
             }
-            reader->naluCallback(ARSTREAM_READER2_CAUSE_NALU_COPY_COMPLETE, reader->currentNaluBuffer, 0, 0, 0, 0, 0, &dummy, reader->custom);
+            reader->naluCallback(ARSTREAM_READER2_CAUSE_NALU_COPY_COMPLETE, reader->currentNaluBuffer, 0, 0, 0, 0, 0, 0, &dummy, reader->custom);
             ret = 0;
         }
         reader->currentNaluBuffer = nextNaluBuffer;
@@ -946,17 +1041,25 @@ static int ARSTREAM_Reader2_CheckBufferSize(ARSTREAM_Reader2_t *reader, int payl
 }
 
 
-static void ARSTREAM_Reader2_OutputNalu(ARSTREAM_Reader2_t *reader, uint64_t receptionTs, uint64_t auTimestamp, int isFirstNaluInAu, int isLastNaluInAu, int missingPacketsBefore)
+static void ARSTREAM_Reader2_OutputNalu(ARSTREAM_Reader2_t *reader, uint32_t timestamp, int isFirstNaluInAu, int isLastNaluInAu, int missingPacketsBefore)
 {
+    uint64_t timestampScaled, timestampScaledShifted;
+
+    timestampScaled = ((((uint64_t)timestamp * 1000) + 45) / 90); /* 90000 Hz clock to microseconds */
+    //TODO: handle the timestamp 32 bits loopback
+    timestampScaledShifted = (reader->clockDelta != 0) ? (timestampScaled - reader->clockDelta) : 0; /* 90000 Hz clock to microseconds */
+
     if (reader->resenderCount > 0)
     {
-        int resendRet = ARSTREAM_Reader2_ResendNalu(reader, reader->currentNaluBuffer, reader->currentNaluSize, auTimestamp, isLastNaluInAu);
+        int resendRet = ARSTREAM_Reader2_ResendNalu(reader, reader->currentNaluBuffer, reader->currentNaluSize, timestampScaled, isLastNaluInAu);
         if (resendRet != 0)
         {
             //ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Failed to resend NALU (%d)", resendRet); //TODO debug
         }
     }
-    reader->currentNaluBuffer = reader->naluCallback(ARSTREAM_READER2_CAUSE_NALU_COMPLETE, reader->currentNaluBuffer, reader->currentNaluSize, auTimestamp,
+
+    reader->currentNaluBuffer = reader->naluCallback(ARSTREAM_READER2_CAUSE_NALU_COMPLETE, reader->currentNaluBuffer, reader->currentNaluSize,
+                                                     timestampScaled, timestampScaledShifted,
                                                      isFirstNaluInAu, isLastNaluInAu, missingPacketsBefore, &(reader->currentNaluBufferSize), reader->custom);
 }
 
@@ -969,8 +1072,7 @@ void* ARSTREAM_Reader2_RunRecvThread(void *ARSTREAM_Reader2_t_Param)
     int recvSize, payloadSize;
     int fuPending = 0, currentAuSize = 0;
     ARSTREAM_NetworkHeaders_DataHeader2_t *header = NULL;
-    uint32_t rtpTimestamp = 0;
-    uint64_t currentTimestamp = 0, previousTimestamp = 0, receptionTs = 0;
+    uint32_t rtpTimestamp = 0, previousTimestamp = 0;
     uint16_t currentFlags;
     int auStartSeqNum = -1, naluStartSeqNum = -1, previousSeqNum = -1, currentSeqNum, seqNumDelta;
     int gapsInSeqNum = 0, gapsInSeqNumAu = 0, uncertainAuChange = 0;
@@ -1030,15 +1132,9 @@ void* ARSTREAM_Reader2_RunRecvThread(void *ARSTREAM_Reader2_t_Param)
         else if (recvSize >= sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t))
         {
             rtpTimestamp = ntohl(header->timestamp);
-            currentTimestamp = (((uint64_t)rtpTimestamp * 1000) + 45) / 90; /* 90000 Hz clock to microseconds */
-            //TODO: handle the timestamp 32 bits loopback
-            if (reader->firstTimestamp == 0)
-            {
-                reader->firstTimestamp = rtpTimestamp;
-            }
             currentSeqNum = (int)ntohs(header->seqNum);
             currentFlags = ntohs(header->flags);
-            ARSTREAM_Reader2_UpdateMonitoring(reader, rtpTimestamp, currentSeqNum, (currentFlags & (1 << 7)) ? 1 : 0, (uint32_t)recvSize, &receptionTs);
+            ARSTREAM_Reader2_UpdateMonitoring(reader, rtpTimestamp, currentSeqNum, (currentFlags & (1 << 7)) ? 1 : 0, (uint32_t)recvSize);
 
             if (previousSeqNum != -1)
             {
@@ -1060,7 +1156,7 @@ void* ARSTREAM_Reader2_RunRecvThread(void *ARSTREAM_Reader2_t_Param)
 
             if (seqNumDelta > 0)
             {
-                if ((previousTimestamp != 0) && (currentTimestamp != previousTimestamp))
+                if ((previousTimestamp != 0) && (rtpTimestamp != previousTimestamp))
                 {
                     if (gapsInSeqNumAu)
                     {
@@ -1144,7 +1240,7 @@ void* ARSTREAM_Reader2_RunRecvThread(void *ARSTREAM_Reader2_t_Param)
                                         }
                                         /*ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Output FU-A NALU (seqNum %d->%d) isFirst=%d isLast=%d gapsInSeqNum=%d",
                                                     naluStartSeqNum, currentSeqNum, isFirst, isLast, gapsInSeqNum);*/ //TODO debug
-                                        ARSTREAM_Reader2_OutputNalu(reader, receptionTs, currentTimestamp, isFirst, isLast, gapsInSeqNum);
+                                        ARSTREAM_Reader2_OutputNalu(reader, rtpTimestamp, isFirst, isLast, gapsInSeqNum);
                                         gapsInSeqNum = 0;
                                     }
                                 }
@@ -1209,7 +1305,7 @@ void* ARSTREAM_Reader2_RunRecvThread(void *ARSTREAM_Reader2_t_Param)
                                     currentAuSize += naluSize;
                                     /*ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Output STAP-A NALU (seqNum %d) isFirst=%d isLast=%d gapsInSeqNum=%d",
                                                 currentSeqNum, isFirst, isLast, gapsInSeqNum);*/ //TODO debug
-                                    ARSTREAM_Reader2_OutputNalu(reader, receptionTs, currentTimestamp, isFirst, isLast, gapsInSeqNum);
+                                    ARSTREAM_Reader2_OutputNalu(reader, rtpTimestamp, isFirst, isLast, gapsInSeqNum);
                                     gapsInSeqNum = 0;
                                 }
                                 else
@@ -1257,7 +1353,7 @@ void* ARSTREAM_Reader2_RunRecvThread(void *ARSTREAM_Reader2_t_Param)
                             currentAuSize += payloadSize;
                             /*ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Output single NALU (seqNum %d) isFirst=%d isLast=%d gapsInSeqNum=%d",
                                         currentSeqNum, isFirst, isLast, gapsInSeqNum);*/ //TODO debug
-                            ARSTREAM_Reader2_OutputNalu(reader, receptionTs, currentTimestamp, isFirst, isLast, gapsInSeqNum);
+                            ARSTREAM_Reader2_OutputNalu(reader, rtpTimestamp, isFirst, isLast, gapsInSeqNum);
                             gapsInSeqNum = 0;
                         }
                         else
@@ -1281,7 +1377,7 @@ void* ARSTREAM_Reader2_RunRecvThread(void *ARSTREAM_Reader2_t_Param)
                 }
 
                 previousSeqNum = currentSeqNum;
-                previousTimestamp = currentTimestamp;
+                previousTimestamp = rtpTimestamp;
             }
             else
             {
@@ -1296,7 +1392,7 @@ void* ARSTREAM_Reader2_RunRecvThread(void *ARSTREAM_Reader2_t_Param)
         ARSAL_Mutex_Unlock(&(reader->streamMutex));
     }
 
-    reader->naluCallback(ARSTREAM_READER2_CAUSE_CANCEL, reader->currentNaluBuffer, 0, 0, 0, 0, 0, &(reader->currentNaluBufferSize), reader->custom);
+    reader->naluCallback(ARSTREAM_READER2_CAUSE_CANCEL, reader->currentNaluBuffer, 0, 0, 0, 0, 0, 0, &(reader->currentNaluBufferSize), reader->custom);
 
     ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Stream reader receiving thread ended");
     ARSAL_Mutex_Lock(&(reader->streamMutex));
@@ -1316,16 +1412,173 @@ void* ARSTREAM_Reader2_RunRecvThread(void *ARSTREAM_Reader2_t_Param)
 void* ARSTREAM_Reader2_RunSendThread(void *ARSTREAM_Reader2_t_Param)
 {
     ARSTREAM_Reader2_t *reader = (ARSTREAM_Reader2_t *)ARSTREAM_Reader2_t_Param;
+    uint8_t *msgBuffer;
+    int msgBufferSize = sizeof(ARSTREAM_NetworkHeaders_ClockFrame_t);
+    ARSTREAM_NetworkHeaders_ClockFrame_t *clockFrame;
+    uint64_t originateTimestamp = 0;
+    uint64_t receiveTimestamp = 0;
+    uint64_t transmitTimestamp = 0;
+    uint64_t receiveTimestamp2 = 0;
+    uint64_t originateTimestamp2 = 0;
+    int64_t clockDelta = 0;
+    int64_t rtDelay = 0;
+    uint32_t tsH, tsL;
+    ssize_t bytes;
+    struct timespec t1;
+    struct pollfd p;
+    int shouldStop, ret, pollRet;
+
+/* DEBUG */
+    /*FILE *fDebug;
+    fDebug = fopen("clock.dat", "w");*/
+/* /DEBUG */
+
+    /* Parameters check */
+    if (reader == NULL)
+    {
+        ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Error while starting %s, bad parameters", __FUNCTION__);
+        return (void *)0;
+    }
+
+    /* Alloc and check */
+    msgBuffer = malloc(msgBufferSize);
+    if (msgBuffer == NULL)
+    {
+        ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Error while starting %s, can not alloc memory", __FUNCTION__);
+        return (void *)0;
+    }
+    clockFrame = (ARSTREAM_NetworkHeaders_ClockFrame_t*)msgBuffer;
+
+    /* Socket setup */
+    ret = ARSTREAM_Reader2_SendSocketSetup(reader);
+    if (ret != 0)
+    {
+        ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Failed to setup send socket (error %d) - aborting", ret);
+        free(msgBuffer);
+        return (void*)0;
+    }
 
     ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Stream reader sending thread running");
     ARSAL_Mutex_Lock(&(reader->streamMutex));
     reader->sendThreadStarted = 1;
+    shouldStop = reader->threadsShouldStop;
     ARSAL_Mutex_Unlock(&(reader->streamMutex));
+
+    while (shouldStop == 0)
+    {
+        ARSAL_Time_GetTime(&t1);
+        transmitTimestamp = (uint64_t)t1.tv_sec * 1000000 + (uint64_t)t1.tv_nsec / 1000;
+
+        memset(clockFrame, 0, sizeof(ARSTREAM_NetworkHeaders_ClockFrame_t));
+
+        tsH = (uint32_t)(transmitTimestamp >> 32);
+        tsL = (uint32_t)(transmitTimestamp & 0xFFFFFFFF);
+        clockFrame->transmitTimestampH = htonl(tsH);
+        clockFrame->transmitTimestampL = htonl(tsL);
+
+        bytes = ARSAL_Socket_Send(reader->sendSocket, msgBuffer, msgBufferSize, 0);
+        if (bytes < 0)
+        {
+            ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Socket send error: error=%d (%s)", errno, strerror(errno));
+        }
+        else
+        {
+            //ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_READER2_TAG, "Request sent (%d bytes) - transmitTS: %llu", bytes, (long long unsigned int)transmitTimestamp); //TODO: debug
+
+            originateTimestamp2 = transmitTimestamp;
+
+            /* poll */
+            p.fd = reader->sendSocket;
+            p.events = POLLIN;
+            p.revents = 0;
+            pollRet = poll(&p, 1, 100); //TODO
+            if (pollRet == 0)
+            {
+                /* failed: poll timeout */
+                ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_READER2_TAG, "Polling timed out"); //TODO: debug
+            }
+            else if (pollRet < 0)
+            {
+                /* failed: poll error */
+                ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Poll error: error=%d (%s)", errno, strerror(errno));
+            }
+            else if (p.revents & POLLIN)
+            {
+                do
+                {
+                    bytes = ARSAL_Socket_Recv(reader->sendSocket, msgBuffer, msgBufferSize, 0);
+                    if (bytes >= 0)
+                    {
+                        /* success */
+                        ARSAL_Time_GetTime(&t1);
+                        receiveTimestamp2 = (uint64_t)t1.tv_sec * 1000000 + (uint64_t)t1.tv_nsec / 1000;
+                        originateTimestamp = ((uint64_t)ntohl(clockFrame->originateTimestampH) << 32) + (uint64_t)ntohl(clockFrame->originateTimestampL);
+                        receiveTimestamp = ((uint64_t)ntohl(clockFrame->receiveTimestampH) << 32) + (uint64_t)ntohl(clockFrame->receiveTimestampL);
+                        transmitTimestamp = ((uint64_t)ntohl(clockFrame->transmitTimestampH) << 32) + (uint64_t)ntohl(clockFrame->transmitTimestampL);
+
+                        if (originateTimestamp == originateTimestamp2)
+                        {
+                            clockDelta = (int64_t)(receiveTimestamp + transmitTimestamp) / 2 - (int64_t)(originateTimestamp + receiveTimestamp2) / 2;
+                            reader->clockDelta = clockDelta;
+                            rtDelay = (receiveTimestamp2 - originateTimestamp) - (transmitTimestamp - receiveTimestamp);
+
+/* DEBUG */
+                            /*setlocale(LC_ALL, "C");
+                            fprintf(fDebug, "%llu %llu %llu %llu %lld %lld\n",
+                                    (long long unsigned int)originateTimestamp, (long long unsigned int)receiveTimestamp, (long long unsigned int)transmitTimestamp, (long long unsigned int)receiveTimestamp2,
+                                    (long long int)clockDelta, (long long int)rtDelay);
+                            setlocale(LC_ALL, "");*/
+/* /DEBUG */
+
+                            ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_READER2_TAG, "Clock - originateTS: %llu | receiveTS: %llu | transmitTS: %llu | receiveTS2: %llu | delta: %lld | rtDelay: %lld",
+                                        (long long unsigned int)originateTimestamp, (long long unsigned int)receiveTimestamp, (long long unsigned int)transmitTimestamp, (long long unsigned int)receiveTimestamp2,
+                                        (long long int)clockDelta, (long long int)rtDelay); //TODO: debug
+                        }
+                        else
+                        {
+                            ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_READER2_TAG, "Originate timestamp missmatch (%llu vs. %llu)", (long long unsigned int)originateTimestamp2, (long long unsigned int)originateTimestamp); //TODO: debug
+                        }
+                    }
+                    else if (errno != EAGAIN)
+                    {
+                        /* failed: socket error */
+                        ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Socket receive error %d ('%s')", errno, strerror(errno));
+                    }
+                }
+                while (bytes >= 0);
+            }
+            else
+            {
+                /* no poll error, no timeout, but socket is not ready */
+                int error = 0;
+                socklen_t errlen = sizeof(error);
+                ARSAL_Socket_Getsockopt(reader->sendSocket, SOL_SOCKET, SO_ERROR, (void *)&error, &errlen);
+                ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "No poll error, no timeout, but socket is not ready (revents = %d, error = %d)", p.revents, error);
+            }
+        }
+
+        usleep(200 * 1000);
+        //TODO
+
+        ARSAL_Mutex_Lock(&(reader->streamMutex));
+        shouldStop = reader->threadsShouldStop;
+        ARSAL_Mutex_Unlock(&(reader->streamMutex));
+    }
 
     ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Stream reader sending thread ended");
     ARSAL_Mutex_Lock(&(reader->streamMutex));
     reader->sendThreadStarted = 0;
     ARSAL_Mutex_Unlock(&(reader->streamMutex));
+
+    if (msgBuffer)
+    {
+        free(msgBuffer);
+        msgBuffer = NULL;
+    }
+
+/* DEBUG */
+    //fclose(fDebug);
+/* /DEBUG */
 
     return (void *)0;
 }
@@ -1392,7 +1645,7 @@ eARSTREAM_ERROR ARSTREAM_Reader2_GetMonitoring(ARSTREAM_Reader2_t *reader, uint6
             curTime = reader->monitoringPoint[idx].recvTimestamp;
             bytes = reader->monitoringPoint[idx].bytes;
             bytesSum += bytes;
-            auTimestamp = (((uint64_t)(reader->monitoringPoint[idx].timestamp - reader->firstTimestamp) * 1000) + 45) / 90; /* 90000 Hz clock to microseconds */
+            auTimestamp = ((((uint64_t)(reader->monitoringPoint[idx].timestamp /*TODO*/) * 1000) + 45) / 90) - reader->clockDelta; /* 90000 Hz clock to microseconds */
             receptionTime = curTime - auTimestamp;
             receptionTimeSum += receptionTime;
             currentSeqNum = reader->monitoringPoint[idx].seqNum;
@@ -1417,7 +1670,7 @@ eARSTREAM_ERROR ARSTREAM_Reader2_GetMonitoring(ARSTREAM_Reader2_t *reader, uint6
                 idx = (idx - 1 >= 0) ? idx - 1 : ARSTREAM_READER2_MONITORING_MAX_POINTS - 1;
                 curTime = reader->monitoringPoint[idx].recvTimestamp;
                 bytes = reader->monitoringPoint[idx].bytes;
-                auTimestamp = (((uint64_t)(reader->monitoringPoint[idx].timestamp - reader->firstTimestamp) * 1000) + 45) / 90; /* 90000 Hz clock to microseconds */
+                auTimestamp = ((((uint64_t)(reader->monitoringPoint[idx].timestamp /*TODO*/) * 1000) + 45) / 90) - reader->clockDelta; /* 90000 Hz clock to microseconds */
                 receptionTime = curTime - auTimestamp;
                 packetSizeVarSum += ((bytes - _meanPacketSize) * (bytes - _meanPacketSize));
                 receptionTimeVarSum += ((receptionTime - meanReceptionTime) * (receptionTime - meanReceptionTime));

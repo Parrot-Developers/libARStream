@@ -124,6 +124,18 @@ typedef struct {
 
 #define ARSTREAM_NETWORK_MAX_RTP_PAYLOAD_SIZE (0xFFFF - sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t) - ARSTREAM_NETWORK_UDP_HEADER_SIZE - ARSTREAM_NETWORK_IP_HEADER_SIZE)
 
+/**
+ * @brief Format of v2 stream clock frames
+ */
+typedef struct {
+    uint32_t originateTimestampH;
+    uint32_t originateTimestampL;
+    uint32_t receiveTimestampH;
+    uint32_t receiveTimestampL;
+    uint32_t transmitTimestampH;
+    uint32_t transmitTimestampL;
+} __attribute__ ((packed)) ARSTREAM_NetworkHeaders_ClockFrame_t;
+
 /*
  * Functions declarations
  */

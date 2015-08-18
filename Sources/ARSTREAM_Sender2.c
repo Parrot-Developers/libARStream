@@ -155,7 +155,6 @@ struct ARSTREAM_Sender2_t {
     void *custom;
 
     uint64_t lastAuTimestamp;
-    uint64_t firstTimestamp;
     uint64_t lastFifoDropTime;
     uint16_t seqNum;
     ARSAL_Mutex_t streamMutex;
@@ -991,6 +990,116 @@ static int ARSTREAM_Sender2_Connect(ARSTREAM_Sender2_t *sender)
 }
 
 
+static int ARSTREAM_Sender2_ReceiveSocketSetup(ARSTREAM_Sender2_t *sender)
+{
+    int ret = 0;
+
+    struct sockaddr_in recvSin;
+    int err;
+
+    /* check parameters */
+    //TODO
+
+    if (ret == 0)
+    {
+        /* create socket */
+        sender->recvSocket = ARSAL_Socket_Create(AF_INET, SOCK_DGRAM, 0);
+        if (sender->recvSocket < 0)
+        {
+            ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Failed to create send socket");
+            ret = -1;
+        }
+    }
+
+    if (ret == 0)
+    {
+        /* initialize socket */
+
+        /* set to non-blocking */
+        int flags = fcntl(sender->recvSocket, F_GETFL, 0);
+        fcntl(sender->recvSocket, F_SETFL, flags | O_NONBLOCK);
+
+        /* receive address */
+        memset(&recvSin, 0, sizeof(struct sockaddr_in));
+        recvSin.sin_family = AF_INET;
+        recvSin.sin_port = htons(5005); //TODO
+        recvSin.sin_addr.s_addr = htonl(INADDR_ANY);
+
+        if ((sender->sendAddr) && (strlen(sender->sendAddr)))
+        {
+            int addrFirst = atoi(sender->sendAddr);
+            if ((addrFirst >= 224) && (addrFirst <= 239))
+            {
+                /* multicast: not supported */
+
+                ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Cannot receive from multicast peer address '%s'", sender->sendAddr);
+                ret = -1;
+            }
+            else
+            {
+                /* unicast */
+                if ((sender->ifaceAddr) && (strlen(sender->ifaceAddr) > 0))
+                {
+                    err = inet_pton(AF_INET, sender->ifaceAddr, &(recvSin.sin_addr));
+                    if (err <= 0)
+                    {
+                        ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Failed to convert address '%s'", sender->ifaceAddr);
+                        ret = -1;
+                    }
+                }
+            }
+        }
+        else
+        {
+            /* unicast */
+            if ((sender->ifaceAddr) && (strlen(sender->ifaceAddr) > 0))
+            {
+                err = inet_pton(AF_INET, sender->ifaceAddr, &(recvSin.sin_addr));
+                if (err <= 0)
+                {
+                    ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Failed to convert address '%s'", sender->ifaceAddr);
+                    ret = -1;
+                }
+            }
+        }
+    }
+
+    if (ret == 0)
+    {
+        /* allow multiple sockets to use the same port */
+        unsigned int yes = 1;
+        err = ARSAL_Socket_Setsockopt(sender->recvSocket, SOL_SOCKET, SO_REUSEADDR, (char*)&yes, sizeof(yes));
+        if (err != 0)
+        {
+            ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Failed to set socket option SO_REUSEADDR: error=%d (%s)", errno, strerror(errno));
+            ret = -1;
+        }
+    }
+
+    if (ret == 0)
+    {
+        /* bind the socket */
+        err = ARSAL_Socket_Bind(sender->recvSocket, (struct sockaddr*)&recvSin, sizeof(recvSin));
+        if (err != 0)
+        {
+            ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Error on socket bind port=%d: error=%d (%s)", 5005 /*TODO*/, errno, strerror(errno));
+            ret = -1;
+        }
+    }
+
+    if (ret != 0)
+    {
+        if (sender->recvSocket >= 0)
+        {
+            ARSAL_Socket_Close(sender->recvSocket);
+        }
+        sender->recvSocket = -1;
+    }
+
+    return ret;
+}
+
+
 static int ARSTREAM_Sender2_SendData(ARSTREAM_Sender2_t *sender, uint8_t *sendBuffer, uint32_t sendSize, uint64_t inputTimestamp, uint64_t auTimestamp, int isLastInAu, int maxLatencyUs, int maxNetworkLatencyUs)
 {
     int ret = 0, totalLatencyDrop = 0, networkLatencyDrop = 0, fifoDrop = 0;
@@ -1007,11 +1116,8 @@ static int ARSTREAM_Sender2_SendData(ARSTREAM_Sender2_t *sender, uint8_t *sendBu
     }
     header->flags = htons(flags);
     header->seqNum = htons(sender->seqNum++);
-    if (sender->firstTimestamp == 0)
-    {
-        sender->firstTimestamp = auTimestamp;
-    }
-    rtpTimestamp = (uint32_t)(((((auTimestamp - sender->firstTimestamp) * 90) + 500) / 1000) & 0xFFFFFFFF); /* microseconds to 90000 Hz clock */
+    rtpTimestamp = (uint32_t)((((auTimestamp * 90) + 500) / 1000) & 0xFFFFFFFF); /* microseconds to 90000 Hz clock */
+    //TODO: handle the timestamp 32 bits loopback
     header->timestamp = htonl(rtpTimestamp);
     header->ssrc = htonl(ARSTREAM_NETWORK_HEADERS2_RTP_SSRC);
 
@@ -1468,7 +1574,7 @@ void* ARSTREAM_Sender2_RunSendThread (void *ARSTREAM_Sender2_t_Param)
             }
             else
             {
-                uint32_t rtpTimestamp = (uint32_t)(((((nalu.auTimestamp - sender->firstTimestamp) * 90) + 500) / 1000) & 0xFFFFFFFF);
+                uint32_t rtpTimestamp = (uint32_t)((((nalu.auTimestamp * 90) + 500) / 1000) & 0xFFFFFFFF);
                 ARSTREAM_Sender2_UpdateMonitoring(sender, nalu.naluInputTimestamp, nalu.auTimestamp, rtpTimestamp, sender->seqNum, nalu.isLastInAu, 0, nalu.naluSize);
                 if (nalu.drop)
                 {
@@ -1567,19 +1673,148 @@ void* ARSTREAM_Sender2_RunSendThread (void *ARSTREAM_Sender2_t_Param)
 
 void* ARSTREAM_Sender2_RunRecvThread(void *ARSTREAM_Sender2_t_Param)
 {
-    ARSTREAM_Sender2_t *sender = (ARSTREAM_Sender2_t*)ARSTREAM_Sender2_t_Param;
+    ARSTREAM_Sender2_t *sender = (ARSTREAM_Sender2_t *)ARSTREAM_Sender2_t_Param;
+    uint8_t *msgBuffer;
+    int msgBufferSize = sizeof(ARSTREAM_NetworkHeaders_ClockFrame_t);
+    ARSTREAM_NetworkHeaders_ClockFrame_t *clockFrame;
+    uint64_t originateTimestamp = 0;
+    uint64_t receiveTimestamp = 0;
+    uint64_t transmitTimestamp = 0;
+    uint64_t receiveTimestamp2 = 0;
+    int64_t clockDelta = 0;
+    int64_t rtDelay = 0;
+    uint32_t tsH, tsL;
+    ssize_t bytes;
+    struct timespec t1;
+    struct pollfd p;
+    struct sockaddr_in src_addr;
+    socklen_t addrlen = sizeof(src_addr);
+    int shouldStop, ret, pollRet;
+
+    /* Parameters check */
+    if (sender == NULL)
+    {
+        ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Error while starting %s, bad parameters", __FUNCTION__);
+        return (void *)0;
+    }
+
+    /* Alloc and check */
+    msgBuffer = malloc(msgBufferSize);
+    if (msgBuffer == NULL)
+    {
+        ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Error while starting %s, can not alloc memory", __FUNCTION__);
+        return (void *)0;
+    }
+    clockFrame = (ARSTREAM_NetworkHeaders_ClockFrame_t*)msgBuffer;
+
+    /* Socket setup */
+    ret = ARSTREAM_Sender2_ReceiveSocketSetup(sender);
+    if (ret != 0)
+    {
+        ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Failed to setup receive socket (error %d) - aborting", ret);
+        free(msgBuffer);
+        return (void*)0;
+    }
 
     ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_SENDER2_TAG, "Stream sender receiving thread running");
     ARSAL_Mutex_Lock(&(sender->streamMutex));
     sender->recvThreadStarted = 1;
+    shouldStop = sender->threadsShouldStop;
     ARSAL_Mutex_Unlock(&(sender->streamMutex));
+
+    while (shouldStop == 0)
+    {
+        /* poll */
+        p.fd = sender->recvSocket;
+        p.events = POLLIN;
+        p.revents = 0;
+        pollRet = poll(&p, 1, 500); //TODO
+        if (pollRet == 0)
+        {
+            /* failed: poll timeout */
+            ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Polling timed out"); //TODO: debug
+        }
+        else if (pollRet < 0)
+        {
+            /* failed: poll error */
+            ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Poll error: error=%d (%s)", errno, strerror(errno));
+        }
+        else if (p.revents & POLLIN)
+        {
+            bytes = ARSAL_Socket_Recvfrom(sender->recvSocket, msgBuffer, msgBufferSize, 0, (struct sockaddr*)&src_addr, &addrlen);
+            if (bytes >= 0)
+            {
+                /* success */
+                ARSAL_Time_GetTime(&t1);
+                receiveTimestamp = (uint64_t)t1.tv_sec * 1000000 + (uint64_t)t1.tv_nsec / 1000;
+
+                originateTimestamp = ((uint64_t)ntohl(clockFrame->transmitTimestampH) << 32) + (uint64_t)ntohl(clockFrame->transmitTimestampL);
+                ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Clock message received - originateTimestamp: %llu", (long long unsigned int)originateTimestamp); //TODO: debug
+
+                memset(clockFrame, 0, sizeof(ARSTREAM_NetworkHeaders_ClockFrame_t));
+
+                tsH = (uint32_t)(receiveTimestamp >> 32);
+                tsL = (uint32_t)(receiveTimestamp & 0xFFFFFFFF);
+                clockFrame->receiveTimestampH = htonl(tsH);
+                clockFrame->receiveTimestampL = htonl(tsL);
+
+                tsH = (uint32_t)(originateTimestamp >> 32);
+                tsL = (uint32_t)(originateTimestamp & 0xFFFFFFFF);
+                clockFrame->originateTimestampH = htonl(tsH);
+                clockFrame->originateTimestampL = htonl(tsL);
+
+                ARSAL_Time_GetTime(&t1);
+                transmitTimestamp = (uint64_t)t1.tv_sec * 1000000 + (uint64_t)t1.tv_nsec / 1000;
+
+                tsH = (uint32_t)(transmitTimestamp >> 32);
+                tsL = (uint32_t)(transmitTimestamp & 0xFFFFFFFF);
+                clockFrame->transmitTimestampH = htonl(tsH);
+                clockFrame->transmitTimestampL = htonl(tsL);
+
+                bytes = ARSAL_Socket_Sendto(sender->recvSocket, msgBuffer, msgBufferSize, 0, (struct sockaddr*)&src_addr, addrlen);
+                if (bytes < 0)
+                {
+                    ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Socket send error: error=%d (%s)", errno, strerror(errno));
+                }
+
+                //clockDelta = (int64_t)(receiveTimestamp + transmitTimestamp) / 2 - (int64_t)(originateTimestamp + receiveTimestamp2) / 2;
+                //rtDelay = (receiveTimestamp2 - originateTimestamp) - (transmitTimestamp - receiveTimestamp);
+
+                /*ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_SENDER2_TAG, "Clock - originateTS: %llu | receiveTS: %llu | transmitTS: %llu",
+                            (long long unsigned int)originateTimestamp, (long long unsigned int)receiveTimestamp, (long long unsigned int)transmitTimestamp);*/ //TODO: debug
+            }
+            else
+            {
+                /* failed: socket error */
+                ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Socket receive error %d ('%s')", errno, strerror(errno));
+            }
+        }
+        else
+        {
+            /* no poll error, no timeout, but socket is not ready */
+            int error = 0;
+            socklen_t errlen = sizeof(error);
+            ARSAL_Socket_Getsockopt(sender->recvSocket, SOL_SOCKET, SO_ERROR, (void *)&error, &errlen);
+            ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "No poll error, no timeout, but socket is not ready (revents = %d, error = %d)", p.revents, error);
+        }
+
+        ARSAL_Mutex_Lock(&(sender->streamMutex));
+        shouldStop = sender->threadsShouldStop;
+        ARSAL_Mutex_Unlock(&(sender->streamMutex));
+    }
 
     ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_SENDER2_TAG, "Stream sender receiving thread ended");
     ARSAL_Mutex_Lock(&(sender->streamMutex));
     sender->recvThreadStarted = 0;
     ARSAL_Mutex_Unlock(&(sender->streamMutex));
 
-    return (void*)0;
+    if (msgBuffer)
+    {
+        free(msgBuffer);
+        msgBuffer = NULL;
+    }
+
+    return (void *)0;
 }
 
 
