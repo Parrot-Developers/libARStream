@@ -64,7 +64,7 @@ Java_com_parrot_arsdk_arstream_ARStreamReader2_nativeConstructor (JNIEnv *env, j
 
     ARSTREAM_Reader2_Config_t config;
     memset(&config, 0, sizeof(config));
-    config.serverAddr = c_remoteAddress;
+    config.serverAddr = c_serverAddress;
     config.mcastAddr = NULL;
     config.mcastIfaceAddr = NULL;
     config.serverStreamPort = serverStreamPort;

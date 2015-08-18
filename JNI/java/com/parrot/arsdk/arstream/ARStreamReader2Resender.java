@@ -73,7 +73,7 @@ public class ARStreamReader2Resender
       */
     public ARStreamReader2Resender(ARStreamReader2 reader, String clientAddress, int clientStreamPort, int clientControlPort, int maxBitrate, int maxLatency, int maxNetworkLatency)
     {
-        Log.e(TAG, "ARStreamReader2Resender " + targetIp);
+        Log.e(TAG, "ARStreamReader2Resender " + clientAddress);
         this.cResender = nativeConstructor(reader.getCReader(), clientAddress, clientStreamPort, clientControlPort, maxBitrate, maxLatency, maxNetworkLatency);
         this.valid =  (this.cResender != 0);
         if (this.valid) {
