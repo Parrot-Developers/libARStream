@@ -30,7 +30,7 @@
 */
 /**
  * @file ARSTREAM_Sender2.h
- * @brief Stream sender over network (v2)
+ * @brief Stream sender over a network (v2)
  * @date 04/17/2015
  * @author aurelien.barre@parrot.com
  */
@@ -48,67 +48,93 @@
  */
 #include <libARStream/ARSTREAM_Error.h>
 
+
 /*
  * Macros
  */
+
+/**
+ * @brief Default server-side stream port
+ */
+#define ARSTREAM_SENDER2_DEFAULT_SERVER_STREAM_PORT     (5004)
+
+/**
+ * @brief Default server-side control port
+ */
+#define ARSTREAM_SENDER2_DEFAULT_SERVER_CONTROL_PORT    (5005)
+
+/**
+ * @brief Default H.264 NAL unit FIFO size
+ */
+#define ARSTREAM_SENDER2_DEFAULT_NALU_FIFO_SIZE         (1024)
+
 
 /*
  * Types
  */
 
-#define ARSTREAM_SENDER2_DEFAULT_SERVER_STREAM_PORT     (5004)
-#define ARSTREAM_SENDER2_DEFAULT_SERVER_CONTROL_PORT    (5005)
-#define ARSTREAM_SENDER2_DEFAULT_NALU_FIFO_SIZE         (1024)
-
 /**
  * @brief Callback status values
  */
 typedef enum {
-    ARSTREAM_SENDER2_STATUS_SENT = 0, /**< Access Unit was sent */
-    ARSTREAM_SENDER2_STATUS_CANCELLED, /**< Access Unit was cancelled (not sent or partly sent) */
+    ARSTREAM_SENDER2_STATUS_SENT = 0,   /**< Access unit or NAL unit was sent */
+    ARSTREAM_SENDER2_STATUS_CANCELLED,  /**< Access unit or NAL unit was cancelled (not sent or partly sent) */
     ARSTREAM_SENDER2_STATUS_MAX,
 } eARSTREAM_SENDER2_STATUS;
 
 /**
- * @brief Callback type for sender informations
- * This callback is called when a frame pointer is no longer needed by the library.
- * This can occur when a frame is acknowledged, cancelled, or if a network error happened.
+ * @brief Callback function for access units
+ * This callback function is called when buffers associated with an access unit are no longer used by the sender.
+ * This occurs when packets corresponding to an access unit have all been sent or dropped.
  *
- * @param[in] status Why the call was made
- * @param[in] framePointer Pointer to the frame which was sent/cancelled
- * @param[in] frameSize Size, in bytes, of the frame
- * @param[in] custom Custom pointer passed during ARSTREAM_Sender2_New
+ * @param[in] status Why the call is made
+ * @param[in] auUserPtr Access unit user pointer associated with the NAL units submitted to the sender
+ * @param[in] userPtr Global access unit callback user pointer
  * @see eARSTREAM_SENDER2_STATUS
  */
-typedef void (*ARSTREAM_Sender2_AuCallback_t)(eARSTREAM_SENDER2_STATUS status, void *auUserPtr, void *userPtr);
+typedef void (*ARSTREAM_Sender2_AuCallback_t) (eARSTREAM_SENDER2_STATUS status, void *auUserPtr, void *userPtr);
 
-typedef void (*ARSTREAM_Sender2_NaluCallback_t)(eARSTREAM_SENDER2_STATUS status, void *naluUserPtr, void *userPtr);
+/**
+ * @brief Callback function for NAL units
+ * This callback function is called when a buffer associated with a NAL unit is no longer used by the sender.
+ * This occurs when packets corresponding to a NAL unit have all been sent or dropped.
+ *
+ * @param[in] status Why the call is made
+ * @param[in] naluUserPtr NAL unit user pointer associated with the NAL unit submitted to the sender
+ * @param[in] userPtr Global NAL unit callback user pointer
+ * @see eARSTREAM_SENDER2_STATUS
+ */
+typedef void (*ARSTREAM_Sender2_NaluCallback_t) (eARSTREAM_SENDER2_STATUS status, void *naluUserPtr, void *userPtr);
 
-typedef struct ARSTREAM_Sender2_Config_t {
-    const char *clientAddr;
-    const char *mcastAddr;
-    const char *mcastIfaceAddr;
-    int serverStreamPort;
-    int serverControlPort;
-    int clientStreamPort;
-    int clientControlPort;
-    ARSTREAM_Sender2_AuCallback_t auCallback;
-    void *auCallbackUserPtr;
-    ARSTREAM_Sender2_NaluCallback_t naluCallback;
-    void *naluCallbackUserPtr;
-    int naluFifoSize;
-    int maxPacketSize;
-    int targetPacketSize;
-    int maxBitrate;
-    int maxLatencyMs;
-    int maxNetworkLatencyMs;
+/**
+ * @brief Sender2 configuration parameters
+ */
+typedef struct ARSTREAM_Sender2_Config_t
+{
+    const char *clientAddr;                         /**< Client address */
+    const char *mcastAddr;                          /**< Multicast send address (optional, NULL for no multicast) */
+    const char *mcastIfaceAddr;                     /**< Multicast output interface address (required if mcastAddr is not NULL) */
+    int serverStreamPort;                           /**< Server stream port, @see ARSTREAM_SENDER2_DEFAULT_SERVER_STREAM_PORT */
+    int serverControlPort;                          /**< Server control port, @see ARSTREAM_SENDER2_DEFAULT_SERVER_CONTROL_PORT */
+    int clientStreamPort;                           /**< Client stream port */
+    int clientControlPort;                          /**< Client control port */
+    ARSTREAM_Sender2_AuCallback_t auCallback;       /**< Access unit callback function (optional, can be NULL) */
+    void *auCallbackUserPtr;                        /**< Access unit callback function user pointer (optional, can be NULL) */
+    ARSTREAM_Sender2_NaluCallback_t naluCallback;   /**< NAL unit callback function (optional, can be NULL) */
+    void *naluCallbackUserPtr;                      /**< NAL unit callback function user pointer (optional, can be NULL) */
+    int naluFifoSize;                               /**< NAL unit FIFO size, @see ARSTREAM_SENDER2_DEFAULT_NALU_FIFO_SIZE */
+    int maxPacketSize;                              /**< Maximum network packet size in bytes (example: the interface MTU) */
+    int targetPacketSize;                           /**< Target network packet size in bytes */
+    int maxBitrate;                                 /**< Maximum streaming bitrate in bit/s */
+    int maxLatencyMs;                               /**< Maximum acceptable total latency in milliseconds (optional, can be 0) */
+    int maxNetworkLatencyMs;                        /**< Maximum acceptable network latency in milliseconds */
+
 } ARSTREAM_Sender2_Config_t;
 
 /**
- * @brief An ARSTREAM_Sender2_t instance allow streaming frames over a network
+ * @brief A Sender2 instance to allow streaming H.264 video over a network
  */
 typedef struct ARSTREAM_Sender2_t ARSTREAM_Sender2_t;
-
 
 
 /*
@@ -116,103 +142,102 @@ typedef struct ARSTREAM_Sender2_t ARSTREAM_Sender2_t;
  */
 
 /**
- * @brief Creates a new ARSTREAM_Sender2_t
- * @warning This function allocates memory. An ARSTREAM_Sender2_t muse be deleted by a call to ARSTREAM_Sender2_Delete
+ * @brief Creates a new Sender2
+ * @warning This function allocates memory. Sender2 must be deleted by a call to ARSTREAM_Sender2_Delete
  *
- * @param[in] manager Pointer to a valid and connected ARNETWORK_Manager_t, which will be used to stream frames
- * @param[in] dataBufferID ID of a StreamDataBuffer available within the manager
- * @param[in] ackBufferID ID of a StreamAckBuffer available within the manager
- * @param[in] callback The status update callback which will be called every time the status of a send-frame is updated
- * @param[in] framesBufferSize Number of frames that the ARSTREAM_Sender2_t instance will be able to hold in queue
- * @param[in] maxFragmentSize Maximum allowed size for a video data fragment. Video frames larger that will be fragmented.
- * @param[in] maxNumberOfFragment number maximum of fragment of one frame.
- * @param[in] custom Custom pointer which will be passed to callback
+ * @param[in] config Pointer to a configuration parameters structure
  * @param[out] error Optionnal pointer to an eARSTREAM_ERROR to hold any error information
+ *
  * @return A pointer to the new ARSTREAM_Sender2_t, or NULL if an error occured
  *
- * @note framesBufferSize should be greater than the number of frames between two I-Frames
- *
- * @see ARSTREAM_Sender2_InitStreamDataBuffer()
- * @see ARSTREAM_Sender2_InitStreamAckBuffer()
  * @see ARSTREAM_Sender2_StopSender()
  * @see ARSTREAM_Sender2_Delete()
  */
 ARSTREAM_Sender2_t* ARSTREAM_Sender2_New (ARSTREAM_Sender2_Config_t *config, eARSTREAM_ERROR *error);
 
 /**
- * @brief Stops a running ARSTREAM_Sender2_t
- * @warning Once stopped, an ARSTREAM_Sender2_t can not be restarted
+ * @brief Stops a running Sender2
+ * @warning Once stopped, a Sender2 cannot be restarted
  *
- * @param[in] sender The ARSTREAM_Sender2_t to stop
+ * @param[in] sender The Sender2 instance
  *
  * @note Calling this function multiple times has no effect
  */
 void ARSTREAM_Sender2_StopSender (ARSTREAM_Sender2_t *sender);
 
 /**
- * @brief Deletes an ARSTREAM_Sender2_t
- * @warning This function should NOT be called on a running ARSTREAM_Sender2_t
+ * @brief Deletes a Sender2
+ * @warning This function should NOT be called on a running Sender2
  *
- * @param sender Pointer to the ARSTREAM_Sender2_t * to delete
+ * @param sender Pointer to the ARSTREAM_Sender2_t* to delete
  *
- * @return ARSTREAM_OK if the ARSTREAM_Sender2_t was deleted
- * @return ARSTREAM_ERROR_BUSY if the ARSTREAM_Sender2_t is still busy and can not be stopped now (probably because ARSTREAM_Sender2_StopSender() was not called yet)
+ * @return ARSTREAM_OK if the Sender2 was deleted
+ * @return ARSTREAM_ERROR_BUSY if the Sender2 is still busy and can not be stopped now (probably because ARSTREAM_Sender2_StopSender() has not been called yet)
  * @return ARSTREAM_ERROR_BAD_PARAMETERS if sender does not point to a valid ARSTREAM_Sender2_t
  *
- * @note The library use a double pointer, so it can set *sender to NULL after freeing it
+ * @note The function uses a double pointer, so it can set *sender to NULL after freeing it
  */
 eARSTREAM_ERROR ARSTREAM_Sender2_Delete (ARSTREAM_Sender2_t **sender);
 
 /**
- * @brief Sends a new frame
+ * @brief Sends a new NAL unit
+ * @warning The NAL unit buffer must remain available for the sender until the NAL unit or access unit callback functions are called.
  *
- * @param[in] sender The ARSTREAM_Sender2_t which will try to send the frame
- * @param[in] frameBuffer pointer to the frame in memory
- * @param[in] frameSize size of the frame in memory
- * @param[in] flushPreviousFrames Boolean-like flag (0/1). If active, tells the sender to flush the frame queue when adding this frame.
- * @param[out] nbPreviousFrames Optionnal int pointer which will store the number of frames previously in the buffer (even if the buffer is flushed)
+ * @param[in] sender The Sender2 instance
+ * @param[in] naluBuffer Pointer to the NAL unit buffer
+ * @param[in] naluSize Size of the NAL unit in bytes
+ * @param[in] auTimestamp Access unit timastamp in microseconds. All NAL units of an access unit must share the same timestamp.
+ * @param[in] isLastNaluInAu Boolean-like flag (0/1). If active, tells the sender that the NAL unit is the last of the access unit.
+ * @param[in] auUserPtr Access unit user pointer that will be passed to the access unit callback function (optional, can be NULL).
+ * @param[in] naluUserPtr NAL unit user pointer that will be passed to the NAL unit callback function (optional, can be NULL).
+ *
  * @return ARSTREAM_OK if no error happened
- * @return ARSTREAM_ERROR_BAD_PARAMETERS if the sender or frameBuffer pointer is invalid, or if frameSize is zero
- * @return ARSTREAM_ERROR_FRAME_TOO_LARGE if the frameSize is greater that the maximum frame size of the libARStream (typically 128000 bytes)
- * @return ARSTREAM_ERROR_QUEUE_FULL if the frame can not be added to queue. This value can not happen if flushPreviousFrames is active
+ * @return ARSTREAM_ERROR_BAD_PARAMETERS if the sender or naluBuffer pointer is invalid, or if naluSize or auTimestamp is zero
+ * @return ARSTREAM_ERROR_QUEUE_FULL if the NAL unit FIFO is full
  */
 eARSTREAM_ERROR ARSTREAM_Sender2_SendNewNalu (ARSTREAM_Sender2_t *sender, uint8_t *naluBuffer, uint32_t naluSize, uint64_t auTimestamp, int isLastNaluInAu, void *auUserPtr, void *naluUserPtr);
 
 /**
- * @brief Flushes all currently queued frames
+ * @brief Flush all currently queued NAL units
  *
- * @param[in] sender The ARSTREAM_Sender2_t to be flushed.
+ * @param[in] sender The Sender2 instance
+ *
  * @return ARSTREAM_OK if no error occured.
  * @return ARSTREAM_ERROR_BAD_PARAMETERS if the sender is invalid.
  */
 eARSTREAM_ERROR ARSTREAM_Sender2_FlushNaluQueue (ARSTREAM_Sender2_t *sender);
 
 /**
- * @brief Runs the data loop of the ARSTREAM_Sender2_t
- * @warning This function never returns until ARSTREAM_Sender2_StopSender() is called. Thus, it should be called on its own thread
- * @post Stop the ARSTREAM_Sender2_t by calling ARSTREAM_Sender2_StopSender() before joining the thread calling this function
+ * @brief Runs the stream loop of the Sender2
+ * @warning This function never returns until ARSTREAM_Sender2_StopSender() is called. Thus, it should be called on its own thread.
+ * @post Stop the Sender2 by calling ARSTREAM_Sender2_StopSender() before joining the thread calling this function.
+ *
  * @param[in] ARSTREAM_Sender2_t_Param A valid (ARSTREAM_Sender2_t *) casted as a (void *)
  */
 void* ARSTREAM_Sender2_RunStreamThread (void *ARSTREAM_Sender2_t_Param);
 
 /**
- * @brief Runs the acknowledge loop of the ARSTREAM_Sender2_t
- * @warning This function never returns until ARSTREAM_Sender2_StopSender() is called. Thus, it should be called on its own thread
- * @post Stop the ARSTREAM_Sender2_t by calling ARSTREAM_Sender2_StopSender() before joining the thread calling this function
+ * @brief Runs the control loop of the Sender2
+ * @warning This function never returns until ARSTREAM_Sender2_StopSender() is called. Thus, it should be called on its own thread.
+ * @post Stop the Sender2 by calling ARSTREAM_Sender2_StopSender() before joining the thread calling this function.
+ *
  * @param[in] ARSTREAM_Sender2_t_Param A valid (ARSTREAM_Sender2_t *) casted as a (void *)
  */
 void* ARSTREAM_Sender2_RunControlThread (void *ARSTREAM_Sender2_t_Param);
 
 /**
- * @brief Gets the user pointer associated with the sender access unit callback
- * @param[in] sender The ARSTREAM_Sender2_t
+ * @brief Get the user pointer associated with the sender access unit callback function
+ *
+ * @param[in] sender The Sender2 instance
+ *
  * @return The user pointer associated with the AU callback, or NULL if sender does not point to a valid sender
  */
 void* ARSTREAM_Sender2_GetAuCallbackUserPtr (ARSTREAM_Sender2_t *sender);
 
 /**
- * @brief Gets the user pointer associated with the sender NAL unit callback
- * @param[in] sender The ARSTREAM_Sender2_t
+ * @brief Get the user pointer associated with the sender NAL unit callback function
+ *
+ * @param[in] sender The Sender2 instance
  * @return The user pointer associated with the NALU callback, or NULL if sender does not point to a valid sender
  */
 void* ARSTREAM_Sender2_GetNaluCallbackUserPtr (ARSTREAM_Sender2_t *sender);
@@ -229,8 +254,35 @@ int ARSTREAM_Sender2_GetMaxNetworkLatencyMs(ARSTREAM_Sender2_t *sender);
 
 eARSTREAM_ERROR ARSTREAM_Sender2_SetMaxBitrateAndLatencyMs(ARSTREAM_Sender2_t *sender, int maxBitrate, int maxLatencyMs, int maxNetworkLatencyMs);
 
+/**
+ * @brief Get the stream monitoring
+ * The monitoring data is computed form the time startTime and back timeIntervalUs microseconds at most.
+ * If startTime is 0 the start time is the current time.
+ * If monitoring data is not available up to timeIntervalUs, the monitoring is computed on less time and the real interval is output to realTimeIntervalUs.
+ * Pointers to monitoring parameters that are not required can be left NULL.
+ *
+ * @param[in] sender The Sender2 instance
+ * @param[in] startTime Monitoring start time in microseconds (0 means current time)
+ * @param[in] timeIntervalUs Monitoring time interval (back from startTime) in microseconds
+ * @param[out] realTimeIntervalUs Real monitoring time interval in microseconds (optional, can be NULL)
+ * @param[out] meanAcqToNetworkTime Mean acquisition to network time during realTimeIntervalUs in microseconds (optional, can be NULL)
+ * @param[out] acqToNetworkJitter Acquisition to network time jitter during realTimeIntervalUs in microseconds (optional, can be NULL)
+ * @param[out] meanNetworkTime Mean network time during realTimeIntervalUs in microseconds (optional, can be NULL)
+ * @param[out] networkJitter Network time jitter during realTimeIntervalUs in microseconds (optional, can be NULL)
+ * @param[out] bytesSent Bytes sent during realTimeIntervalUs (optional, can be NULL)
+ * @param[out] meanPacketSize Mean packet size during realTimeIntervalUs (optional, can be NULL)
+ * @param[out] packetSizeStdDev Packet size standard deviation during realTimeIntervalUs (optional, can be NULL)
+ * @param[out] packetsSent Packets sent during realTimeIntervalUs (optional, can be NULL)
+ * @param[out] bytesDropped Bytes dropped during realTimeIntervalUs (optional, can be NULL)
+ * @param[out] naluDropped NAL units dropped during realTimeIntervalUs (optional, can be NULL)
+ *
+ * @return ARSTREAM_OK if no error occured.
+ * @return ARSTREAM_ERROR_BAD_PARAMETERS if the sender is invalid or if timeIntervalUs is 0.
+ */
 eARSTREAM_ERROR ARSTREAM_Sender2_GetMonitoring(ARSTREAM_Sender2_t *sender, uint64_t startTime, uint32_t timeIntervalUs, uint32_t *realTimeIntervalUs, uint32_t *meanAcqToNetworkTime,
                                                uint32_t *acqToNetworkJitter, uint32_t *meanNetworkTime, uint32_t *networkJitter, uint32_t *bytesSent, uint32_t *meanPacketSize,
                                                uint32_t *packetSizeStdDev, uint32_t *packetsSent, uint32_t *bytesDropped, uint32_t *naluDropped);
 
+
 #endif /* _ARSTREAM_SENDER2_H_ */
+

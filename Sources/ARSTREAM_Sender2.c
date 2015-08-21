@@ -30,7 +30,7 @@
 */
 /**
  * @file ARSTREAM_Sender2.c
- * @brief Stream sender over network (v2)
+ * @brief Stream sender over a network (v2)
  * @date 04/17/2015
  * @author aurelien.barre@parrot.com
  */
