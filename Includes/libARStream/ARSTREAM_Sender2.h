@@ -143,7 +143,7 @@ typedef struct ARSTREAM_Sender2_t ARSTREAM_Sender2_t;
 
 /**
  * @brief Creates a new Sender2
- * @warning This function allocates memory. Sender2 must be deleted by a call to ARSTREAM_Sender2_Delete
+ * @warning This function allocates memory. The Sender2 must be deleted by a call to ARSTREAM_Sender2_Delete()
  *
  * @param[in] config Pointer to a configuration parameters structure
  * @param[out] error Optionnal pointer to an eARSTREAM_ERROR to hold any error information
@@ -241,18 +241,6 @@ void* ARSTREAM_Sender2_GetAuCallbackUserPtr (ARSTREAM_Sender2_t *sender);
  * @return The user pointer associated with the NALU callback, or NULL if sender does not point to a valid sender
  */
 void* ARSTREAM_Sender2_GetNaluCallbackUserPtr (ARSTREAM_Sender2_t *sender);
-
-int ARSTREAM_Sender2_GetTargetPacketSize(ARSTREAM_Sender2_t *sender);
-
-eARSTREAM_ERROR ARSTREAM_Sender2_SetTargetPacketSize(ARSTREAM_Sender2_t *sender, int targetPacketSize);
-
-int ARSTREAM_Sender2_GetMaxBitrate(ARSTREAM_Sender2_t *sender);
-
-int ARSTREAM_Sender2_GetMaxLatencyMs(ARSTREAM_Sender2_t *sender);
-
-int ARSTREAM_Sender2_GetMaxNetworkLatencyMs(ARSTREAM_Sender2_t *sender);
-
-eARSTREAM_ERROR ARSTREAM_Sender2_SetMaxBitrateAndLatencyMs(ARSTREAM_Sender2_t *sender, int maxBitrate, int maxLatencyMs, int maxNetworkLatencyMs);
 
 /**
  * @brief Get the stream monitoring

@@ -1366,6 +1366,11 @@ void* ARSTREAM_Sender2_RunStreamThread (void *ARSTREAM_Sender2_t_Param)
         return (void*)0;
     }
 
+    targetPacketSize = sender->targetPacketSize;
+    maxPacketSize = sender->maxPacketSize;
+    maxLatencyUs = (sender->maxLatencyMs) ? sender->maxLatencyMs * 1000 - ((sender->maxBitrate) ? (int)((uint64_t)sender->streamSocketSendBufferSize * 8 * 1000000 / sender->maxBitrate) : 0) : 0;
+    maxNetworkLatencyUs = (sender->maxNetworkLatencyMs) ? sender->maxNetworkLatencyMs * 1000 - ((sender->maxBitrate) ? (int)((uint64_t)sender->streamSocketSendBufferSize * 8 * 1000000 / sender->maxBitrate) : 0) : 0;
+
     ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_SENDER2_TAG, "Sender stream thread running");
     ARSAL_Mutex_Lock(&(sender->streamMutex));
     sender->streamThreadStarted = 1;
@@ -1380,13 +1385,6 @@ void* ARSTREAM_Sender2_RunStreamThread (void *ARSTREAM_Sender2_t_Param)
         {
             ARSAL_Time_GetTime(&t1);
             curTime = (uint64_t)t1.tv_sec * 1000000 + (uint64_t)t1.tv_nsec / 1000;
-
-            ARSAL_Mutex_Lock(&(sender->streamMutex));
-            targetPacketSize = sender->targetPacketSize;
-            maxPacketSize = sender->maxPacketSize;
-            maxLatencyUs = (sender->maxLatencyMs) ? sender->maxLatencyMs * 1000 - ((sender->maxBitrate) ? (int)((uint64_t)sender->streamSocketSendBufferSize * 8 * 1000000 / sender->maxBitrate) : 0) : 0;
-            maxNetworkLatencyUs = (sender->maxNetworkLatencyMs) ? sender->maxNetworkLatencyMs * 1000 - ((sender->maxBitrate) ? (int)((uint64_t)sender->streamSocketSendBufferSize * 8 * 1000000 / sender->maxBitrate) : 0) : 0;
-            ARSAL_Mutex_Unlock(&(sender->streamMutex));
 
             if ((previousTimestamp != 0) && (nalu.auTimestamp != previousTimestamp))
             {
@@ -1820,103 +1818,6 @@ void* ARSTREAM_Sender2_GetNaluCallbackUserPtr(ARSTREAM_Sender2_t *sender)
     {
         ret = sender->naluCallbackUserPtr;
     }
-    return ret;
-}
-
-
-int ARSTREAM_Sender2_GetTargetPacketSize(ARSTREAM_Sender2_t *sender)
-{
-    int ret = -1;
-    if (sender != NULL)
-    {
-        ARSAL_Mutex_Lock(&(sender->streamMutex));
-        ret = sender->targetPacketSize + sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t) + ARSTREAM_NETWORK_UDP_HEADER_SIZE + ARSTREAM_NETWORK_IP_HEADER_SIZE;
-        ARSAL_Mutex_Unlock(&(sender->streamMutex));
-    }
-    return ret;
-}
-
-
-eARSTREAM_ERROR ARSTREAM_Sender2_SetTargetPacketSize(ARSTREAM_Sender2_t *sender, int targetPacketSize)
-{
-    eARSTREAM_ERROR ret = ARSTREAM_OK;
-    if ((sender == NULL) || (targetPacketSize == 0))
-    {
-        return ARSTREAM_ERROR_BAD_PARAMETERS;
-    }
-
-    ARSAL_Mutex_Lock(&(sender->streamMutex));
-    sender->targetPacketSize = targetPacketSize - sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t) - ARSTREAM_NETWORK_UDP_HEADER_SIZE - ARSTREAM_NETWORK_IP_HEADER_SIZE;
-    ARSAL_Mutex_Unlock(&(sender->streamMutex));
-
-    return ret;
-}
-
-
-int ARSTREAM_Sender2_GetMaxBitrate(ARSTREAM_Sender2_t *sender)
-{
-    int ret = -1;
-    if (sender != NULL)
-    {
-        ARSAL_Mutex_Lock(&(sender->streamMutex));
-        ret = sender->maxBitrate;
-        ARSAL_Mutex_Unlock(&(sender->streamMutex));
-    }
-    return ret;
-}
-
-
-int ARSTREAM_Sender2_GetMaxLatencyMs(ARSTREAM_Sender2_t *sender)
-{
-    int ret = -1;
-    if (sender != NULL)
-    {
-        ARSAL_Mutex_Lock(&(sender->streamMutex));
-        ret = sender->maxLatencyMs;
-        ARSAL_Mutex_Unlock(&(sender->streamMutex));
-    }
-    return ret;
-}
-
-
-int ARSTREAM_Sender2_GetMaxNetworkLatencyMs(ARSTREAM_Sender2_t *sender)
-{
-    int ret = -1;
-    if (sender != NULL)
-    {
-        ARSAL_Mutex_Lock(&(sender->streamMutex));
-        ret = sender->maxNetworkLatencyMs;
-        ARSAL_Mutex_Unlock(&(sender->streamMutex));
-    }
-    return ret;
-}
-
-
-eARSTREAM_ERROR ARSTREAM_Sender2_SetMaxBitrateAndLatencyMs(ARSTREAM_Sender2_t *sender, int maxBitrate, int maxLatencyMs, int maxNetworkLatencyMs)
-{
-    eARSTREAM_ERROR ret = ARSTREAM_OK;
-    if ((sender == NULL) || (maxBitrate <= 0) || (maxLatencyMs < 0) || (maxNetworkLatencyMs <= 0))
-    {
-        return ARSTREAM_ERROR_BAD_PARAMETERS;
-    }
-
-    ARSAL_Mutex_Lock(&(sender->streamMutex));
-    sender->maxBitrate = maxBitrate;
-    sender->maxLatencyMs = maxLatencyMs;
-    sender->maxNetworkLatencyMs = maxNetworkLatencyMs;
-    int totalBufSize = maxBitrate * maxNetworkLatencyMs / 1000 / 8;
-    sender->streamSocketSendBufferSize = totalBufSize / 2;
-    sender->naluFifoBufferSize = totalBufSize / 2;
-    if (sender->streamSocketSendBufferSize)
-    {
-        int err = ARSTREAM_Sender2_SetSocketSendBufferSize(sender, sender->streamSocket, sender->streamSocketSendBufferSize);
-        if (err != 0)
-        {
-            ret = ARSTREAM_ERROR_BAD_PARAMETERS;
-        }
-    }
-    ARSAL_Mutex_Unlock(&(sender->streamMutex));
-
     return ret;
 }
 
