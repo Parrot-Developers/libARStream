@@ -259,7 +259,7 @@ static ARSTREAM_Reader2_NaluBuffer_t* ARSTREAM_Reader2_Resender_GetAvailableNalu
                 }
                 else
                 {
-                    ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Reallocated NALU buffer (size: %d) - naluBufferCount = %d", newSize, reader->naluBufferCount); //TODO: debug
+                    ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Reallocated NALU buffer (size: %d) - naluBufferCount = %d", newSize, reader->naluBufferCount);
                     naluBuf->naluBufferSize = newSize;
                     retNaluBuf = naluBuf;
                     break;
@@ -283,7 +283,7 @@ static ARSTREAM_Reader2_NaluBuffer_t* ARSTREAM_Reader2_Resender_GetAvailableNalu
         }
         else
         {
-            ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Allocated new NALU buffer (size: %d) - naluBufferCount = %d", newSize, reader->naluBufferCount); //TODO: debug
+            ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Allocated new NALU buffer (size: %d) - naluBufferCount = %d", newSize, reader->naluBufferCount);
             naluBuf->naluBufferSize = newSize;
             retNaluBuf = naluBuf;
         }
@@ -312,7 +312,7 @@ static int ARSTREAM_Reader2_ResendNalu(ARSTREAM_Reader2_t *reader, uint8_t *nalu
     if (naluBuf == NULL)
     {
         ARSAL_Mutex_Unlock(&(reader->naluBufferMutex));
-        ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_READER2_TAG, "Failed to get available NALU buffer (naluSize=%d, naluBufferCount=%d)", naluSize, reader->naluBufferCount); //TODO: debug
+        ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_READER2_TAG, "Failed to get available NALU buffer (naluSize=%d, naluBufferCount=%d)", naluSize, reader->naluBufferCount);
         return -1;
     }
     memcpy(naluBuf->naluBuffer, naluBuffer, naluSize);
@@ -336,7 +336,7 @@ static int ARSTREAM_Reader2_ResendNalu(ARSTREAM_Reader2_t *reader, uint8_t *nalu
         if (err != ARSTREAM_OK)
         {
             naluBuf->useCount--;
-            ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_READER2_TAG, "Failed to resend NALU (%d)", err); //TODO: debug
+            ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_READER2_TAG, "Failed to resend NALU on resender #%d (error %d)", i, err);
         }
     }
 
@@ -691,7 +691,7 @@ static int ARSTREAM_Reader2_SetSocketReceiveBufferSize(ARSTREAM_Reader2_t *reade
     }
     else
     {
-        ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_READER2_TAG, "Socket receive buffer size is %d bytes", size); //TODO: debug
+        ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Socket receive buffer size is %d bytes", size);
     }
 
     return ret;
@@ -708,7 +708,7 @@ static int ARSTREAM_Reader2_StreamSocketSetup(ARSTREAM_Reader2_t *reader)
     reader->streamSocket = ARSAL_Socket_Create(AF_INET, SOCK_DGRAM, 0);
     if (reader->streamSocket < 0)
     {
-        ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Failed to create receive socket");
+        ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Failed to create stream socket");
         ret = -1;
     }
 
@@ -839,7 +839,7 @@ static int ARSTREAM_Reader2_ControlSocketSetup(ARSTREAM_Reader2_t *reader)
         reader->controlSocket = ARSAL_Socket_Create(AF_INET, SOCK_DGRAM, 0);
         if (reader->controlSocket < 0)
         {
-            ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Failed to create send socket");
+            ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Failed to create control socket");
             ret = -1;
         }
     }
@@ -979,7 +979,7 @@ static int ARSTREAM_Reader2_ReadData(ARSTREAM_Reader2_t *reader, uint8_t *recvBu
                 if (pollRet == 0)
                 {
                     /* failed: poll timeout */
-                    ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_READER2_TAG, "Polling timed out"); //TODO: debug
+                    ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Polling timed out");
                     ret = -2;
                     *recvSize = 0;
                 }
@@ -1079,10 +1079,6 @@ static void ARSTREAM_Reader2_OutputNalu(ARSTREAM_Reader2_t *reader, uint32_t tim
     if (reader->resenderCount > 0)
     {
         int resendRet = ARSTREAM_Reader2_ResendNalu(reader, reader->currentNaluBuffer, reader->currentNaluSize, timestampScaled, isLastNaluInAu);
-        if (resendRet != 0)
-        {
-            //ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Failed to resend NALU (%d)", resendRet); //TODO debug
-        }
     }
 
     reader->currentNaluBuffer = reader->naluCallback(ARSTREAM_READER2_CAUSE_NALU_COMPLETE, reader->currentNaluBuffer, reader->currentNaluSize,
@@ -1126,7 +1122,7 @@ void* ARSTREAM_Reader2_RunStreamThread(void *ARSTREAM_Reader2_t_Param)
     recvBuffer = malloc(recvBufferSize);
     if (recvBuffer == NULL)
     {
-        ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Error while starting %s, can not alloc memory", __FUNCTION__);
+        ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Error while starting %s, cannot allocate memory", __FUNCTION__);
         return (void *)0;
     }
     header = (ARSTREAM_NetworkHeaders_DataHeader2_t *)recvBuffer;
@@ -1135,12 +1131,12 @@ void* ARSTREAM_Reader2_RunStreamThread(void *ARSTREAM_Reader2_t_Param)
     ret = ARSTREAM_Reader2_StreamSocketSetup(reader);
     if (ret != 0)
     {
-        ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Failed to bind (error %d) - aborting", ret);
+        ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Failed to setup the stream socket (error %d) - aborting", ret);
         free(recvBuffer);
         return (void*)0;
     }
 
-    ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Stream reader receiving thread running");
+    ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Reader stream thread running");
     ARSAL_Mutex_Lock(&(reader->streamMutex));
     reader->streamThreadStarted = 1;
     shouldStop = reader->threadsShouldStop;
@@ -1273,7 +1269,7 @@ void* ARSTREAM_Reader2_RunStreamThread(void *ARSTREAM_Reader2_t_Param)
                                 }
                                 else
                                 {
-                                    ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Failed to realloc auBuffer for output size (%d) for FU-A packet at seqNum %d", outputSize, currentSeqNum);
+                                    ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Failed to get a larger buffer (output size %d) for FU-A NALU at seqNum %d", outputSize, currentSeqNum);
                                 }
                             }
                             if (endBit)
@@ -1296,7 +1292,6 @@ void* ARSTREAM_Reader2_RunStreamThread(void *ARSTREAM_Reader2_t_Param)
                             //ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Incomplete FU-A packet before STAP-A at seqNum %d (fuPending)", currentSeqNum);
                         }
 
-//ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "STAP-A at seqNum %d, payloadSize=%d", currentSeqNum, payloadSize);
                         if (payloadSize >= 3)
                         {
                             uint8_t *curBuf = recvBuffer + sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t) + 1;
@@ -1308,7 +1303,6 @@ void* ARSTREAM_Reader2_RunStreamThread(void *ARSTREAM_Reader2_t_Param)
                             {
                                 naluCount++;
                                 nextNaluSize = (sizeLeft >= naluSize + 2) ? ((uint16_t)(*(curBuf + naluSize)) << 8) | ((uint16_t)(*(curBuf + naluSize + 1))) : 0;
-//ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "-- STAP-A at seqNum %d, naluSize=%d, sizeLeft=%d, nextNaluSize=%d", currentSeqNum, naluSize, sizeLeft, nextNaluSize);
                                 reader->currentNaluSize = 0;
                                 if (!ARSTREAM_Reader2_CheckBufferSize(reader, naluSize + startCodeLength))
                                 {
@@ -1337,7 +1331,7 @@ void* ARSTREAM_Reader2_RunStreamThread(void *ARSTREAM_Reader2_t_Param)
                                 }
                                 else
                                 {
-                                    ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Failed to realloc auBuffer for output size (%d) for single NALU packet at seqNum %d", payloadSize + startCodeLength, currentSeqNum);
+                                    ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Failed to get a larger buffer (output size %d) for STAP-A NALU at seqNum %d", naluSize + startCodeLength, currentSeqNum);
                                 }
                                 curBuf += naluSize;
                                 sizeLeft -= naluSize;
@@ -1385,7 +1379,7 @@ void* ARSTREAM_Reader2_RunStreamThread(void *ARSTREAM_Reader2_t_Param)
                         }
                         else
                         {
-                            ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Failed to realloc auBuffer for output size (%d) for single NALU packet at seqNum %d", payloadSize + startCodeLength, currentSeqNum);
+                            ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Failed to get a larger buffer (output size %d) for single NALU at seqNum %d", payloadSize + startCodeLength, currentSeqNum);
                         }
                     }
                 }
@@ -1421,7 +1415,7 @@ void* ARSTREAM_Reader2_RunStreamThread(void *ARSTREAM_Reader2_t_Param)
 
     reader->naluCallback(ARSTREAM_READER2_CAUSE_CANCEL, reader->currentNaluBuffer, 0, 0, 0, 0, 0, 0, &(reader->currentNaluBufferSize), reader->naluCallbackUserPtr);
 
-    ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Stream reader receiving thread ended");
+    ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Reader stream thread ended");
     ARSAL_Mutex_Lock(&(reader->streamMutex));
     reader->streamThreadStarted = 0;
     ARSAL_Mutex_Unlock(&(reader->streamMutex));
@@ -1471,7 +1465,7 @@ void* ARSTREAM_Reader2_RunControlThread(void *ARSTREAM_Reader2_t_Param)
     msgBuffer = malloc(msgBufferSize);
     if (msgBuffer == NULL)
     {
-        ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Error while starting %s, can not alloc memory", __FUNCTION__);
+        ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Error while starting %s, cannot allocate memory", __FUNCTION__);
         return (void *)0;
     }
     clockFrame = (ARSTREAM_NetworkHeaders_ClockFrame_t*)msgBuffer;
@@ -1480,12 +1474,12 @@ void* ARSTREAM_Reader2_RunControlThread(void *ARSTREAM_Reader2_t_Param)
     ret = ARSTREAM_Reader2_ControlSocketSetup(reader);
     if (ret != 0)
     {
-        ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Failed to setup send socket (error %d) - aborting", ret);
+        ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Failed to setup the control socket (error %d) - aborting", ret);
         free(msgBuffer);
         return (void*)0;
     }
 
-    ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Stream reader sending thread running");
+    ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Reader control thread running");
     ARSAL_Mutex_Lock(&(reader->streamMutex));
     reader->controlThreadStarted = 1;
     shouldStop = reader->threadsShouldStop;
@@ -1510,19 +1504,17 @@ void* ARSTREAM_Reader2_RunControlThread(void *ARSTREAM_Reader2_t_Param)
         }
         else
         {
-            //ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_READER2_TAG, "Request sent (%d bytes) - transmitTS: %llu", bytes, (long long unsigned int)transmitTimestamp); //TODO: debug
-
             originateTimestamp2 = transmitTimestamp;
 
             /* poll */
             p.fd = reader->controlSocket;
             p.events = POLLIN;
             p.revents = 0;
-            pollRet = poll(&p, 1, 100); //TODO
+            pollRet = poll(&p, 1, 100); //TODO: timeout value?
             if (pollRet == 0)
             {
                 /* failed: poll timeout */
-                ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_READER2_TAG, "Polling timed out"); //TODO: debug
+                ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Polling timed out");
             }
             else if (pollRet < 0)
             {
@@ -1557,13 +1549,13 @@ void* ARSTREAM_Reader2_RunControlThread(void *ARSTREAM_Reader2_t_Param)
                             setlocale(LC_ALL, "");*/
 /* /DEBUG */
 
-                            ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_READER2_TAG, "Clock - originateTS: %llu | receiveTS: %llu | transmitTS: %llu | receiveTS2: %llu | delta: %lld | rtDelay: %lld",
+                            /*ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_READER2_TAG, "Clock - originateTS: %llu | receiveTS: %llu | transmitTS: %llu | receiveTS2: %llu | delta: %lld | rtDelay: %lld",
                                         (long long unsigned int)originateTimestamp, (long long unsigned int)receiveTimestamp, (long long unsigned int)transmitTimestamp, (long long unsigned int)receiveTimestamp2,
-                                        (long long int)clockDelta, (long long int)rtDelay); //TODO: debug
+                                        (long long int)clockDelta, (long long int)rtDelay);*/ //TODO: debug
                         }
                         else
                         {
-                            ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_READER2_TAG, "Originate timestamp missmatch (%llu vs. %llu)", (long long unsigned int)originateTimestamp2, (long long unsigned int)originateTimestamp); //TODO: debug
+                            /*ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Originate timestamp missmatch (%llu vs. %llu)", (long long unsigned int)originateTimestamp2, (long long unsigned int)originateTimestamp);*/ //TODO: debug
                         }
                     }
                     else if (errno != EAGAIN)
@@ -1592,7 +1584,7 @@ void* ARSTREAM_Reader2_RunControlThread(void *ARSTREAM_Reader2_t_Param)
         ARSAL_Mutex_Unlock(&(reader->streamMutex));
     }
 
-    ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Stream reader sending thread ended");
+    ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Reader control thread ended");
     ARSAL_Mutex_Lock(&(reader->streamMutex));
     reader->controlThreadStarted = 0;
     ARSAL_Mutex_Unlock(&(reader->streamMutex));
