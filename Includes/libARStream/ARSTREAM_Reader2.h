@@ -56,12 +56,12 @@
 /**
  * @brief Default client-side stream port
  */
-#define ARSTREAM_READER2_DEFAULT_CLIENT_STREAM_PORT     (6004)
+#define ARSTREAM_READER2_DEFAULT_CLIENT_STREAM_PORT     (55004)
 
 /**
  * @brief Default client-side control port
  */
-#define ARSTREAM_READER2_DEFAULT_CLIENT_CONTROL_PORT    (6005)
+#define ARSTREAM_READER2_DEFAULT_CLIENT_CONTROL_PORT    (55005)
 
 
 /*
