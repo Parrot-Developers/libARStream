@@ -30,7 +30,7 @@
 */
 /**
  * @file ARSTREAM_Reader2.c
- * @brief Stream reader on network (v2)
+ * @brief Stream reader on a network (v2)
  * @date 04/16/2015
  * @author aurelien.barre@parrot.com
  */
