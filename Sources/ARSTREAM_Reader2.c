@@ -101,6 +101,11 @@
     #define ARSTREAM_READER2_MONITORING_OUTPUT_FILENAME "reader_monitor"
 #endif
 
+//#define ARSTREAM_READER2_CLOCKSYNC_DEBUG_FILE
+#ifdef ARSTREAM_READER2_CLOCKSYNC_DEBUG_FILE
+    #include <locale.h>
+#endif
+
 
 /**
  * Sets *PTR to VAL if PTR is not null
@@ -1449,10 +1454,10 @@ void* ARSTREAM_Reader2_RunControlThread(void *ARSTREAM_Reader2_t_Param)
     struct pollfd p;
     int shouldStop, ret, pollRet;
 
-/* DEBUG */
-    /*FILE *fDebug;
-    fDebug = fopen("clock.dat", "w");*/
-/* /DEBUG */
+#ifdef ARSTREAM_READER2_CLOCKSYNC_DEBUG_FILE
+    FILE *fDebug;
+    fDebug = fopen("clock.dat", "w");
+#endif
 
     /* Parameters check */
     if (reader == NULL)
@@ -1541,13 +1546,13 @@ void* ARSTREAM_Reader2_RunControlThread(void *ARSTREAM_Reader2_t_Param)
                             reader->clockDelta = clockDelta;
                             rtDelay = (receiveTimestamp2 - originateTimestamp) - (transmitTimestamp - receiveTimestamp);
 
-/* DEBUG */
-                            /*setlocale(LC_ALL, "C");
+#ifdef ARSTREAM_READER2_CLOCKSYNC_DEBUG_FILE
+                            setlocale(LC_ALL, "C");
                             fprintf(fDebug, "%llu %llu %llu %llu %lld %lld\n",
                                     (long long unsigned int)originateTimestamp, (long long unsigned int)receiveTimestamp, (long long unsigned int)transmitTimestamp, (long long unsigned int)receiveTimestamp2,
                                     (long long int)clockDelta, (long long int)rtDelay);
-                            setlocale(LC_ALL, "");*/
-/* /DEBUG */
+                            setlocale(LC_ALL, "");
+#endif
 
                             /*ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_READER2_TAG, "Clock - originateTS: %llu | receiveTS: %llu | transmitTS: %llu | receiveTS2: %llu | delta: %lld | rtDelay: %lld",
                                         (long long unsigned int)originateTimestamp, (long long unsigned int)receiveTimestamp, (long long unsigned int)transmitTimestamp, (long long unsigned int)receiveTimestamp2,
@@ -1595,9 +1600,9 @@ void* ARSTREAM_Reader2_RunControlThread(void *ARSTREAM_Reader2_t_Param)
         msgBuffer = NULL;
     }
 
-/* DEBUG */
-    //fclose(fDebug);
-/* /DEBUG */
+#ifdef ARSTREAM_READER2_CLOCKSYNC_DEBUG_FILE
+    fclose(fDebug);
+#endif
 
     return (void *)0;
 }
