@@ -74,10 +74,15 @@
  */
 
 #define ARSTREAM_READER2_TAG "ARSTREAM_Reader2"
-#define ARSTREAM_READER2_DATAREAD_TIMEOUT_MS (500)
+
+#define ARSTREAM_READER2_STREAM_DATAREAD_TIMEOUT_MS (500)
+#define ARSTREAM_READER2_CLOCKSYNC_DATAREAD_TIMEOUT_MS (100)
+#define ARSTREAM_READER2_CLOCKSYNC_PERIOD_MS (200) // 5 Hz
+
 #define ARSTREAM_READER2_RESENDER_MAX_COUNT (4)
 #define ARSTREAM_READER2_RESENDER_MAX_NALU_BUFFER_COUNT (1024) //TODO: tune this value
 #define ARSTREAM_READER2_RESENDER_NALU_BUFFER_MALLOC_CHUNK_SIZE (4096)
+
 #define ARSTREAM_READER2_MONITORING_MAX_POINTS (2048)
 
 #define ARSTREAM_H264_STARTCODE 0x00000001
@@ -980,7 +985,7 @@ static int ARSTREAM_Reader2_ReadData(ARSTREAM_Reader2_t *reader, uint8_t *recvBu
                 p.fd = reader->streamSocket;
                 p.events = POLLIN;
                 p.revents = 0;
-                pollRet = poll(&p, 1, ARSTREAM_READER2_DATAREAD_TIMEOUT_MS);
+                pollRet = poll(&p, 1, ARSTREAM_READER2_STREAM_DATAREAD_TIMEOUT_MS);
                 if (pollRet == 0)
                 {
                     /* failed: poll timeout */
@@ -1446,13 +1451,14 @@ void* ARSTREAM_Reader2_RunControlThread(void *ARSTREAM_Reader2_t_Param)
     uint64_t transmitTimestamp = 0;
     uint64_t receiveTimestamp2 = 0;
     uint64_t originateTimestamp2 = 0;
+    uint64_t loopStartTime = 0;
     int64_t clockDelta = 0;
     int64_t rtDelay = 0;
     uint32_t tsH, tsL;
     ssize_t bytes;
     struct timespec t1;
     struct pollfd p;
-    int shouldStop, ret, pollRet;
+    int shouldStop, ret, pollRet, timeElapsed, sleepDuration;
 
 #ifdef ARSTREAM_READER2_CLOCKSYNC_DEBUG_FILE
     FILE *fDebug;
@@ -1493,7 +1499,7 @@ void* ARSTREAM_Reader2_RunControlThread(void *ARSTREAM_Reader2_t_Param)
     while (shouldStop == 0)
     {
         ARSAL_Time_GetTime(&t1);
-        transmitTimestamp = (uint64_t)t1.tv_sec * 1000000 + (uint64_t)t1.tv_nsec / 1000;
+        loopStartTime = transmitTimestamp = (uint64_t)t1.tv_sec * 1000000 + (uint64_t)t1.tv_nsec / 1000;
 
         memset(clockFrame, 0, sizeof(ARSTREAM_NetworkHeaders_ClockFrame_t));
 
@@ -1515,7 +1521,7 @@ void* ARSTREAM_Reader2_RunControlThread(void *ARSTREAM_Reader2_t_Param)
             p.fd = reader->controlSocket;
             p.events = POLLIN;
             p.revents = 0;
-            pollRet = poll(&p, 1, 100); //TODO: timeout value?
+            pollRet = poll(&p, 1, ARSTREAM_READER2_CLOCKSYNC_DATAREAD_TIMEOUT_MS);
             if (pollRet == 0)
             {
                 /* failed: poll timeout */
@@ -1581,8 +1587,14 @@ void* ARSTREAM_Reader2_RunControlThread(void *ARSTREAM_Reader2_t_Param)
             }
         }
 
-        usleep(200 * 1000);
-        //TODO
+        ARSAL_Time_GetTime(&t1);
+        timeElapsed = (int)((uint64_t)t1.tv_sec * 1000000 + (uint64_t)t1.tv_nsec / 1000 - loopStartTime);
+
+        sleepDuration = ARSTREAM_READER2_CLOCKSYNC_PERIOD_MS * 1000 - timeElapsed;
+        if (sleepDuration > 0)
+        {
+            usleep(sleepDuration);
+        }
 
         ARSAL_Mutex_Lock(&(reader->streamMutex));
         shouldStop = reader->threadsShouldStop;

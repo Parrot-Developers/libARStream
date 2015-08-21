@@ -82,6 +82,11 @@
 #define ARSTREAM_SENDER2_MIN_POLL_TIMEOUT_MS (10)
 
 /**
+ * Socket timeout value for clock sync packets (milliseconds)
+ */
+#define ARSTREAM_SENDER2_CLOCKSYNC_DATAREAD_TIMEOUT_MS (500)
+
+/**
  * Sets *PTR to VAL if PTR is not null
  */
 #define SET_WITH_CHECK(PTR,VAL)                 \
@@ -1706,7 +1711,7 @@ void* ARSTREAM_Sender2_RunControlThread(void *ARSTREAM_Sender2_t_Param)
         p.fd = sender->controlSocket;
         p.events = POLLIN;
         p.revents = 0;
-        pollRet = poll(&p, 1, 500); //TODO: timeout value?
+        pollRet = poll(&p, 1, ARSTREAM_SENDER2_CLOCKSYNC_DATAREAD_TIMEOUT_MS);
         if (pollRet == 0)
         {
             /* failed: poll timeout */
