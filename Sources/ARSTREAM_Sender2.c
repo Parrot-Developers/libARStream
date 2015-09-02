@@ -303,7 +303,7 @@ static int ARSTREAM_Sender2_DropFromFifo(ARSTREAM_Sender2_t *sender, int maxTarg
 {
     ARSTREAM_Sender2_Nalu_t* cur = NULL;
     int size = 0, dropSize[4] = {0, 0, 0, 0};
-    int nri;
+    int nri, curNri, curNaluType;
 
     if (!sender)
     {
@@ -353,7 +353,9 @@ static int ARSTREAM_Sender2_DropFromFifo(ARSTREAM_Sender2_t *sender, int maxTarg
             }
 
             /* check the NRI bits */
-            if ((((uint8_t)(*(cur->naluBuffer)) >> 5) & 0x3) == nri)
+            curNri = (((uint8_t)(*(cur->naluBuffer)) >> 5) & 0x3);
+            curNaluType = ((uint8_t)(*(cur->naluBuffer)) & 0x1F);
+            if ((curNri == nri) && (curNaluType != 6)) // do not filter out SEI
             {
                 cur->drop = 1;
                 size -= cur->naluSize;
