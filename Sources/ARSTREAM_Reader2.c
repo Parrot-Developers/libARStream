@@ -682,7 +682,7 @@ eARSTREAM_ERROR ARSTREAM_Reader2_Delete(ARSTREAM_Reader2_t **reader)
 static int ARSTREAM_Reader2_SetSocketReceiveBufferSize(ARSTREAM_Reader2_t *reader, int socket, int size)
 {
     int ret = 0, err;
-    int size2 = sizeof(int);
+    socklen_t size2 = sizeof(size2);
 
     size /= 2;
     err = ARSAL_Socket_Setsockopt(socket, SOL_SOCKET, SO_RCVBUF, (void*)&size, sizeof(size));
@@ -1058,7 +1058,7 @@ static int ARSTREAM_Reader2_CheckBufferSize(ARSTREAM_Reader2_t *reader, int payl
 
     if ((reader->currentNaluBuffer == NULL) || (reader->currentNaluSize + payloadSize > reader->currentNaluBufferSize))
     {
-        uint32_t nextNaluBufferSize = reader->currentNaluSize + payloadSize, dummy = 0;
+        int32_t nextNaluBufferSize = reader->currentNaluSize + payloadSize, dummy = 0;
         uint8_t *nextNaluBuffer = reader->naluCallback(ARSTREAM_READER2_CAUSE_NALU_BUFFER_TOO_SMALL, reader->currentNaluBuffer, 0, 0, 0, 0, 0, 0, &nextNaluBufferSize, reader->naluCallbackUserPtr);
         ret = -1;
         if ((nextNaluBuffer != NULL) && (nextNaluBufferSize > 0) && (nextNaluBufferSize >= reader->currentNaluSize + payloadSize))
@@ -1088,7 +1088,7 @@ static void ARSTREAM_Reader2_OutputNalu(ARSTREAM_Reader2_t *reader, uint32_t tim
 
     if (reader->resenderCount > 0)
     {
-        int resendRet = ARSTREAM_Reader2_ResendNalu(reader, reader->currentNaluBuffer, reader->currentNaluSize, timestampScaled, isLastNaluInAu);
+        ARSTREAM_Reader2_ResendNalu(reader, reader->currentNaluBuffer, reader->currentNaluSize, timestampScaled, isLastNaluInAu);
     }
 
     reader->currentNaluBuffer = reader->naluCallback(ARSTREAM_READER2_CAUSE_NALU_COMPLETE, reader->currentNaluBuffer, reader->currentNaluSize,
@@ -1754,8 +1754,8 @@ eARSTREAM_ERROR ARSTREAM_Reader2_GetMonitoring(ARSTREAM_Reader2_t *reader, uint6
 ARSTREAM_Reader2_Resender_t* ARSTREAM_Reader2_Resender_New(ARSTREAM_Reader2_t *reader, ARSTREAM_Reader2_Resender_Config_t *config, eARSTREAM_ERROR *error)
 {
     ARSTREAM_Reader2_Resender_t *retResender = NULL;
-    int streamMutexWasInit = 0;
-    int monitoringMutexWasInit = 0;
+    //int streamMutexWasInit = 0;
+    //int monitoringMutexWasInit = 0;
     eARSTREAM_ERROR internalError = ARSTREAM_OK;
     /* ARGS Check */
     if ((reader == NULL) ||

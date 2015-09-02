@@ -868,7 +868,7 @@ static void ARSTREAM_Sender2_UpdateMonitoring(ARSTREAM_Sender2_t *sender, uint64
 static int ARSTREAM_Sender2_SetSocketSendBufferSize(ARSTREAM_Sender2_t *sender, int socket, int size)
 {
     int ret = 0, err;
-    int size2 = sizeof(int);
+    socklen_t size2 = sizeof(size2);
 
     size /= 2;
     err = ARSAL_Socket_Setsockopt(socket, SOL_SOCKET, SO_SNDBUF, (void*)&size, sizeof(size));
@@ -1663,9 +1663,9 @@ void* ARSTREAM_Sender2_RunControlThread(void *ARSTREAM_Sender2_t_Param)
     uint64_t originateTimestamp = 0;
     uint64_t receiveTimestamp = 0;
     uint64_t transmitTimestamp = 0;
-    uint64_t receiveTimestamp2 = 0;
-    int64_t clockDelta = 0;
-    int64_t rtDelay = 0;
+    //uint64_t receiveTimestamp2 = 0;
+    //int64_t clockDelta = 0;
+    //int64_t rtDelay = 0;
     uint32_t tsH, tsL;
     ssize_t bytes;
     struct timespec t1;
