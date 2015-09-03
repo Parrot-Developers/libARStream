@@ -146,7 +146,6 @@ typedef struct ARSTREAM_Reader2_Resender_Config_t
     int clientControlPort;                          /**< Client control port */
     int maxPacketSize;                              /**< Maximum network packet size in bytes (example: the interface MTU) */
     int targetPacketSize;                           /**< Target network packet size in bytes */
-    int maxBitrate;                                 /**< Maximum streaming bitrate in bit/s (should be provided by the original server) */
     int maxLatencyMs;                               /**< Maximum acceptable total latency in milliseconds (optional, can be 0) */
     int maxNetworkLatencyMs;                        /**< Maximum acceptable network latency in milliseconds */
 

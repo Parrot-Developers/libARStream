@@ -1798,7 +1798,7 @@ ARSTREAM_Reader2_Resender_t* ARSTREAM_Reader2_Resender_New(ARSTREAM_Reader2_t *r
         senderConfig.naluFifoSize = ARSTREAM_READER2_RESENDER_MAX_NALU_BUFFER_COUNT;
         senderConfig.maxPacketSize = config->maxPacketSize;
         senderConfig.targetPacketSize = config->targetPacketSize;
-        senderConfig.maxBitrate = config->maxBitrate;
+        senderConfig.maxBitrate = reader->maxBitrate;
         senderConfig.maxLatencyMs = config->maxLatencyMs;
         senderConfig.maxNetworkLatencyMs = config->maxNetworkLatencyMs;
         retResender->sender = ARSTREAM_Sender2_New(&senderConfig, &error2);
