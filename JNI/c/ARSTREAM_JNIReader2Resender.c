@@ -39,7 +39,7 @@
 
 JNIEXPORT jlong JNICALL
 Java_com_parrot_arsdk_arstream_ARStreamReader2Resender_nativeConstructor (JNIEnv *env, jobject thizz, jlong cReader, jstring clientAddress, jint clientStreamPort, jint clientControlPort,
-                                                                          jint serverStreamPort, jint serverControlPort, jint maxPacketSize, jint targetPacketSize, jint maxBitrate, jint maxLatency, jint maxNetworkLatency)
+                                                                          jint serverStreamPort, jint serverControlPort, jint maxPacketSize, jint targetPacketSize, jint maxLatency, jint maxNetworkLatency)
 {
     eARSTREAM_ERROR err = ARSTREAM_OK;
     const char *c_clientAddress = (*env)->GetStringUTFChars (env, clientAddress, NULL);
@@ -55,7 +55,6 @@ Java_com_parrot_arsdk_arstream_ARStreamReader2Resender_nativeConstructor (JNIEnv
     config.clientControlPort = clientControlPort;
     config.maxPacketSize = maxPacketSize;
     config.targetPacketSize = targetPacketSize;
-    config.maxBitrate = maxBitrate;
     config.maxLatencyMs = maxLatency;
     config.maxNetworkLatencyMs = maxNetworkLatency;
 

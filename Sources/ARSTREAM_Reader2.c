@@ -1414,7 +1414,7 @@ void* ARSTREAM_Reader2_RunStreamThread(void *ARSTREAM_Reader2_t_Param)
             {
                 /* out of order packet */
                 //TODO
-                ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Out of order sequence number (currentSeqNum=%d, previousSeqNum=%d, seqNumDelta=%d)", currentSeqNum, previousSeqNum, seqNumDelta);
+                ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_READER2_TAG, "Out of order sequence number (currentSeqNum=%d, previousSeqNum=%d, seqNumDelta=%d)", currentSeqNum, previousSeqNum, seqNumDelta); //TODO: debug
             }
         }
 
