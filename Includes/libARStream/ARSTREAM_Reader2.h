@@ -181,6 +181,18 @@ typedef struct ARSTREAM_Reader2_Resender_t ARSTREAM_Reader2_Resender_t;
 ARSTREAM_Reader2_t* ARSTREAM_Reader2_New (ARSTREAM_Reader2_Config_t *config, eARSTREAM_ERROR *error);
 
 /**
+ * @brief Invalidate the current NAL unit buffer
+ *
+ * This function blocks until the current NAL unit buffer is no longer used by the Reader2.
+ * The NAL unit callback function will then be called with cause ARSTREAM_READER2_CAUSE_NALU_BUFFER_TOO_SMALL to get a new buffer.
+ *
+ * @param[in] reader The Reader2 instance
+ *
+ * @note Calling this function multiple times has no effect
+ */
+void ARSTREAM_Reader2_InvalidateNaluBuffer (ARSTREAM_Reader2_t *reader);
+
+/**
  * @brief Stops a running Reader2
  * @warning Once stopped, a Reader2 cannot be restarted
  *

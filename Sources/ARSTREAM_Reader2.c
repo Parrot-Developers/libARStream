@@ -177,9 +177,11 @@ struct ARSTREAM_Reader2_t {
     int currentNaluSize;       // Actual data length
     uint8_t *currentNaluBuffer;
     uint64_t clockDelta;
+    int scheduleNaluBufferChange;
 
     /* Thread status */
     ARSAL_Mutex_t streamMutex;
+    ARSAL_Cond_t streamCond;
     int threadsShouldStop;
     int streamThreadStarted;
     int controlThreadStarted;
@@ -359,7 +361,7 @@ static int ARSTREAM_Reader2_ResendNalu(ARSTREAM_Reader2_t *reader, uint8_t *nalu
 ARSTREAM_Reader2_t* ARSTREAM_Reader2_New(ARSTREAM_Reader2_Config_t *config, eARSTREAM_ERROR *error)
 {
     ARSTREAM_Reader2_t *retReader = NULL;
-    int streamMutexWasInit = 0;
+    int streamMutexWasInit = 0, streamCondWasInit = 0;
     int monitoringMutexWasInit = 0;
     int naluBufferMutexWasInit = 0;
     eARSTREAM_ERROR internalError = ARSTREAM_OK;
@@ -441,6 +443,18 @@ ARSTREAM_Reader2_t* ARSTREAM_Reader2_New(ARSTREAM_Reader2_Config_t *config, eARS
         else
         {
             streamMutexWasInit = 1;
+        }
+    }
+    if (internalError == ARSTREAM_OK)
+    {
+        int condInitRet = ARSAL_Cond_Init(&(retReader->streamCond));
+        if (condInitRet != 0)
+        {
+            internalError = ARSTREAM_ERROR_ALLOC;
+        }
+        else
+        {
+            streamCondWasInit = 1;
         }
     }
     if (internalError == ARSTREAM_OK)
@@ -545,6 +559,10 @@ ARSTREAM_Reader2_t* ARSTREAM_Reader2_New(ARSTREAM_Reader2_Config_t *config, eARS
         {
             ARSAL_Mutex_Destroy(&(retReader->streamMutex));
         }
+        if (streamCondWasInit == 1)
+        {
+            ARSAL_Cond_Destroy(&(retReader->streamCond));
+        }
         if (monitoringMutexWasInit == 1)
         {
             ARSAL_Mutex_Destroy(&(retReader->monitoringMutex));
@@ -577,6 +595,19 @@ ARSTREAM_Reader2_t* ARSTREAM_Reader2_New(ARSTREAM_Reader2_Config_t *config, eARS
 
     SET_WITH_CHECK(error, internalError);
     return retReader;
+}
+
+
+void ARSTREAM_Reader2_InvalidateNaluBuffer(ARSTREAM_Reader2_t *reader)
+{
+    if (reader != NULL)
+    {
+        ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Invalidating NALU buffer...");
+        ARSAL_Mutex_Lock(&(reader->streamMutex));
+        reader->scheduleNaluBufferChange = 1;
+        ARSAL_Cond_Wait(&(reader->streamCond), &(reader->streamMutex));
+        ARSAL_Mutex_Unlock(&(reader->streamMutex));
+    }
 }
 
 
@@ -641,6 +672,7 @@ eARSTREAM_ERROR ARSTREAM_Reader2_Delete(ARSTREAM_Reader2_t **reader)
             }
 #endif
             ARSAL_Mutex_Destroy(&((*reader)->streamMutex));
+            ARSAL_Cond_Destroy(&((*reader)->streamCond));
             ARSAL_Mutex_Destroy(&((*reader)->monitoringMutex));
             ARSAL_Mutex_Destroy(&((*reader)->naluBufferMutex));
             if ((*reader)->controlSocket != -1)
@@ -1420,7 +1452,18 @@ void* ARSTREAM_Reader2_RunStreamThread(void *ARSTREAM_Reader2_t_Param)
 
         ARSAL_Mutex_Lock(&(reader->streamMutex));
         shouldStop = reader->threadsShouldStop;
-        ARSAL_Mutex_Unlock(&(reader->streamMutex));
+        if (reader->scheduleNaluBufferChange)
+        {
+            reader->currentNaluBuffer = NULL;
+            reader->currentNaluBufferSize = 0;
+            reader->scheduleNaluBufferChange = 0;
+            ARSAL_Mutex_Unlock(&(reader->streamMutex));
+            ARSAL_Cond_Signal(&(reader->streamCond));
+        }
+        else
+        {
+            ARSAL_Mutex_Unlock(&(reader->streamMutex));
+        }
     }
 
     reader->naluCallback(ARSTREAM_READER2_CAUSE_CANCEL, reader->currentNaluBuffer, 0, 0, 0, 0, 0, 0, &(reader->currentNaluBufferSize), reader->naluCallbackUserPtr);
