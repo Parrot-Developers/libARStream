@@ -607,6 +607,7 @@ void ARSTREAM_Reader2_InvalidateNaluBuffer(ARSTREAM_Reader2_t *reader)
         reader->scheduleNaluBufferChange = 1;
         ARSAL_Cond_Wait(&(reader->streamCond), &(reader->streamMutex));
         ARSAL_Mutex_Unlock(&(reader->streamMutex));
+        ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "NALU buffer invalidate is OK");
     }
 }
 
@@ -1090,6 +1091,10 @@ static int ARSTREAM_Reader2_CheckBufferSize(ARSTREAM_Reader2_t *reader, int payl
 
     if ((reader->currentNaluBuffer == NULL) || (reader->currentNaluSize + payloadSize > reader->currentNaluBufferSize))
     {
+        if (reader->currentNaluBuffer == NULL)
+        {
+            ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "currentNaluBuffer is NULL => naluCallback(BUFFER_TOO_SMALL)"); //TODO: debug
+        }
         int32_t nextNaluBufferSize = reader->currentNaluSize + payloadSize, dummy = 0;
         uint8_t *nextNaluBuffer = reader->naluCallback(ARSTREAM_READER2_CAUSE_NALU_BUFFER_TOO_SMALL, reader->currentNaluBuffer, 0, 0, 0, 0, 0, 0, &nextNaluBufferSize, reader->naluCallbackUserPtr);
         ret = -1;
@@ -1104,6 +1109,7 @@ static int ARSTREAM_Reader2_CheckBufferSize(ARSTREAM_Reader2_t *reader, int payl
         }
         reader->currentNaluBuffer = nextNaluBuffer;
         reader->currentNaluBufferSize = nextNaluBufferSize;
+        ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "naluCallback: currentNaluBuffer=0x%08X", reader->currentNaluBuffer); //TODO: debug
     }
 
     return ret;
@@ -1126,6 +1132,7 @@ static void ARSTREAM_Reader2_OutputNalu(ARSTREAM_Reader2_t *reader, uint32_t tim
     reader->currentNaluBuffer = reader->naluCallback(ARSTREAM_READER2_CAUSE_NALU_COMPLETE, reader->currentNaluBuffer, reader->currentNaluSize,
                                                      timestampScaled, timestampScaledShifted,
                                                      isFirstNaluInAu, isLastNaluInAu, missingPacketsBefore, &(reader->currentNaluBufferSize), reader->naluCallbackUserPtr);
+    ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "naluCallback: currentNaluBuffer=0x%08X", reader->currentNaluBuffer); //TODO: debug
 }
 
 
@@ -1459,6 +1466,7 @@ void* ARSTREAM_Reader2_RunStreamThread(void *ARSTREAM_Reader2_t_Param)
             reader->scheduleNaluBufferChange = 0;
             ARSAL_Mutex_Unlock(&(reader->streamMutex));
             ARSAL_Cond_Signal(&(reader->streamCond));
+            ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "NALU buffer invalidated");
         }
         else
         {
