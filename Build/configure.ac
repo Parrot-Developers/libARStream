@@ -95,6 +95,9 @@ AC_HEADER_STDC
 # Checks for typedefs, structures, and compiler characteristics.
 AC_TYPE_SIZE_T
 
+# Checks for library functions.
+AC_CHECK_LIB([m],[sqrt])
+
 # Generate libtool version info number
 if test x"$sover" = x"yes"; then
 	LDFLAGS+=" -release $PACKAGE_VERSION"
@@ -106,9 +109,6 @@ fi
 # --> set these variables instead of CFLAGS or LDFLAGS
 AC_SUBST([CFLAGS])
 AC_SUBST([LDFLAGS])
-
-# Checks for library functions.
-
 
 # Generates Makefile
 AC_CONFIG_FILES([Makefile])
