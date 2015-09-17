@@ -66,6 +66,9 @@ AR_DEPENDS([libARNetwork], [Y], [libARNetwork/ARNetwork.h])
 # Check headers
 ##########################################################################
 
+# Check for SO_NOSIGPIPE macros
+AC_CHECK_DECLS([SO_NOSIGPIPE, MSG_NOSIGNAL],[],[],[[#include <sys/socket.h>]])
+
 # Checks for generic headers
 AC_CHECK_HEADERS([inttypes.h],,AC_MSG_ERROR(The inttypes.h header is required in order to build the library!))
 AC_CHECK_HEADERS([stdlib.h],,AC_MSG_ERROR(The stdlib.h header is required in order to build the library!))

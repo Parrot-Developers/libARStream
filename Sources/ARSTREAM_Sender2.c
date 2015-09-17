@@ -1052,6 +1052,19 @@ static int ARSTREAM_Sender2_ControlSocketSetup(ARSTREAM_Sender2_t *sender)
         }
     }
 
+#if HAVE_DECL_SO_NOSIGPIPE
+    if (ret == 0)
+    {
+        /* remove SIGPIPE */
+        int set = 1;
+        err = ARSAL_Socket_Setsockopt(sender->controlSocket, SOL_SOCKET, SO_NOSIGPIPE, (void*)&set, sizeof(int));
+        if (err != 0)
+        {
+            ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Error on setsockopt: error=%d (%s)", errno, strerror(errno));
+        }
+    }
+#endif
+
     if (ret == 0)
     {
         /* set to non-blocking */
