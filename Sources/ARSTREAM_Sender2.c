@@ -499,8 +499,9 @@ ARSTREAM_Sender2_t* ARSTREAM_Sender2_New(ARSTREAM_Sender2_Config_t *config, eARS
         retSender->maxLatencyMs = (config->maxLatencyMs > 0) ? config->maxLatencyMs : 0;
         retSender->maxNetworkLatencyMs = (config->maxNetworkLatencyMs > 0) ? config->maxNetworkLatencyMs : 0;
         int totalBufSize = config->maxBitrate * config->maxNetworkLatencyMs / 1000 / 8;
-        retSender->streamSocketSendBufferSize = totalBufSize / 2; //TODO: tuning
-        retSender->naluFifoBufferSize = totalBufSize / 2; //TODO: tuning
+        int minStreamSocketSendBufferSize = config->maxBitrate * 50 / 1000 / 8;
+        retSender->streamSocketSendBufferSize = minStreamSocketSendBufferSize;
+        retSender->naluFifoBufferSize = totalBufSize - retSender->streamSocketSendBufferSize;
     }
 
     /* Setup internal mutexes/sems */
