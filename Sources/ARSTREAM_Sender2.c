@@ -500,7 +500,7 @@ ARSTREAM_Sender2_t* ARSTREAM_Sender2_New(ARSTREAM_Sender2_Config_t *config, eARS
         retSender->maxNetworkLatencyMs = (config->maxNetworkLatencyMs > 0) ? config->maxNetworkLatencyMs : 0;
         int totalBufSize = config->maxBitrate * config->maxNetworkLatencyMs / 1000 / 8;
         int minStreamSocketSendBufferSize = config->maxBitrate * 50 / 1000 / 8;
-        retSender->streamSocketSendBufferSize = minStreamSocketSendBufferSize;
+        retSender->streamSocketSendBufferSize = (totalBufSize / 4 > minStreamSocketSendBufferSize) ? totalBufSize / 4 : minStreamSocketSendBufferSize;
         retSender->naluFifoBufferSize = totalBufSize - retSender->streamSocketSendBufferSize;
     }
 
