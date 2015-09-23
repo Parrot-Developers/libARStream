@@ -165,7 +165,6 @@ struct ARSTREAM_Sender2_t {
     int maxNetworkLatencyMs;
 
     uint64_t lastAuTimestamp;
-    uint64_t lastFifoDropTime;
     uint16_t seqNum;
     ARSAL_Mutex_t streamMutex;
 
@@ -304,6 +303,7 @@ static int ARSTREAM_Sender2_DropFromFifo(ARSTREAM_Sender2_t *sender, int maxTarg
     ARSTREAM_Sender2_Nalu_t* cur = NULL;
     int size = 0, dropSize[4] = {0, 0, 0, 0};
     int nri, curNri, curNaluType;
+    //Note: this feature is not used currently as it requires that different levels of NALU priorities are present in the stream
 
     if (!sender)
     {
@@ -1141,7 +1141,7 @@ static int ARSTREAM_Sender2_ControlSocketSetup(ARSTREAM_Sender2_t *sender)
 
 static int ARSTREAM_Sender2_SendData(ARSTREAM_Sender2_t *sender, uint8_t *sendBuffer, uint32_t sendSize, uint64_t inputTimestamp, uint64_t auTimestamp, int isLastInAu, int maxLatencyUs, int maxNetworkLatencyUs)
 {
-    int ret = 0, totalLatencyDrop = 0, networkLatencyDrop = 0, fifoDrop = 0;
+    int ret = 0, totalLatencyDrop = 0, networkLatencyDrop = 0;
     ARSTREAM_NetworkHeaders_DataHeader2_t *header = (ARSTREAM_NetworkHeaders_DataHeader2_t *)sendBuffer;
     uint16_t flags;
     uint32_t rtpTimestamp;
@@ -1205,7 +1205,6 @@ static int ARSTREAM_Sender2_SendData(ARSTREAM_Sender2_t *sender, uint8_t *sendBu
                         ARSTREAM_Sender2_UpdateMonitoring(sender, inputTimestamp, auTimestamp, rtpTimestamp, sender->seqNum - 1, isLastInAu, 0, sendSize);
                         ARSAL_PRINT(ARSAL_PRINT_VERBOSE, ARSTREAM_SENDER2_TAG, "Time %llu: dropped packet (polling timed out: timeout = %dms) (seqNum = %d)",
                                     auTimestamp, pollTimeMs, header->seqNum);
-                        fifoDrop = 1;
                         ret = -2;
                     }
                     else if (pollRet < 0)
@@ -1213,7 +1212,6 @@ static int ARSTREAM_Sender2_SendData(ARSTREAM_Sender2_t *sender, uint8_t *sendBu
                         /* failed: poll error */
                         ARSTREAM_Sender2_UpdateMonitoring(sender, inputTimestamp, auTimestamp, rtpTimestamp, sender->seqNum - 1, isLastInAu, 0, sendSize);
                         ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Poll error: error=%d (%s)", errno, strerror(errno));
-                        fifoDrop = 1;
                         ret = -1;
                     }
                     else if (p.revents & POLLOUT)
@@ -1251,7 +1249,6 @@ static int ARSTREAM_Sender2_SendData(ARSTREAM_Sender2_t *sender, uint8_t *sendBu
                                 ARSTREAM_Sender2_UpdateMonitoring(sender, inputTimestamp, auTimestamp, rtpTimestamp, sender->seqNum - 1, isLastInAu, 0, sendSize);
                                 ARSAL_PRINT(ARSAL_PRINT_VERBOSE, ARSTREAM_SENDER2_TAG, "Time %llu: dropped packet (socket buffer full #2) (seqNum = %d)",
                                             auTimestamp, header->seqNum);
-                                fifoDrop = 1;
                                 ret = -2;
                             }
                             else
@@ -1259,7 +1256,6 @@ static int ARSTREAM_Sender2_SendData(ARSTREAM_Sender2_t *sender, uint8_t *sendBu
                                 /* failed: socket error */
                                 ARSTREAM_Sender2_UpdateMonitoring(sender, inputTimestamp, auTimestamp, rtpTimestamp, sender->seqNum - 1, isLastInAu, 0, sendSize);
                                 ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Socket send error #2 error=%d (%s)", errno, strerror(errno));
-                                fifoDrop = 1;
                                 ret = -1;
                             }
                         }
@@ -1277,7 +1273,6 @@ static int ARSTREAM_Sender2_SendData(ARSTREAM_Sender2_t *sender, uint8_t *sendBu
                                 ARSAL_PRINT(ARSAL_PRINT_VERBOSE, ARSTREAM_SENDER2_TAG, "Time %llu: dropped packet (after poll network latency %.1fms > %.1fms) (seqNum = %d)",
                                             auTimestamp, (float)(curTime - inputTimestamp) / 1000., (float)maxNetworkLatencyUs / 1000., header->seqNum);
                             }
-                            fifoDrop = 1;
                             ret = -2;
                         }
                     }
@@ -1288,7 +1283,6 @@ static int ARSTREAM_Sender2_SendData(ARSTREAM_Sender2_t *sender, uint8_t *sendBu
                     ARSTREAM_Sender2_UpdateMonitoring(sender, inputTimestamp, auTimestamp, rtpTimestamp, sender->seqNum - 1, isLastInAu, 0, sendSize);
                     ARSAL_PRINT(ARSAL_PRINT_VERBOSE, ARSTREAM_SENDER2_TAG, "Time %llu: dropped packet (poll timeout too short: timeout = %dms) (seqNum = %d)",
                                 auTimestamp, pollTimeMs, header->seqNum);
-                    fifoDrop = 1;
                     ret = -2;
                 }
                 break;
@@ -1297,7 +1291,6 @@ static int ARSTREAM_Sender2_SendData(ARSTREAM_Sender2_t *sender, uint8_t *sendBu
                 /* failed: socket error */
                 ARSTREAM_Sender2_UpdateMonitoring(sender, inputTimestamp, auTimestamp, rtpTimestamp, sender->seqNum - 1, isLastInAu, 0, sendSize);
                 ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Socket send error: error=%d (%s)", errno, strerror(errno));
-                fifoDrop = 1;
                 ret = -1;
                 break;
             }
@@ -1322,18 +1315,7 @@ static int ARSTREAM_Sender2_SendData(ARSTREAM_Sender2_t *sender, uint8_t *sendBu
             ARSAL_PRINT(ARSAL_PRINT_VERBOSE, ARSTREAM_SENDER2_TAG, "Time %llu: dropped packet (network latency %.1fms > %.1fms) (seqNum = %d)",
                         auTimestamp, (float)(curTime - inputTimestamp) / 1000., (float)maxNetworkLatencyUs / 1000., header->seqNum);
         }
-        fifoDrop = 1;
         ret = -2;
-    }
-
-    if ((sender->naluFifoBufferSize) && (fifoDrop) && (sender->lastFifoDropTime != auTimestamp))
-    {
-        int fifoDropRet = ARSTREAM_Sender2_DropFromFifo(sender, sender->naluFifoBufferSize);
-        if (fifoDropRet < 0)
-        {
-            ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_SENDER2_TAG, "Failed to drop NALUs from FIFO (%d)", fifoDropRet);
-        }
-        sender->lastFifoDropTime = auTimestamp;
     }
 
     return ret;
