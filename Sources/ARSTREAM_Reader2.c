@@ -309,6 +309,7 @@ static int ARSTREAM_Reader2_ResendNalu(ARSTREAM_Reader2_t *reader, uint8_t *nalu
 {
     int ret = 0, i;
     ARSTREAM_Reader2_NaluBuffer_t *naluBuf = NULL;
+    ARSTREAM_Sender2_NaluDesc_t nalu;
 
     /* remove the byte stream format start code */
     if (reader->insertStartCodes)
@@ -332,7 +333,14 @@ static int ARSTREAM_Reader2_ResendNalu(ARSTREAM_Reader2_t *reader, uint8_t *nalu
     naluBuf->auTimestamp = auTimestamp;
     naluBuf->isLastNaluInAu = isLastNaluInAu;
 
-    /* esnd the NALU to all resenders */
+    nalu.naluBuffer = naluBuf->naluBuffer;
+    nalu.naluSize = naluSize;
+    nalu.auTimestamp = auTimestamp;
+    nalu.isLastNaluInAu = isLastNaluInAu;
+    nalu.auUserPtr = NULL;
+    nalu.naluUserPtr = naluBuf;
+
+    /* send the NALU to all resenders */
     for (i = 0; i < reader->resenderCount; i++)
     {
         ARSTREAM_Reader2_Resender_t *resender = reader->resender[i];
@@ -340,8 +348,8 @@ static int ARSTREAM_Reader2_ResendNalu(ARSTREAM_Reader2_t *reader, uint8_t *nalu
 
         naluBuf->useCount++;
         ARSAL_Mutex_Unlock(&(reader->naluBufferMutex));
-        
-        err = ARSTREAM_Sender2_SendNewNalu(resender->sender, naluBuf->naluBuffer, naluSize, auTimestamp, isLastNaluInAu, NULL, naluBuf);
+
+        err = ARSTREAM_Sender2_SendNewNalu(resender->sender, &nalu);
 
         ARSAL_Mutex_Lock(&(reader->naluBufferMutex));
 

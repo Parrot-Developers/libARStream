@@ -132,6 +132,20 @@ typedef struct ARSTREAM_Sender2_Config_t
 } ARSTREAM_Sender2_Config_t;
 
 /**
+ * @brief Sender2 NAL unit descriptor
+ */
+typedef struct ARSTREAM_Sender2_NaluDesc_t
+{
+    uint8_t *naluBuffer;                            /**< Pointer to the NAL unit buffer */
+    uint32_t naluSize;                              /**< Size of the NAL unit in bytes */
+    uint64_t auTimestamp;                           /**< Access unit timastamp in microseconds. All NAL units of an access unit must share the same timestamp */
+    int isLastNaluInAu;                             /**< Boolean-like flag (0/1). If active, tells the sender that the NAL unit is the last of the access unit */
+    void *auUserPtr;                                /**< Access unit user pointer that will be passed to the access unit callback function (optional, can be NULL) */
+    void *naluUserPtr;                              /**< NAL unit user pointer that will be passed to the NAL unit callback function (optional, can be NULL) */
+
+} ARSTREAM_Sender2_NaluDesc_t;
+
+/**
  * @brief A Sender2 instance to allow streaming H.264 video over a network
  */
 typedef struct ARSTREAM_Sender2_t ARSTREAM_Sender2_t;
@@ -184,18 +198,27 @@ eARSTREAM_ERROR ARSTREAM_Sender2_Delete (ARSTREAM_Sender2_t **sender);
  * @warning The NAL unit buffer must remain available for the sender until the NAL unit or access unit callback functions are called.
  *
  * @param[in] sender The Sender2 instance
- * @param[in] naluBuffer Pointer to the NAL unit buffer
- * @param[in] naluSize Size of the NAL unit in bytes
- * @param[in] auTimestamp Access unit timastamp in microseconds. All NAL units of an access unit must share the same timestamp.
- * @param[in] isLastNaluInAu Boolean-like flag (0/1). If active, tells the sender that the NAL unit is the last of the access unit.
- * @param[in] auUserPtr Access unit user pointer that will be passed to the access unit callback function (optional, can be NULL).
- * @param[in] naluUserPtr NAL unit user pointer that will be passed to the NAL unit callback function (optional, can be NULL).
+ * @param[in] nalu Pointer to a NAL unit descriptor
  *
  * @return ARSTREAM_OK if no error happened
- * @return ARSTREAM_ERROR_BAD_PARAMETERS if the sender or naluBuffer pointer is invalid, or if naluSize or auTimestamp is zero
+ * @return ARSTREAM_ERROR_BAD_PARAMETERS if the sender, nalu or naluBuffer pointers are invalid, or if naluSize or auTimestamp is zero
  * @return ARSTREAM_ERROR_QUEUE_FULL if the NAL unit FIFO is full
  */
-eARSTREAM_ERROR ARSTREAM_Sender2_SendNewNalu (ARSTREAM_Sender2_t *sender, uint8_t *naluBuffer, uint32_t naluSize, uint64_t auTimestamp, int isLastNaluInAu, void *auUserPtr, void *naluUserPtr);
+eARSTREAM_ERROR ARSTREAM_Sender2_SendNewNalu (ARSTREAM_Sender2_t *sender, const ARSTREAM_Sender2_NaluDesc_t *nalu);
+
+/**
+ * @brief Sends multiple new NAL units
+ * @warning The NAL unit buffers must remain available for the sender until the NAL unit or access unit callback functions are called.
+ *
+ * @param[in] sender The Sender2 instance
+ * @param[in] nalu Pointer to a NAL unit descriptor array
+ * @param[in] naluCount Number of NAL units in the array
+ *
+ * @return ARSTREAM_OK if no error happened
+ * @return ARSTREAM_ERROR_BAD_PARAMETERS if the sender, nalu or naluBuffer pointers are invalid, or if a naluSize or auTimestamp is zero
+ * @return ARSTREAM_ERROR_QUEUE_FULL if the NAL unit FIFO is full
+ */
+eARSTREAM_ERROR ARSTREAM_Sender2_SendNNewNalu (ARSTREAM_Sender2_t *sender, const ARSTREAM_Sender2_NaluDesc_t *nalu, int naluCount);
 
 /**
  * @brief Flush all currently queued NAL units

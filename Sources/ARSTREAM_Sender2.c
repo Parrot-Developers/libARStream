@@ -200,7 +200,7 @@ struct ARSTREAM_Sender2_t {
 };
 
 
-static int ARSTREAM_Sender2_EnqueueNalu(ARSTREAM_Sender2_t *sender, const ARSTREAM_Sender2_Nalu_t* nalu)
+static int ARSTREAM_Sender2_EnqueueNalu(ARSTREAM_Sender2_t *sender, const ARSTREAM_Sender2_NaluDesc_t *nalu, uint64_t inputTimestamp)
 {
     int i;
     ARSTREAM_Sender2_Nalu_t* cur = NULL;
@@ -223,7 +223,14 @@ static int ARSTREAM_Sender2_EnqueueNalu(ARSTREAM_Sender2_t *sender, const ARSTRE
         if (!sender->fifoPool[i].used)
         {
             cur = &sender->fifoPool[i];
-            memcpy(cur, nalu, sizeof(ARSTREAM_Sender2_Nalu_t));
+            cur->naluBuffer = nalu->naluBuffer;
+            cur->naluSize = nalu->naluSize;
+            cur->auTimestamp = nalu->auTimestamp;
+            cur->naluInputTimestamp = inputTimestamp;
+            cur->isLastInAu = nalu->isLastNaluInAu;
+            cur->auUserPtr = nalu->auUserPtr;
+            cur->naluUserPtr = nalu->naluUserPtr;
+            cur->drop = 0;
             cur->prev = NULL;
             cur->next = NULL;
             cur->used = 1;
@@ -247,6 +254,72 @@ static int ARSTREAM_Sender2_EnqueueNalu(ARSTREAM_Sender2_t *sender, const ARSTRE
     if (!sender->fifoHead)
     {
         sender->fifoHead = cur;
+    }
+
+    ARSAL_Mutex_Unlock(&(sender->fifoMutex));
+    ARSAL_Cond_Signal(&(sender->fifoCond));
+
+    return 0;
+}
+
+
+static int ARSTREAM_Sender2_EnqueueNNalu(ARSTREAM_Sender2_t *sender, const ARSTREAM_Sender2_NaluDesc_t *nalu, int naluCount, uint64_t inputTimestamp)
+{
+    int i, k;
+    ARSTREAM_Sender2_Nalu_t* cur = NULL;
+
+    if ((!sender) || (!nalu) || (naluCount <= 0))
+    {
+        return -1;
+    }
+
+    ARSAL_Mutex_Lock(&(sender->fifoMutex));
+
+    if (sender->fifoCount + naluCount >= sender->naluFifoSize)
+    {
+        ARSAL_Mutex_Unlock(&(sender->fifoMutex));
+        return -2;
+    }
+
+    for (k = 0; k < naluCount; k++)
+    {
+        for (i = 0; i < sender->naluFifoSize; i++)
+        {
+            if (!sender->fifoPool[i].used)
+            {
+                cur = &sender->fifoPool[i];
+                cur->naluBuffer = nalu[k].naluBuffer;
+                cur->naluSize = nalu[k].naluSize;
+                cur->auTimestamp = nalu[k].auTimestamp;
+                cur->naluInputTimestamp = inputTimestamp;
+                cur->isLastInAu = nalu[k].isLastNaluInAu;
+                cur->auUserPtr = nalu[k].auUserPtr;
+                cur->naluUserPtr = nalu[k].naluUserPtr;
+                cur->drop = 0;
+                cur->prev = NULL;
+                cur->next = NULL;
+                cur->used = 1;
+                break;
+            }
+        }
+
+        if (!cur)
+        {
+            ARSAL_Mutex_Unlock(&(sender->fifoMutex));
+            return -3;
+        }
+
+        sender->fifoCount++;
+        if (sender->fifoTail)
+        {
+            sender->fifoTail->next = cur;
+            cur->prev = sender->fifoTail;
+        }
+        sender->fifoTail = cur; 
+        if (!sender->fifoHead)
+        {
+            sender->fifoHead = cur;
+        }
     }
 
     ARSAL_Mutex_Unlock(&(sender->fifoMutex));
@@ -766,17 +839,23 @@ eARSTREAM_ERROR ARSTREAM_Sender2_Delete(ARSTREAM_Sender2_t **sender)
 }
 
 
-eARSTREAM_ERROR ARSTREAM_Sender2_SendNewNalu(ARSTREAM_Sender2_t *sender, uint8_t *naluBuffer, uint32_t naluSize, uint64_t auTimestamp, int isLastNaluInAu, void *auUserPtr, void *naluUserPtr)
+eARSTREAM_ERROR ARSTREAM_Sender2_SendNewNalu(ARSTREAM_Sender2_t *sender, const ARSTREAM_Sender2_NaluDesc_t *nalu)
 {
     eARSTREAM_ERROR retVal = ARSTREAM_OK;
+    int res;
     struct timespec t1;
+    uint64_t inputTimestamp;
     ARSAL_Time_GetTime(&t1);
 
     // Args check
     if ((sender == NULL) ||
-        (naluBuffer == NULL) ||
-        (naluSize == 0) ||
-        (auTimestamp == 0))
+        (nalu == NULL))
+    {
+        retVal = ARSTREAM_ERROR_BAD_PARAMETERS;
+    }
+    if ((nalu->naluBuffer == NULL) ||
+        (nalu->naluSize == 0) ||
+        (nalu->auTimestamp == 0))
     {
         retVal = ARSTREAM_ERROR_BAD_PARAMETERS;
     }
@@ -790,19 +869,53 @@ eARSTREAM_ERROR ARSTREAM_Sender2_SendNewNalu(ARSTREAM_Sender2_t *sender, uint8_t
 
     if (retVal == ARSTREAM_OK)
     {
-        int res;
-        ARSTREAM_Sender2_Nalu_t nalu;
-        memset(&nalu, 0, sizeof(nalu));
+        inputTimestamp = (uint64_t)t1.tv_sec * 1000000 + (uint64_t)t1.tv_nsec / 1000;
+        res = ARSTREAM_Sender2_EnqueueNalu(sender, nalu, inputTimestamp);
+        if (res < 0)
+        {
+            retVal = ARSTREAM_ERROR_QUEUE_FULL;
+        }
+    }
+    return retVal;
+}
 
-        nalu.naluBuffer = naluBuffer;
-        nalu.naluSize = naluSize;
-        nalu.auTimestamp = auTimestamp;
-        nalu.naluInputTimestamp = (uint64_t)t1.tv_sec * 1000000 + (uint64_t)t1.tv_nsec / 1000;
-        nalu.isLastInAu = isLastNaluInAu;
-        nalu.auUserPtr = auUserPtr;
-        nalu.naluUserPtr = naluUserPtr;
 
-        res = ARSTREAM_Sender2_EnqueueNalu(sender, &nalu);
+eARSTREAM_ERROR ARSTREAM_Sender2_SendNNewNalu(ARSTREAM_Sender2_t *sender, const ARSTREAM_Sender2_NaluDesc_t *nalu, int naluCount)
+{
+    eARSTREAM_ERROR retVal = ARSTREAM_OK;
+    int k, res;
+    struct timespec t1;
+    uint64_t inputTimestamp;
+    ARSAL_Time_GetTime(&t1);
+
+    // Args check
+    if ((sender == NULL) ||
+        (nalu == NULL) ||
+        (naluCount <= 0))
+    {
+        retVal = ARSTREAM_ERROR_BAD_PARAMETERS;
+    }
+    for (k = 0; k < naluCount; k++)
+    {
+        if ((nalu[k].naluBuffer == NULL) ||
+            (nalu[k].naluSize == 0) ||
+            (nalu[k].auTimestamp == 0))
+        {
+            retVal = ARSTREAM_ERROR_BAD_PARAMETERS;
+        }
+    }
+
+    ARSAL_Mutex_Lock(&(sender->streamMutex));
+    if (!sender->streamThreadStarted)
+    {
+        retVal = ARSTREAM_ERROR_BAD_PARAMETERS;
+    }
+    ARSAL_Mutex_Unlock(&(sender->streamMutex));
+
+    if (retVal == ARSTREAM_OK)
+    {
+        inputTimestamp = (uint64_t)t1.tv_sec * 1000000 + (uint64_t)t1.tv_nsec / 1000;
+        res = ARSTREAM_Sender2_EnqueueNNalu(sender, nalu, naluCount, inputTimestamp);
         if (res < 0)
         {
             retVal = ARSTREAM_ERROR_QUEUE_FULL;
