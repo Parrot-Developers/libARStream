@@ -612,9 +612,13 @@ void ARSTREAM_Reader2_InvalidateNaluBuffer(ARSTREAM_Reader2_t *reader)
     {
         ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "Invalidating NALU buffer...");
         ARSAL_Mutex_Lock(&(reader->streamMutex));
-        reader->scheduleNaluBufferChange = 1;
-        ARSAL_Cond_Wait(&(reader->streamCond), &(reader->streamMutex));
+        if (reader->streamThreadStarted)
+        {
+            reader->scheduleNaluBufferChange = 1;
+            ARSAL_Cond_Wait(&(reader->streamCond), &(reader->streamMutex));
+        }
         ARSAL_Mutex_Unlock(&(reader->streamMutex));
+        ARSAL_PRINT(ARSAL_PRINT_DEBUG, ARSTREAM_READER2_TAG, "NALU buffer invalidated");
     }
 }
 
@@ -629,6 +633,7 @@ void ARSTREAM_Reader2_StopReader(ARSTREAM_Reader2_t *reader)
         ARSAL_Mutex_Lock(&(reader->streamMutex));
         reader->threadsShouldStop = 1;
         ARSAL_Mutex_Unlock(&(reader->streamMutex));
+        ARSAL_Cond_Signal(&(reader->streamCond));
 
         for (i = 0; i < reader->resenderCount; i++)
         {
