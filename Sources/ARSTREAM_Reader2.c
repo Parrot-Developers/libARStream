@@ -200,6 +200,7 @@ struct ARSTREAM_Reader2_t {
     /* Resenders */
     ARSTREAM_Reader2_Resender_t *resender[ARSTREAM_READER2_RESENDER_MAX_COUNT];
     int resenderCount;
+    ARSAL_Mutex_t resenderMutex;
     ARSAL_Mutex_t naluBufferMutex;
     ARSTREAM_Reader2_NaluBuffer_t naluBuffer[ARSTREAM_READER2_RESENDER_MAX_NALU_BUFFER_COUNT];
     int naluBufferCount;
@@ -328,6 +329,9 @@ static int ARSTREAM_Reader2_ResendNalu(ARSTREAM_Reader2_t *reader, uint8_t *nalu
         ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_READER2_TAG, "Failed to get available NALU buffer (naluSize=%d, naluBufferCount=%d)", naluSize, reader->naluBufferCount);
         return -1;
     }
+    naluBuf->useCount++;
+    ARSAL_Mutex_Unlock(&(reader->naluBufferMutex));
+
     memcpy(naluBuf->naluBuffer, naluBuffer, naluSize);
     naluBuf->naluSize = naluSize;
     naluBuf->auTimestamp = auTimestamp;
@@ -341,25 +345,31 @@ static int ARSTREAM_Reader2_ResendNalu(ARSTREAM_Reader2_t *reader, uint8_t *nalu
     nalu.naluUserPtr = naluBuf;
 
     /* send the NALU to all resenders */
+    ARSAL_Mutex_Lock(&(reader->resenderMutex));
     for (i = 0; i < reader->resenderCount; i++)
     {
         ARSTREAM_Reader2_Resender_t *resender = reader->resender[i];
         eARSTREAM_ERROR err;
 
-        naluBuf->useCount++;
-        ARSAL_Mutex_Unlock(&(reader->naluBufferMutex));
-
-        err = ARSTREAM_Sender2_SendNewNalu(resender->sender, &nalu);
-
-        ARSAL_Mutex_Lock(&(reader->naluBufferMutex));
-
-        if (err != ARSTREAM_OK)
+        if ((resender) && (resender->senderRunning))
         {
-            naluBuf->useCount--;
-            ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_READER2_TAG, "Failed to resend NALU on resender #%d (error %d)", i, err);
+            err = ARSTREAM_Sender2_SendNewNalu(resender->sender, &nalu);
+            if (err == ARSTREAM_OK)
+            {
+                ARSAL_Mutex_Lock(&(reader->naluBufferMutex));
+                naluBuf->useCount++;
+                ARSAL_Mutex_Unlock(&(reader->naluBufferMutex));
+            }
+            else
+            {
+                ARSAL_PRINT(ARSAL_PRINT_WARNING, ARSTREAM_READER2_TAG, "Failed to resend NALU on resender #%d (error %d)", i, err);
+            }
         }
     }
+    ARSAL_Mutex_Unlock(&(reader->resenderMutex));
 
+    ARSAL_Mutex_Lock(&(reader->naluBufferMutex));
+    naluBuf->useCount--;
     ARSAL_Mutex_Unlock(&(reader->naluBufferMutex));
 
     return ret;
@@ -371,6 +381,7 @@ ARSTREAM_Reader2_t* ARSTREAM_Reader2_New(ARSTREAM_Reader2_Config_t *config, eARS
     ARSTREAM_Reader2_t *retReader = NULL;
     int streamMutexWasInit = 0, streamCondWasInit = 0;
     int monitoringMutexWasInit = 0;
+    int resenderMutexWasInit = 0;
     int naluBufferMutexWasInit = 0;
     eARSTREAM_ERROR internalError = ARSTREAM_OK;
 
@@ -479,6 +490,18 @@ ARSTREAM_Reader2_t* ARSTREAM_Reader2_New(ARSTREAM_Reader2_Config_t *config, eARS
     }
     if (internalError == ARSTREAM_OK)
     {
+        int mutexInitRet = ARSAL_Mutex_Init(&(retReader->resenderMutex));
+        if (mutexInitRet != 0)
+        {
+            internalError = ARSTREAM_ERROR_ALLOC;
+        }
+        else
+        {
+            resenderMutexWasInit = 1;
+        }
+    }
+    if (internalError == ARSTREAM_OK)
+    {
         int mutexInitRet = ARSAL_Mutex_Init(&(retReader->naluBufferMutex));
         if (mutexInitRet != 0)
         {
@@ -575,6 +598,10 @@ ARSTREAM_Reader2_t* ARSTREAM_Reader2_New(ARSTREAM_Reader2_Config_t *config, eARS
         {
             ARSAL_Mutex_Destroy(&(retReader->monitoringMutex));
         }
+        if (resenderMutexWasInit == 1)
+        {
+            ARSAL_Mutex_Destroy(&(retReader->resenderMutex));
+        }
         if (naluBufferMutexWasInit == 1)
         {
             ARSAL_Mutex_Destroy(&(retReader->naluBufferMutex));
@@ -635,10 +662,17 @@ void ARSTREAM_Reader2_StopReader(ARSTREAM_Reader2_t *reader)
         ARSAL_Mutex_Unlock(&(reader->streamMutex));
         ARSAL_Cond_Signal(&(reader->streamCond));
 
+        /* stop all resenders */
+        ARSAL_Mutex_Lock(&(reader->resenderMutex));
         for (i = 0; i < reader->resenderCount; i++)
         {
-            ARSTREAM_Reader2_Resender_Stop(reader->resender[i]);
+            if (reader->resender[i] != NULL)
+            {
+                ARSTREAM_Sender2_StopSender(reader->resender[i]->sender);
+                reader->resender[i]->senderRunning = 0;
+            }
         }
+        ARSAL_Mutex_Unlock(&(reader->resenderMutex));
     }
 }
 
@@ -662,14 +696,37 @@ eARSTREAM_ERROR ARSTREAM_Reader2_Delete(ARSTREAM_Reader2_t **reader)
         if (canDelete == 1)
         {
             int i;
+
+            /* delete all resenders */
+            ARSAL_Mutex_Lock(&((*reader)->resenderMutex));
             for (i = 0; i < (*reader)->resenderCount; i++)
             {
-                retVal = ARSTREAM_Reader2_Resender_Delete(&(*reader)->resender[i]);
-                if (retVal != ARSTREAM_OK)
+                ARSTREAM_Reader2_Resender_t *resender = (*reader)->resender[i];
+                if (resender == NULL)
                 {
-                    ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "ARSTREAM_Reader2_Resender_Delete failed (%d)", retVal);
+                    continue;
+                }
+
+                if (!resender->senderRunning)
+                {
+                    retVal = ARSTREAM_Sender2_Delete(&(resender->sender));
+                    if (retVal == ARSTREAM_OK)
+                    {
+                        free(resender);
+                        (*reader)->resender[i] = NULL;
+                    }
+                    else
+                    {
+                        ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Resender: failed to delete Sender2 (%d)", retVal);
+                    }
+                }
+                else
+                {
+                    ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Resender #%d is still running", i);
                 }
             }
+            ARSAL_Mutex_Unlock(&((*reader)->resenderMutex));
+
             for (i = 0; i < (*reader)->naluBufferCount; i++)
             {
                 ARSTREAM_Reader2_NaluBuffer_t *naluBuf = &(*reader)->naluBuffer[i];
@@ -678,15 +735,18 @@ eARSTREAM_ERROR ARSTREAM_Reader2_Delete(ARSTREAM_Reader2_t **reader)
                     free(naluBuf->naluBuffer);
                 }
             }
+
 #ifdef ARSTREAM_READER2_MONITORING_OUTPUT
             if ((*reader)->fMonitorOut)
             {
                 fclose((*reader)->fMonitorOut);
             }
 #endif
+
             ARSAL_Mutex_Destroy(&((*reader)->streamMutex));
             ARSAL_Cond_Destroy(&((*reader)->streamCond));
             ARSAL_Mutex_Destroy(&((*reader)->monitoringMutex));
+            ARSAL_Mutex_Destroy(&((*reader)->resenderMutex));
             ARSAL_Mutex_Destroy(&((*reader)->naluBufferMutex));
             if ((*reader)->controlSocket != -1)
             {
@@ -1836,9 +1896,8 @@ eARSTREAM_ERROR ARSTREAM_Reader2_GetMonitoring(ARSTREAM_Reader2_t *reader, uint6
 ARSTREAM_Reader2_Resender_t* ARSTREAM_Reader2_Resender_New(ARSTREAM_Reader2_t *reader, ARSTREAM_Reader2_Resender_Config_t *config, eARSTREAM_ERROR *error)
 {
     ARSTREAM_Reader2_Resender_t *retResender = NULL;
-    //int streamMutexWasInit = 0;
-    //int monitoringMutexWasInit = 0;
     eARSTREAM_ERROR internalError = ARSTREAM_OK;
+
     /* ARGS Check */
     if ((reader == NULL) ||
         (config == NULL) ||
@@ -1859,7 +1918,6 @@ ARSTREAM_Reader2_Resender_t* ARSTREAM_Reader2_Resender_New(ARSTREAM_Reader2_t *r
     if (internalError == ARSTREAM_OK)
     {
         memset(retResender, 0, sizeof(ARSTREAM_Reader2_Resender_t));
-        retResender->reader = reader;
     }
 
     /* Setup ARStream_Sender2 */
@@ -1892,14 +1950,25 @@ ARSTREAM_Reader2_Resender_t* ARSTREAM_Reader2_Resender_New(ARSTREAM_Reader2_t *r
 
     if (internalError == ARSTREAM_OK)
     {
-        retResender->senderRunning = 1;
-        reader->resender[reader->resenderCount] = retResender;
-        reader->resenderCount++;
+        ARSAL_Mutex_Lock(&(reader->resenderMutex));
+        if (reader->resenderCount < ARSTREAM_READER2_RESENDER_MAX_COUNT)
+        {
+            retResender->reader = reader;
+            retResender->senderRunning = 1;
+            reader->resender[reader->resenderCount] = retResender;
+            reader->resenderCount++;
+        }
+        else
+        {
+            internalError = ARSTREAM_ERROR_BAD_PARAMETERS;
+        }
+        ARSAL_Mutex_Unlock(&(reader->resenderMutex));
     }
 
     if ((internalError != ARSTREAM_OK) &&
         (retResender != NULL))
     {
+        if (retResender->sender) ARSTREAM_Sender2_Delete(&(retResender->sender));
         free(retResender);
         retResender = NULL;
     }
@@ -1911,60 +1980,83 @@ ARSTREAM_Reader2_Resender_t* ARSTREAM_Reader2_Resender_New(ARSTREAM_Reader2_t *r
 
 void ARSTREAM_Reader2_Resender_Stop(ARSTREAM_Reader2_Resender_t *resender)
 {
-    if ((resender != NULL) && (resender->sender != NULL))
+    if (resender != NULL)
     {
-        ARSTREAM_Sender2_StopSender(resender->sender);
-        resender->senderRunning = 0;
+        ARSAL_Mutex_Lock(&(resender->reader->resenderMutex));
+        if (resender->sender != NULL)
+        {
+            ARSTREAM_Sender2_StopSender(resender->sender);
+            resender->senderRunning = 0;
+        }
+        ARSAL_Mutex_Unlock(&(resender->reader->resenderMutex));
     }
 }
 
 
 eARSTREAM_ERROR ARSTREAM_Reader2_Resender_Delete(ARSTREAM_Reader2_Resender_t **resender)
 {
+    ARSTREAM_Reader2_t *reader;
     int i, idx;
     eARSTREAM_ERROR retVal = ARSTREAM_ERROR_BAD_PARAMETERS;
+
     if ((resender != NULL) &&
-        (*resender != NULL)&&
-        ((*resender)->reader != NULL))
+        (*resender != NULL))
     {
-        for (i = 0, idx = -1; i < (*resender)->reader->resenderCount; i++)
+        reader = (*resender)->reader;
+        if (reader != NULL)
         {
-            if (*resender == (*resender)->reader->resender[i])
-            {
-                idx = i;
-                break;
-            }
-        }
-        if (idx < 0)
-        {
-            return retVal;
-        }
+            ARSAL_Mutex_Lock(&(reader->resenderMutex));
 
-        if (!(*resender)->senderRunning)
-        {
-            retVal = ARSTREAM_Sender2_Delete(&((*resender)->sender));
-            if (retVal == ARSTREAM_OK)
+            /* find the resender in the array */
+            for (i = 0, idx = -1; i < reader->resenderCount; i++)
             {
-                (*resender)->reader->resender[idx] = NULL;
-                for (i = idx; i < (*resender)->reader->resenderCount; i++)
+                if (*resender == reader->resender[i])
                 {
-                    (*resender)->reader->resender[i] = (*resender)->reader->resender[i + 1];
+                    idx = i;
+                    break;
                 }
-                (*resender)->reader->resenderCount--;
+            }
+            if (idx < 0)
+            {
+                ARSAL_Mutex_Unlock(&(reader->resenderMutex));
+                ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Failed to find the resender");
+                return retVal;
+            }
 
-                free(*resender);
-                *resender = NULL;
+            if (!(*resender)->senderRunning)
+            {
+                retVal = ARSTREAM_Sender2_Delete(&((*resender)->sender));
+                if (retVal == ARSTREAM_OK)
+                {
+                    /* remove the resender: shift the values in the resender array */
+                    reader->resender[idx] = NULL;
+                    for (i = idx; i < reader->resenderCount - 1; i++)
+                    {
+                        reader->resender[i] = reader->resender[i + 1];
+                    }
+                    reader->resenderCount--;
+
+                    free(*resender);
+                    *resender = NULL;
+                }
+                else
+                {
+                    ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Resender: failed to delete Sender2 (%d)", retVal);
+                }
             }
             else
             {
-                ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Failed to delete Sender2");
+                ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Resender: sender2 is still running");
             }
-        }
-        else
-        {
-            ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Sender2 is still running");
+
+            ARSAL_Mutex_Unlock(&(reader->resenderMutex));
         }
     }
+    else
+    {
+        ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Invalid resender");
+    }
+
     return retVal;
 }
 
