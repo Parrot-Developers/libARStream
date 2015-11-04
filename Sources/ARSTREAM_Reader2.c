@@ -306,7 +306,7 @@ static ARSTREAM_Reader2_NaluBuffer_t* ARSTREAM_Reader2_Resender_GetAvailableNalu
 }
 
 
-static int ARSTREAM_Reader2_ResendNalu(ARSTREAM_Reader2_t *reader, uint8_t *naluBuffer, uint32_t naluSize, uint64_t auTimestamp, int isLastNaluInAu)
+static int ARSTREAM_Reader2_ResendNalu(ARSTREAM_Reader2_t *reader, uint8_t *naluBuffer, uint32_t naluSize, uint64_t auTimestamp, int isLastNaluInAu, int missingPacketsBefore)
 {
     int ret = 0, i;
     ARSTREAM_Reader2_NaluBuffer_t *naluBuf = NULL;
@@ -341,6 +341,7 @@ static int ARSTREAM_Reader2_ResendNalu(ARSTREAM_Reader2_t *reader, uint8_t *nalu
     nalu.naluSize = naluSize;
     nalu.auTimestamp = auTimestamp;
     nalu.isLastNaluInAu = isLastNaluInAu;
+    nalu.seqNumForcedDiscontinuity = missingPacketsBefore;
     nalu.auUserPtr = NULL;
     nalu.naluUserPtr = naluBuf;
 
@@ -1219,7 +1220,7 @@ static void ARSTREAM_Reader2_OutputNalu(ARSTREAM_Reader2_t *reader, uint32_t tim
 
     if (reader->resenderCount > 0)
     {
-        ARSTREAM_Reader2_ResendNalu(reader, reader->currentNaluBuffer, reader->currentNaluSize, timestampScaled, isLastNaluInAu);
+        ARSTREAM_Reader2_ResendNalu(reader, reader->currentNaluBuffer, reader->currentNaluSize, timestampScaled, isLastNaluInAu, missingPacketsBefore);
     }
 
     reader->currentNaluBuffer = reader->naluCallback(ARSTREAM_READER2_CAUSE_NALU_COMPLETE, reader->currentNaluBuffer, reader->currentNaluSize,

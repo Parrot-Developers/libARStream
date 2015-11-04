@@ -123,6 +123,7 @@ typedef struct ARSTREAM_Sender2_Nalu_s {
     uint64_t auTimestamp;
     uint64_t naluInputTimestamp;
     int isLastInAu;
+    int seqNumForcedDiscontinuity;
     void *auUserPtr;
     void *naluUserPtr;
     int drop;
@@ -228,6 +229,7 @@ static int ARSTREAM_Sender2_EnqueueNalu(ARSTREAM_Sender2_t *sender, const ARSTRE
             cur->auTimestamp = nalu->auTimestamp;
             cur->naluInputTimestamp = inputTimestamp;
             cur->isLastInAu = nalu->isLastNaluInAu;
+            cur->seqNumForcedDiscontinuity = nalu->seqNumForcedDiscontinuity;
             cur->auUserPtr = nalu->auUserPtr;
             cur->naluUserPtr = nalu->naluUserPtr;
             cur->drop = 0;
@@ -293,6 +295,7 @@ static int ARSTREAM_Sender2_EnqueueNNalu(ARSTREAM_Sender2_t *sender, const ARSTR
                 cur->auTimestamp = nalu[k].auTimestamp;
                 cur->naluInputTimestamp = inputTimestamp;
                 cur->isLastInAu = nalu[k].isLastNaluInAu;
+                cur->seqNumForcedDiscontinuity = nalu->seqNumForcedDiscontinuity;
                 cur->auUserPtr = nalu[k].auUserPtr;
                 cur->naluUserPtr = nalu[k].naluUserPtr;
                 cur->drop = 0;
@@ -1253,7 +1256,7 @@ static int ARSTREAM_Sender2_ControlSocketSetup(ARSTREAM_Sender2_t *sender)
 }
 
 
-static int ARSTREAM_Sender2_SendData(ARSTREAM_Sender2_t *sender, uint8_t *sendBuffer, uint32_t sendSize, uint64_t inputTimestamp, uint64_t auTimestamp, int isLastInAu, int maxLatencyUs, int maxNetworkLatencyUs)
+static int ARSTREAM_Sender2_SendData(ARSTREAM_Sender2_t *sender, uint8_t *sendBuffer, uint32_t sendSize, uint64_t inputTimestamp, uint64_t auTimestamp, int isLastInAu, int maxLatencyUs, int maxNetworkLatencyUs, int seqNumForcedDiscontinuity)
 {
     int ret = 0, totalLatencyDrop = 0, networkLatencyDrop = 0;
     ARSTREAM_NetworkHeaders_DataHeader2_t *header = (ARSTREAM_NetworkHeaders_DataHeader2_t *)sendBuffer;
@@ -1268,6 +1271,7 @@ static int ARSTREAM_Sender2_SendData(ARSTREAM_Sender2_t *sender, uint8_t *sendBu
         flags |= (1 << 7);
     }
     header->flags = htons(flags);
+    sender->seqNum = sender->seqNum + seqNumForcedDiscontinuity;
     header->seqNum = htons(sender->seqNum++);
     rtpTimestamp = (uint32_t)((((auTimestamp * 90) + 500) / 1000) & 0xFFFFFFFF); /* microseconds to 90000 Hz clock */
     //TODO: handle the timestamp 32 bits loopback
@@ -1318,7 +1322,7 @@ static int ARSTREAM_Sender2_SendData(ARSTREAM_Sender2_t *sender, uint8_t *sendBu
                         /* failed: poll timeout */
                         ARSTREAM_Sender2_UpdateMonitoring(sender, inputTimestamp, auTimestamp, rtpTimestamp, sender->seqNum - 1, isLastInAu, 0, sendSize);
                         ARSAL_PRINT(ARSAL_PRINT_VERBOSE, ARSTREAM_SENDER2_TAG, "Time %llu: dropped packet (polling timed out: timeout = %dms) (seqNum = %d)",
-                                    auTimestamp, pollTimeMs, header->seqNum);
+                                    auTimestamp, pollTimeMs, sender->seqNum - 1);
                         ret = -2;
                     }
                     else if (pollRet < 0)
@@ -1362,7 +1366,7 @@ static int ARSTREAM_Sender2_SendData(ARSTREAM_Sender2_t *sender, uint8_t *sendBu
                                 /* failed: socket buffer full */
                                 ARSTREAM_Sender2_UpdateMonitoring(sender, inputTimestamp, auTimestamp, rtpTimestamp, sender->seqNum - 1, isLastInAu, 0, sendSize);
                                 ARSAL_PRINT(ARSAL_PRINT_VERBOSE, ARSTREAM_SENDER2_TAG, "Time %llu: dropped packet (socket buffer full #2) (seqNum = %d)",
-                                            auTimestamp, header->seqNum);
+                                            auTimestamp, sender->seqNum - 1);
                                 ret = -2;
                             }
                             else
@@ -1380,12 +1384,12 @@ static int ARSTREAM_Sender2_SendData(ARSTREAM_Sender2_t *sender, uint8_t *sendBu
                             if (totalLatencyDrop)
                             {
                                 ARSAL_PRINT(ARSAL_PRINT_VERBOSE, ARSTREAM_SENDER2_TAG, "Time %llu: dropped packet (after poll total latency %.1fms > %.1fms) (seqNum = %d)",
-                                            auTimestamp, (float)(curTime - auTimestamp) / 1000., (float)maxLatencyUs / 1000., header->seqNum);
+                                            auTimestamp, (float)(curTime - auTimestamp) / 1000., (float)maxLatencyUs / 1000., sender->seqNum - 1);
                             }
                             if (networkLatencyDrop)
                             {
                                 ARSAL_PRINT(ARSAL_PRINT_VERBOSE, ARSTREAM_SENDER2_TAG, "Time %llu: dropped packet (after poll network latency %.1fms > %.1fms) (seqNum = %d)",
-                                            auTimestamp, (float)(curTime - inputTimestamp) / 1000., (float)maxNetworkLatencyUs / 1000., header->seqNum);
+                                            auTimestamp, (float)(curTime - inputTimestamp) / 1000., (float)maxNetworkLatencyUs / 1000., sender->seqNum - 1);
                             }
                             ret = -2;
                         }
@@ -1396,7 +1400,7 @@ static int ARSTREAM_Sender2_SendData(ARSTREAM_Sender2_t *sender, uint8_t *sendBu
                     /* packet dropped: poll timeout too short */
                     ARSTREAM_Sender2_UpdateMonitoring(sender, inputTimestamp, auTimestamp, rtpTimestamp, sender->seqNum - 1, isLastInAu, 0, sendSize);
                     ARSAL_PRINT(ARSAL_PRINT_VERBOSE, ARSTREAM_SENDER2_TAG, "Time %llu: dropped packet (poll timeout too short: timeout = %dms) (seqNum = %d)",
-                                auTimestamp, pollTimeMs, header->seqNum);
+                                auTimestamp, pollTimeMs, sender->seqNum - 1);
                     ret = -2;
                 }
                 break;
@@ -1422,12 +1426,12 @@ static int ARSTREAM_Sender2_SendData(ARSTREAM_Sender2_t *sender, uint8_t *sendBu
         if (totalLatencyDrop)
         {
             ARSAL_PRINT(ARSAL_PRINT_VERBOSE, ARSTREAM_SENDER2_TAG, "Time %llu: dropped packet (total latency %.1fms > %.1fms) (seqNum = %d)",
-                        auTimestamp, (float)(curTime - auTimestamp) / 1000., (float)maxLatencyUs / 1000., header->seqNum);
+                        auTimestamp, (float)(curTime - auTimestamp) / 1000., (float)maxLatencyUs / 1000., sender->seqNum - 1);
         }
         if (networkLatencyDrop)
         {
             ARSAL_PRINT(ARSAL_PRINT_VERBOSE, ARSTREAM_SENDER2_TAG, "Time %llu: dropped packet (network latency %.1fms > %.1fms) (seqNum = %d)",
-                        auTimestamp, (float)(curTime - inputTimestamp) / 1000., (float)maxNetworkLatencyUs / 1000., header->seqNum);
+                        auTimestamp, (float)(curTime - inputTimestamp) / 1000., (float)maxNetworkLatencyUs / 1000., sender->seqNum - 1);
         }
         ret = -2;
     }
@@ -1448,7 +1452,7 @@ void* ARSTREAM_Sender2_RunStreamThread (void *ARSTREAM_Sender2_t_Param)
     int shouldStop;
     int targetPacketSize, maxPacketSize, packetSize, fragmentSize, meanFragmentSize, offset, fragmentOffset, fragmentCount;
     int ret, totalLatencyDrop, networkLatencyDrop;
-    int stapPending = 0, stapNaluCount = 0, maxLatencyUs, maxNetworkLatencyUs;
+    int stapPending = 0, stapNaluCount = 0, stapSeqNumForcedDiscontinuity = 0, maxLatencyUs, maxNetworkLatencyUs;
     uint8_t stapMaxNri = 0;
     uint64_t curTime;
     struct timespec t1;
@@ -1504,7 +1508,7 @@ void* ARSTREAM_Sender2_RunStreamThread (void *ARSTREAM_Sender2_t_Param)
                     /* Finish the previous STAP-A packet */
                     uint8_t stapHeader = ARSTREAM_NETWORK_HEADERS2_NALU_TYPE_STAPA | ((stapMaxNri & 3) << 5);
                     *(sendBuffer + sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t)) = stapHeader;
-                    ret = ARSTREAM_Sender2_SendData(sender, sendBuffer, sendSize, stapFirstNaluInputTimestamp, stapAuTimestamp, 0, maxLatencyUs, maxNetworkLatencyUs); // do not set the marker bit
+                    ret = ARSTREAM_Sender2_SendData(sender, sendBuffer, sendSize, stapFirstNaluInputTimestamp, stapAuTimestamp, 0, maxLatencyUs, maxNetworkLatencyUs, stapSeqNumForcedDiscontinuity); // do not set the marker bit
                     stapPending = 0;
                     sendSize = 0;
                 }
@@ -1555,7 +1559,7 @@ void* ARSTREAM_Sender2_RunStreamThread (void *ARSTREAM_Sender2_t_Param)
                         /* Finish the previous STAP-A packet */
                         uint8_t stapHeader = ARSTREAM_NETWORK_HEADERS2_NALU_TYPE_STAPA | ((stapMaxNri & 3) << 5);
                         *(sendBuffer + sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t)) = stapHeader;
-                        ret = ARSTREAM_Sender2_SendData(sender, sendBuffer, sendSize, stapFirstNaluInputTimestamp, stapAuTimestamp, 0, maxLatencyUs, maxNetworkLatencyUs); // do not set the marker bit
+                        ret = ARSTREAM_Sender2_SendData(sender, sendBuffer, sendSize, stapFirstNaluInputTimestamp, stapAuTimestamp, 0, maxLatencyUs, maxNetworkLatencyUs, stapSeqNumForcedDiscontinuity); // do not set the marker bit
                         stapPending = 0;
                         sendSize = 0;
                     }
@@ -1585,7 +1589,7 @@ void* ARSTREAM_Sender2_RunStreamThread (void *ARSTREAM_Sender2_t_Param)
                                 endBit = ((i == fragmentCount - 1) && (fragmentOffset + packetSize == fragmentSize)) ? 0x40 : 0;
                                 *(sendBuffer + sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t) + 1) = fuHeader | startBit | endBit;
 
-                                ret = ARSTREAM_Sender2_SendData(sender, sendBuffer, sendSize, nalu.naluInputTimestamp, nalu.auTimestamp, ((nalu.isLastInAu) && (endBit)) ? 1 : 0, maxLatencyUs, maxNetworkLatencyUs);
+                                ret = ARSTREAM_Sender2_SendData(sender, sendBuffer, sendSize, nalu.naluInputTimestamp, nalu.auTimestamp, ((nalu.isLastInAu) && (endBit)) ? 1 : 0, maxLatencyUs, maxNetworkLatencyUs, (startBit) ? nalu.seqNumForcedDiscontinuity : 0);
                                 sendSize = 0;
                             }
                             else
@@ -1602,14 +1606,14 @@ void* ARSTREAM_Sender2_RunStreamThread (void *ARSTREAM_Sender2_t_Param)
                 else
                 {
                     int stapSize = nalu.naluSize + 2 + ((!stapPending) ? sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t) + 1 : 0);
-                    if ((sendSize + stapSize >= maxPacketSize) || (sendSize + stapSize > targetPacketSize))
+                    if ((sendSize + stapSize >= maxPacketSize) || (sendSize + stapSize > targetPacketSize) || (nalu.seqNumForcedDiscontinuity))
                     {
                         if (stapPending)
                         {
                             /* Finish the previous STAP-A packet */
                             uint8_t stapHeader = ARSTREAM_NETWORK_HEADERS2_NALU_TYPE_STAPA | ((stapMaxNri & 3) << 5);
                             *(sendBuffer + sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t)) = stapHeader;
-                            ret = ARSTREAM_Sender2_SendData(sender, sendBuffer, sendSize, stapFirstNaluInputTimestamp, stapAuTimestamp, 0, maxLatencyUs, maxNetworkLatencyUs); // do not set the marker bit
+                            ret = ARSTREAM_Sender2_SendData(sender, sendBuffer, sendSize, stapFirstNaluInputTimestamp, stapAuTimestamp, 0, maxLatencyUs, maxNetworkLatencyUs, stapSeqNumForcedDiscontinuity); // do not set the marker bit
                             stapPending = 0;
                             sendSize = 0;
 
@@ -1623,7 +1627,7 @@ void* ARSTREAM_Sender2_RunStreamThread (void *ARSTREAM_Sender2_t_Param)
                         memcpy(sendBuffer + sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t), nalu.naluBuffer, nalu.naluSize);
                         sendSize = nalu.naluSize + sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t);
                         
-                        ret = ARSTREAM_Sender2_SendData(sender, sendBuffer, sendSize, nalu.naluInputTimestamp, nalu.auTimestamp, nalu.isLastInAu, maxLatencyUs, maxNetworkLatencyUs);
+                        ret = ARSTREAM_Sender2_SendData(sender, sendBuffer, sendSize, nalu.naluInputTimestamp, nalu.auTimestamp, nalu.isLastInAu, maxLatencyUs, maxNetworkLatencyUs, nalu.seqNumForcedDiscontinuity);
                         sendSize = 0;
                     }
                     else
@@ -1636,6 +1640,7 @@ void* ARSTREAM_Sender2_RunStreamThread (void *ARSTREAM_Sender2_t_Param)
                             stapNaluCount = 0;
                             sendSize = sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t) + 1;
                             stapAuTimestamp = nalu.auTimestamp;
+                            stapSeqNumForcedDiscontinuity = nalu.seqNumForcedDiscontinuity;
                             stapFirstNaluInputTimestamp = nalu.naluInputTimestamp;
                         }
                         uint8_t nri = ((uint8_t)(*(nalu.naluBuffer)) >> 5) & 0x3;
@@ -1654,7 +1659,7 @@ void* ARSTREAM_Sender2_RunStreamThread (void *ARSTREAM_Sender2_t_Param)
                             /* Finish the STAP-A packet */
                             uint8_t stapHeader = ARSTREAM_NETWORK_HEADERS2_NALU_TYPE_STAPA | ((stapMaxNri & 3) << 5);
                             *(sendBuffer + sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t)) = stapHeader;
-                            ret = ARSTREAM_Sender2_SendData(sender, sendBuffer, sendSize, stapFirstNaluInputTimestamp, stapAuTimestamp, 1, maxLatencyUs, maxNetworkLatencyUs); // set the marker bit
+                            ret = ARSTREAM_Sender2_SendData(sender, sendBuffer, sendSize, stapFirstNaluInputTimestamp, stapAuTimestamp, 1, maxLatencyUs, maxNetworkLatencyUs, stapSeqNumForcedDiscontinuity); // set the marker bit
                             stapPending = 0;
                             sendSize = 0;
                         }
@@ -1670,23 +1675,25 @@ void* ARSTREAM_Sender2_RunStreamThread (void *ARSTREAM_Sender2_t_Param)
             else
             {
                 uint32_t rtpTimestamp = (uint32_t)((((nalu.auTimestamp * 90) + 500) / 1000) & 0xFFFFFFFF);
-                ARSTREAM_Sender2_UpdateMonitoring(sender, nalu.naluInputTimestamp, nalu.auTimestamp, rtpTimestamp, sender->seqNum, nalu.isLastInAu, 0, nalu.naluSize);
+
+                /* increment the sequence number to let the receiver know that we dropped something */
+                sender->seqNum = sender->seqNum + nalu.seqNumForcedDiscontinuity + 1;
+
+                ARSTREAM_Sender2_UpdateMonitoring(sender, nalu.naluInputTimestamp, nalu.auTimestamp, rtpTimestamp, sender->seqNum - 1, nalu.isLastInAu, 0, nalu.naluSize);
                 if (nalu.drop)
                 {
-                    ARSAL_PRINT(ARSAL_PRINT_VERBOSE, ARSTREAM_SENDER2_TAG, "Time %llu: dropped NALU in FIFO (seqNum = %d)", nalu.auTimestamp, sender->seqNum);
+                    ARSAL_PRINT(ARSAL_PRINT_VERBOSE, ARSTREAM_SENDER2_TAG, "Time %llu: dropped NALU in FIFO (seqNum = %d)", nalu.auTimestamp, sender->seqNum - 1);
                 }
                 else if (totalLatencyDrop)
                 {
                     ARSAL_PRINT(ARSAL_PRINT_VERBOSE, ARSTREAM_SENDER2_TAG, "Time %llu: dropped NALU (total latency %.1fms > %.1fms) (seqNum = %d)",
-                                nalu.auTimestamp, (float)(curTime - nalu.auTimestamp) / 1000., (float)maxLatencyUs / 1000., sender->seqNum);
+                                nalu.auTimestamp, (float)(curTime - nalu.auTimestamp) / 1000., (float)maxLatencyUs / 1000., sender->seqNum - 1);
                 }
                 else if (networkLatencyDrop)
                 {
                     ARSAL_PRINT(ARSAL_PRINT_VERBOSE, ARSTREAM_SENDER2_TAG, "Time %llu: dropped NALU (network latency %.1fms > %.1fms) (seqNum = %d)",
-                                nalu.auTimestamp, (float)(curTime - nalu.naluInputTimestamp) / 1000., (float)maxNetworkLatencyUs / 1000., sender->seqNum);
+                                nalu.auTimestamp, (float)(curTime - nalu.naluInputTimestamp) / 1000., (float)maxNetworkLatencyUs / 1000., sender->seqNum - 1);
                 }
-                /* increment the sequence number to let the receiver know that we dropped something */
-                sender->seqNum++;
 
                 /* call the naluCallback */
                 if (sender->naluCallback != NULL)
