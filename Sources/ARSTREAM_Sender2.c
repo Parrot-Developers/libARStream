@@ -87,6 +87,11 @@
 #define ARSTREAM_SENDER2_CLOCKSYNC_DATAREAD_TIMEOUT_MS (500)
 
 /**
+ * FIFO cond timeout value (milliseconds)
+ */
+#define ARSTREAM_SENDER2_FIFO_COND_TIMEOUT_MS (1000)
+
+/**
  * Sets *PTR to VAL if PTR is not null
  */
 #define SET_WITH_CHECK(PTR,VAL)                 \
@@ -216,6 +221,7 @@ static int ARSTREAM_Sender2_EnqueueNalu(ARSTREAM_Sender2_t *sender, const ARSTRE
     if (sender->fifoCount >= sender->naluFifoSize)
     {
         ARSAL_Mutex_Unlock(&(sender->fifoMutex));
+        ARSAL_Cond_Signal(&(sender->fifoCond));
         return -2;
     }
 
@@ -243,6 +249,7 @@ static int ARSTREAM_Sender2_EnqueueNalu(ARSTREAM_Sender2_t *sender, const ARSTRE
     if (!cur)
     {
         ARSAL_Mutex_Unlock(&(sender->fifoMutex));
+        ARSAL_Cond_Signal(&(sender->fifoCond));
         return -3;
     }
 
@@ -280,6 +287,7 @@ static int ARSTREAM_Sender2_EnqueueNNalu(ARSTREAM_Sender2_t *sender, const ARSTR
     if (sender->fifoCount + naluCount >= sender->naluFifoSize)
     {
         ARSAL_Mutex_Unlock(&(sender->fifoMutex));
+        ARSAL_Cond_Signal(&(sender->fifoCond));
         return -2;
     }
 
@@ -309,6 +317,7 @@ static int ARSTREAM_Sender2_EnqueueNNalu(ARSTREAM_Sender2_t *sender, const ARSTR
         if (!cur)
         {
             ARSAL_Mutex_Unlock(&(sender->fifoMutex));
+            ARSAL_Cond_Signal(&(sender->fifoCond));
             return -3;
         }
 
@@ -1732,7 +1741,7 @@ void* ARSTREAM_Sender2_RunStreamThread (void *ARSTREAM_Sender2_t_Param)
         {
             /* Wake up when a new NALU is in the FIFO or when we need to exit */
             ARSAL_Mutex_Lock(&(sender->fifoMutex));
-            ARSAL_Cond_Wait(&(sender->fifoCond), &(sender->fifoMutex));
+            ARSAL_Cond_Timedwait(&(sender->fifoCond), &(sender->fifoMutex), ARSTREAM_SENDER2_FIFO_COND_TIMEOUT_MS);
             ARSAL_Mutex_Unlock(&(sender->fifoMutex));
         }
     }
