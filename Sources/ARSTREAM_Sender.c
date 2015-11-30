@@ -182,6 +182,10 @@ struct ARSTREAM_Sender_t {
     int efficiency_nbFragments [ARSTREAM_SENDER_EFFICIENCY_AVERAGE_NB_FRAMES];
     int efficiency_nbSent [ARSTREAM_SENDER_EFFICIENCY_AVERAGE_NB_FRAMES];
     int efficiency_index;
+
+    /* Filters */
+    ARSTREAM_Filter_t **filters;
+    int nbFilters;
 };
 
 typedef struct {
@@ -256,7 +260,7 @@ static int ARSTREAM_Sender_SendLateAck (ARSTREAM_Sender_t *sender, uint16_t fram
  * @param framePointer Pointer to the frame which was sent/cancelled
  * @param frameSize Size, in bytes, of the frame
  */
-static void ARSTREAM_Sender_CallCallback (ARSTREAM_Sender_t *sender, eARSTREAM_SENDER_STATUS status, uint8_t *framePointer, uint32_t frameSize);
+static void ARSTREAM_Sender_CallCallback (ARSTREAM_Sender_t *sender, eARSTREAM_SENDER_STATUS status, uint8_t *framePointer, uint32_t frameSize, int isCurrent);
 
 /*
  * Internal functions implementation
@@ -267,7 +271,7 @@ static void ARSTREAM_Sender_FlushQueue (ARSTREAM_Sender_t *sender)
     while (sender->numberOfWaitingFrames > 0)
     {
         ARSTREAM_Sender_Frame_t *nextFrame = &(sender->nextFrames [sender->indexGetNextFrame]);
-        ARSTREAM_Sender_CallCallback (sender, ARSTREAM_SENDER_STATUS_FRAME_CANCEL, nextFrame->frameBuffer, nextFrame->frameSize);
+        ARSTREAM_Sender_CallCallback (sender, ARSTREAM_SENDER_STATUS_FRAME_CANCEL, nextFrame->frameBuffer, nextFrame->frameSize, 0);
         sender->indexGetNextFrame++;
         sender->indexGetNextFrame %= sender->maxNumberOfNextFrames;
         sender->numberOfWaitingFrames--;
@@ -379,16 +383,54 @@ static int ARSTREAM_Sender_PopFromQueue (ARSTREAM_Sender_t *sender, ARSTREAM_Sen
             }
         }
     }
-    // If we got a new frame, copy it
+    // If we got a new frame, apply filters then copy it
     if (retVal == 1)
     {
         ARSTREAM_Sender_Frame_t *frame = &(sender->nextFrames [sender->indexGetNextFrame]);
         sender->indexGetNextFrame++;
         sender->indexGetNextFrame %= sender->maxNumberOfNextFrames;
 
+        // Apply filters
+        int inSize = frame->frameSize;
+        int outSize = 0;
+        int maxOutSize = 0;
+        uint8_t *inBuffer = frame->frameBuffer;
+        uint8_t *outBuffer = NULL;
+        int i;
+        ARSTREAM_Filter_t *prevFilter = NULL;
+        for (i = 0; i < sender->nbFilters; i++)
+        {
+            ARSTREAM_Filter_t *filter = sender->filters[i];
+            maxOutSize = filter->getOutputSize(filter->context,
+                                               inSize);
+            outBuffer = filter->getBuffer(filter->context,
+                                          maxOutSize);
+            outSize = filter->filterBuffer(filter->context,
+                                           inBuffer, inSize,
+                                           outBuffer, maxOutSize);
+            if (prevFilter != NULL)
+            {
+                // We're in a chain, release the input buffer to the
+                // previous filter
+                prevFilter->releaseBuffer(prevFilter->context,
+                                          inBuffer);
+            }
+            else
+            {
+                // We're the first filter, release the input buffer to the
+                // application
+                ARSTREAM_Sender_CallCallback (sender,
+                                              ARSTREAM_SENDER_STATUS_FRAME_SENT,
+                                              frame->frameBuffer,
+                                              frame->frameSize,
+                                              0);
+            }
+            inBuffer = outBuffer;
+            inSize = outSize;
+        }
         newFrame->frameNumber = frame->frameNumber;
-        newFrame->frameBuffer = frame->frameBuffer;
-        newFrame->frameSize   = frame->frameSize;
+        newFrame->frameBuffer = inBuffer;
+        newFrame->frameSize   = inSize;
         newFrame->isHighPriority = frame->isHighPriority;
     }
     ARSAL_Mutex_Unlock (&(sender->nextFrameMutex));
@@ -449,7 +491,7 @@ eARNETWORK_MANAGER_CALLBACK_RETURN ARSTREAM_Sender_NetworkCallback (int IoBuffer
 
 static void ARSTREAM_Sender_FrameWasAck (ARSTREAM_Sender_t *sender)
 {
-    ARSTREAM_Sender_CallCallback (sender, ARSTREAM_SENDER_STATUS_FRAME_SENT, sender->currentFrame.frameBuffer, sender->currentFrame.frameSize);
+    ARSTREAM_Sender_CallCallback (sender, ARSTREAM_SENDER_STATUS_FRAME_SENT, sender->currentFrame.frameBuffer, sender->currentFrame.frameSize, 1);
     sender->currentFrameCbWasCalled = 1;
     ARSAL_Mutex_Lock (&(sender->nextFrameMutex));
     ARSAL_Cond_Signal (&(sender->nextFrameCond));
@@ -465,12 +507,12 @@ static int ARSTREAM_Sender_SendLateAck (ARSTREAM_Sender_t *sender, uint16_t fram
     {
         sender->previousFramesStatus[index] = 1;
         retVal = 1;
-        ARSTREAM_Sender_CallCallback (sender, ARSTREAM_SENDER_STATUS_FRAME_LATE_ACK, NULL, 0);
+        ARSTREAM_Sender_CallCallback (sender, ARSTREAM_SENDER_STATUS_FRAME_LATE_ACK, NULL, 0, 0);
     }
     return retVal;
 }
 
-static void ARSTREAM_Sender_CallCallback (ARSTREAM_Sender_t *sender, eARSTREAM_SENDER_STATUS status, uint8_t *framePointer, uint32_t frameSize)
+static void ARSTREAM_Sender_CallCallback (ARSTREAM_Sender_t *sender, eARSTREAM_SENDER_STATUS status, uint8_t *framePointer, uint32_t frameSize, int isCurrent)
 {
     int needToCall = 1;
     // Dont call if the frame is null, except for LATE_ACKs
@@ -481,7 +523,21 @@ static void ARSTREAM_Sender_CallCallback (ARSTREAM_Sender_t *sender, eARSTREAM_S
 
     if (needToCall == 1)
     {
-        sender->callback(status, framePointer, frameSize, sender->custom);
+        // Release to filter if
+        //  - We are calling the callback on a current frame (i.e. not one in
+        //    the frame queue, which is not yet filtered !)
+        //  - We have at least one filter. Otherwise, the process buffer is
+        //    still the same as the one given in SendNewFrame
+        if (isCurrent && sender->nbFilters > 0)
+        {
+            ARSTREAM_Filter_t *lastFilter = sender->filters[sender->nbFilters - 1];
+            lastFilter->releaseBuffer(lastFilter->context,
+                                      framePointer);
+        }
+        else
+        {
+            sender->callback(status, framePointer, frameSize, sender->custom);
+        }
     }
 }
 
@@ -648,6 +704,8 @@ ARSTREAM_Sender_t* ARSTREAM_Sender_New (ARNETWORK_Manager_t *manager, int dataBu
             retSender->efficiency_nbFragments [i] = 0;
             retSender->efficiency_nbSent [i] = 0;
         }
+        retSender->filters = NULL;
+        retSender->nbFilters = 0;
     }
 
     if ((internalError != ARSTREAM_OK) &&
@@ -742,6 +800,7 @@ eARSTREAM_ERROR ARSTREAM_Sender_Delete (ARSTREAM_Sender_t **sender)
             ARSAL_Cond_Destroy (&((*sender)->nextFrameCond));
             free ((*sender)->nextFrames);
             free ((*sender)->previousFramesStatus);
+            free ((*sender)->filters);
             free (*sender);
             *sender = NULL;
             retVal = ARSTREAM_OK;
@@ -876,7 +935,7 @@ void* ARSTREAM_Sender_RunDataThread (void *ARSTREAM_Sender_t_Param)
                 previousWasAck = 0;
                 ARNETWORK_Manager_FlushInputBuffer (sender->manager, sender->dataBufferID);
 
-                ARSTREAM_Sender_CallCallback(sender, ARSTREAM_SENDER_STATUS_FRAME_CANCEL, sender->currentFrame.frameBuffer, sender->currentFrame.frameSize);
+                ARSTREAM_Sender_CallCallback(sender, ARSTREAM_SENDER_STATUS_FRAME_CANCEL, sender->currentFrame.frameBuffer, sender->currentFrame.frameSize, 1);
             }
             sender->currentFrameCbWasCalled = 0; // New frame
             firstFrame = 0;
@@ -975,7 +1034,7 @@ void* ARSTREAM_Sender_RunDataThread (void *ARSTREAM_Sender_t_Param)
         ARSTREAM_NetworkHeaders_AckPacketDump ("Cancel frame:", &(sender->ackPacket));
         ARSAL_PRINT (ARSAL_PRINT_VERBOSE, ARSTREAM_SENDER_TAG, "Receiver acknowledged %d of %d packets", ARSTREAM_NetworkHeaders_AckPacketCountSet (&(sender->ackPacket), nbPackets), nbPackets);
 #endif
-        ARSTREAM_Sender_CallCallback (sender, ARSTREAM_SENDER_STATUS_FRAME_CANCEL, sender->currentFrame.frameBuffer, sender->currentFrame.frameSize);
+        ARSTREAM_Sender_CallCallback (sender, ARSTREAM_SENDER_STATUS_FRAME_CANCEL, sender->currentFrame.frameBuffer, sender->currentFrame.frameSize, 1);
     }
 
     ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARSTREAM_SENDER_TAG, "Sender thread ended");
@@ -1088,4 +1147,34 @@ void* ARSTREAM_Sender_GetCustom (ARSTREAM_Sender_t *sender)
         ret = sender->custom;
     }
     return ret;
+}
+
+eARSTREAM_ERROR ARSTREAM_Sender_AddFilter (ARSTREAM_Sender_t *sender, ARSTREAM_Filter_t *filter)
+{
+    if (sender == NULL || filter == NULL)
+    {
+        return ARSTREAM_ERROR_BAD_PARAMETERS;
+    }
+
+    if (sender->dataThreadStarted != 0 ||
+        sender->ackThreadStarted != 0)
+    {
+        return ARSTREAM_ERROR_BUSY;
+    }
+
+    eARSTREAM_ERROR err = ARSTREAM_OK;
+    ARSTREAM_Filter_t **newFilters =
+        realloc(sender->filters,
+                (sender->nbFilters + 1) * sizeof (ARSTREAM_Filter_t *));
+    if (newFilters != NULL)
+    {
+        sender->filters = newFilters;
+        newFilters[sender->nbFilters] = filter;
+        sender->nbFilters++;
+    }
+    else
+    {
+        err = ARSTREAM_ERROR_ALLOC;
+    }
+    return err;
 }

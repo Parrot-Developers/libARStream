@@ -9,6 +9,7 @@ HEADER_FILES                                                =   ../Includes/libA
                                                                 ../Includes/libARStream/ARSTREAM_Reader.h  \
                                                                 ../Includes/libARStream/ARSTREAM_Reader2.h \
                                                                 ../Includes/libARStream/ARSTREAM_Error.h   \
+                                                                ../Includes/libARStream/ARSTREAM_Filter.h  \
                                                                 ../Includes/libARStream/ARStream.h
 
 # The sources to add to the library and to add to the source distribution

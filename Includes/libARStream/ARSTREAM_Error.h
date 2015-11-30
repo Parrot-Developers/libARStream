@@ -62,7 +62,7 @@ typedef enum {
     ARSTREAM_ERROR_BAD_PARAMETERS, /**< Bad parameters */
     ARSTREAM_ERROR_ALLOC, /**< Unable to allocate data */
     ARSTREAM_ERROR_FRAME_TOO_LARGE, /**< Bad parameter : frame too large */
-    ARSTREAM_ERROR_BUSY, /**< Object is busy and can not be deleted yet */
+    ARSTREAM_ERROR_BUSY, /**< Object is busy and the operation can not be applied on running objects */
     ARSTREAM_ERROR_QUEUE_FULL, /**< Frame queue is full */
 } eARSTREAM_ERROR;
 

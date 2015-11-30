@@ -48,6 +48,7 @@
  */
 #include <libARNetwork/ARNETWORK_Manager.h>
 #include <libARStream/ARSTREAM_Error.h>
+#include <libARStream/ARSTREAM_Filter.h>
 
 /*
  * Macros
@@ -195,5 +196,18 @@ float ARSTREAM_Reader_GetEstimatedEfficiency (ARSTREAM_Reader_t *reader);
  * @return The custom pointer associated with this reader, or NULL if reader does not point to a valid reader
  */
 void* ARSTREAM_Reader_GetCustom (ARSTREAM_Reader_t *reader);
+
+/**
+ * @brief Adds a new ARSTREAM_Filter_t to the reader
+ * @param[in] reader The ARSTREAM_Reader_t
+ * @param[in] filter The ARSTREAM_Filter_t to add (at the end of the filter chain !)
+ *
+ * @return ARSTREAM_OK if the filter was added
+ * @return ARSTREAM_ERROR_BUSY if the ARSTREAM_Reader_t is running (you cannot add filters to a running instance)
+ * @return ARSTREAM_ERROR_BAD_PARAMETERS if reader does not point to a valid ARSTREAM_Reader_t
+ *
+ * @note The reader will keep a reference on the filter until deleted, so you should not invalidate the filter before stopping/deleting the reader.
+ */
+eARSTREAM_ERROR ARSTREAM_Reader_AddFilter (ARSTREAM_Reader_t *reader, ARSTREAM_Filter_t *filter);
 
 #endif /* _ARSTREAM_READER_H_ */
