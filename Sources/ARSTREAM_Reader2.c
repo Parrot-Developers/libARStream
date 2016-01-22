@@ -1234,7 +1234,7 @@ void* ARSTREAM_Reader2_RunStreamThread(void *ARSTREAM_Reader2_t_Param)
     ARSTREAM_Reader2_t *reader = (ARSTREAM_Reader2_t *)ARSTREAM_Reader2_t_Param;
     uint8_t *recvBuffer = NULL;
     int recvBufferSize;
-    int recvSize, payloadSize;
+    int recvSize, payloadSize, headersOffset;
     int fuPending = 0, currentAuSize = 0;
     ARSTREAM_NetworkHeaders_DataHeader2_t *header = NULL;
     uint32_t rtpTimestamp = 0, previousTimestamp = 0;
@@ -1296,9 +1296,15 @@ void* ARSTREAM_Reader2_RunStreamThread(void *ARSTREAM_Reader2_t_Param)
         }
         else if (recvSize >= sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t))
         {
+            headersOffset = sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t);
             rtpTimestamp = ntohl(header->timestamp);
             currentSeqNum = (int)ntohs(header->seqNum);
             currentFlags = ntohs(header->flags);
+            if (currentFlags & (1 << 12))
+            {
+                uint16_t extLength = ntohs(*((uint16_t*)(recvBuffer + headersOffset) + 1));
+                headersOffset += 4 + extLength * 4;
+            }
             ARSTREAM_Reader2_UpdateMonitoring(reader, rtpTimestamp, currentSeqNum, (currentFlags & (1 << 7)) ? 1 : 0, (uint32_t)recvSize);
 
             if (previousSeqNum != -1)
@@ -1341,11 +1347,11 @@ void* ARSTREAM_Reader2_RunStreamThread(void *ARSTREAM_Reader2_t_Param)
                     auStartSeqNum = currentSeqNum;
                 }
 
-                payloadSize = recvSize - sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t);
+                payloadSize = recvSize - headersOffset;
 
                 if (payloadSize >= 1)
                 {
-                    uint8_t headByte = *(recvBuffer + sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t));
+                    uint8_t headByte = *(recvBuffer + headersOffset);
 
                     if ((headByte & 0x1F) == ARSTREAM_NETWORK_HEADERS2_NALU_TYPE_FUA)
                     {
@@ -1355,7 +1361,7 @@ void* ARSTREAM_Reader2_RunStreamThread(void *ARSTREAM_Reader2_t_Param)
                             uint8_t fuIndicator, fuHeader, startBit, endBit;
                             int outputSize = payloadSize - 2;
                             fuIndicator = headByte;
-                            fuHeader = *(recvBuffer + sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t) + 1);
+                            fuHeader = *(recvBuffer + headersOffset + 1);
                             startBit = fuHeader & 0x80;
                             endBit = fuHeader & 0x40;
 
@@ -1382,7 +1388,7 @@ void* ARSTREAM_Reader2_RunStreamThread(void *ARSTREAM_Reader2_t_Param)
                                         reader->currentNaluSize += startCodeLength;
                                         currentAuSize += startCodeLength;
                                     }
-                                    memcpy(reader->currentNaluBuffer + reader->currentNaluSize + ((startBit) ? 1 : 0), recvBuffer + sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t) + 2, payloadSize - 2);
+                                    memcpy(reader->currentNaluBuffer + reader->currentNaluSize + ((startBit) ? 1 : 0), recvBuffer + headersOffset + 2, payloadSize - 2);
                                     if (startBit)
                                     {
                                         /* restore the NALU header byte */
@@ -1436,7 +1442,7 @@ void* ARSTREAM_Reader2_RunStreamThread(void *ARSTREAM_Reader2_t_Param)
 
                         if (payloadSize >= 3)
                         {
-                            uint8_t *curBuf = recvBuffer + sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t) + 1;
+                            uint8_t *curBuf = recvBuffer + headersOffset + 1;
                             int sizeLeft = payloadSize - 1, naluCount = 0;
                             uint16_t naluSize = ((uint16_t)(*curBuf) << 8) | ((uint16_t)(*(curBuf + 1))), nextNaluSize = 0;
                             curBuf += 2;
@@ -1511,7 +1517,7 @@ void* ARSTREAM_Reader2_RunStreamThread(void *ARSTREAM_Reader2_t_Param)
                                 reader->currentNaluSize += startCodeLength;
                                 currentAuSize += startCodeLength;
                             }
-                            memcpy(reader->currentNaluBuffer + reader->currentNaluSize, recvBuffer + sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t), payloadSize);
+                            memcpy(reader->currentNaluBuffer + reader->currentNaluSize, recvBuffer + headersOffset, payloadSize);
                             reader->currentNaluSize += payloadSize;
                             currentAuSize += payloadSize;
                             /*ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Output single NALU (seqNum %d) isFirst=%d isLast=%d gapsInSeqNum=%d",
