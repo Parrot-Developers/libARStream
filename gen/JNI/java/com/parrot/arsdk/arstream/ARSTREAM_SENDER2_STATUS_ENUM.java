@@ -43,10 +43,10 @@ import java.util.HashMap;
 public enum ARSTREAM_SENDER2_STATUS_ENUM {
    /** Dummy value for all unknown cases */
     eARSTREAM_SENDER2_STATUS_UNKNOWN_ENUM_VALUE (Integer.MIN_VALUE, "Dummy value for all unknown cases"),
-   /** Access Unit was sent */
-    ARSTREAM_SENDER2_STATUS_SENT (0, "Access Unit was sent"),
-   /** Access Unit was cancelled (not sent or partly sent) */
-    ARSTREAM_SENDER2_STATUS_CANCELLED (1, "Access Unit was cancelled (not sent or partly sent)"),
+   /** Access unit or NAL unit was sent */
+    ARSTREAM_SENDER2_STATUS_SENT (0, "Access unit or NAL unit was sent"),
+   /** Access unit or NAL unit was cancelled (not sent or partly sent) */
+    ARSTREAM_SENDER2_STATUS_CANCELLED (1, "Access unit or NAL unit was cancelled (not sent or partly sent)"),
    ARSTREAM_SENDER2_STATUS_MAX (2);
 
     private final int value;

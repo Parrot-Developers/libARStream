@@ -57,7 +57,7 @@ char* ARSTREAM_Error_ToString (eARSTREAM_ERROR error)
         return "Bad parameter : frame too large";
         break;
     case ARSTREAM_ERROR_BUSY:
-        return "Object is busy and can not be deleted yet";
+        return "Object is busy and the operation can not be applied on running objects";
         break;
     case ARSTREAM_ERROR_QUEUE_FULL:
         return "Frame queue is full";
