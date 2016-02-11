@@ -270,7 +270,7 @@ uint32_t ARSTREAM_NetworkHeaders_AckPacketCountNotSet (ARSTREAM_NetworkHeaders_A
     return retVal;
 }
 
-void ARSTREAM_NetworkHeaders_InternalAckPacketDump (const char *prefix, ARSTREAM_NetworkHeaders_AckPacket_t *packet, eARSAL_PRINT_LEVEL level)
+static void ARSTREAM_NetworkHeaders_InternalAckPacketDump (const char *prefix, ARSTREAM_NetworkHeaders_AckPacket_t *packet, eARSAL_PRINT_LEVEL level)
 {
     ARSAL_PRINT (level, ARSTREAM_NETWORK_HEADERS_TAG, "Packet dump: %s", prefix);
     if (packet == NULL)
