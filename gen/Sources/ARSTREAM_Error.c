@@ -63,7 +63,6 @@ const char* ARSTREAM_Error_ToString (eARSTREAM_ERROR error)
         return "Frame queue is full";
         break;
     default:
-        return "Unknown value";
         break;
     }
     return "Unknown value";
