@@ -26,6 +26,7 @@ LOCAL_SRC_FILES := \
 LOCAL_INSTALL_HEADERS := \
 	Includes/libARStream/ARStream.h:usr/include/libARStream/ \
 	Includes/libARStream/ARSTREAM_Error.h:usr/include/libARStream/ \
+	Includes/libARStream/ARSTREAM_Filter.h:usr/include/libARStream/ \
 	Includes/libARStream/ARSTREAM_Reader.h:usr/include/libARStream/  \
 	Includes/libARStream/ARSTREAM_Reader2.h:usr/include/libARStream/ \
 	Includes/libARStream/ARSTREAM_Sender.h:usr/include/libARStream/ \

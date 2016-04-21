@@ -47,6 +47,7 @@
  * ARSDK Headers
  */
 #include <libARNetwork/ARNETWORK_Manager.h>
+#include <libARStream/ARSTREAM_Filter.h>
 #include <libARStream/ARSTREAM_Error.h>
 
 /*
@@ -253,5 +254,18 @@ float ARSTREAM_Sender_GetEstimatedEfficiency (ARSTREAM_Sender_t *sender);
  * @return The custom pointer associated with this sender, or NULL if sender does not point to a valid sender
  */
 void* ARSTREAM_Sender_GetCustom (ARSTREAM_Sender_t *sender);
+
+/**
+ * @brief Adds a new ARSTREAM_Filter_t to the sender
+ * @param[in] sender The ARSTREAM_Sender_t
+ * @param[in] filter The ARSTREAM_Filter_t to add (at the end of the filter chain !)
+ *
+ * @return ARSTREAM_OK if the filter was added
+ * @return ARSTREAM_ERROR_BUSY if the ARSTREAM_Sender_t is running (you cannot add filters to a running instance)
+ * @return ARSTREAM_ERROR_BAD_PARAMETERS if sender does not point to a valid ARSTREAM_Sender_t
+ *
+ * @note The sender will keep a reference on the filter until deleted, so you should not invalidate the filter before stopping/deleting the sender.
+ */
+eARSTREAM_ERROR ARSTREAM_Sender_AddFilter (ARSTREAM_Sender_t *sender, ARSTREAM_Filter_t *filter);
 
 #endif /* _ARSTREAM_SENDER_H_ */

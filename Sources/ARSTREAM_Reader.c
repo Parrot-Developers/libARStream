@@ -102,6 +102,10 @@ struct ARSTREAM_Reader_t {
     uint32_t currentFrameSize;       // Actual data length
     uint8_t *currentFrameBuffer;
 
+    /* Output frame storage */
+    uint32_t outputFrameBufferSize; // Usable length of the buffer
+    uint8_t *outputFrameBuffer;
+
     /* Acknowledge storage */
     ARSAL_Mutex_t ackPacketMutex;
     ARSTREAM_NetworkHeaders_AckPacket_t ackPacket;
@@ -117,6 +121,10 @@ struct ARSTREAM_Reader_t {
     int efficiency_nbUseful [ARSTREAM_READER_EFFICIENCY_AVERAGE_NB_FRAMES];
     int efficiency_nbTotal  [ARSTREAM_READER_EFFICIENCY_AVERAGE_NB_FRAMES];
     int efficiency_index;
+
+    /* Filters */
+    ARSTREAM_Filter_t **filters;
+    int nbFilters;
 };
 
 /*
@@ -200,8 +208,8 @@ ARSTREAM_Reader_t* ARSTREAM_Reader_New (ARNETWORK_Manager_t *manager, int dataBu
         retReader->maxAckInterval = maxAckInterval;
         retReader->callback = callback;
         retReader->custom = custom;
-        retReader->currentFrameBufferSize = frameBufferSize;
-        retReader->currentFrameBuffer = frameBuffer;
+        retReader->outputFrameBufferSize = frameBufferSize;
+        retReader->outputFrameBuffer = frameBuffer;
     }
 
     /* Setup internal mutexes/conditions */
@@ -246,6 +254,8 @@ ARSTREAM_Reader_t* ARSTREAM_Reader_New (ARNETWORK_Manager_t *manager, int dataBu
     if (internalError == ARSTREAM_OK)
     {
         int i;
+        retReader->currentFrameBufferSize = 0;
+        retReader->currentFrameBuffer = NULL;
         retReader->currentFrameSize = 0;
         retReader->threadsShouldStop = 0;
         retReader->dataThreadStarted = 0;
@@ -256,6 +266,8 @@ ARSTREAM_Reader_t* ARSTREAM_Reader_New (ARNETWORK_Manager_t *manager, int dataBu
             retReader->efficiency_nbTotal [i] = 0;
             retReader->efficiency_nbUseful [i] = 0;
         }
+        retReader->filters = NULL;
+        retReader->nbFilters = 0;
     }
 
     if ((internalError != ARSTREAM_OK) &&
@@ -316,6 +328,7 @@ eARSTREAM_ERROR ARSTREAM_Reader_Delete (ARSTREAM_Reader_t **reader)
             ARSAL_Mutex_Destroy (&((*reader)->ackPacketMutex));
             ARSAL_Mutex_Destroy (&((*reader)->ackSendMutex));
             ARSAL_Cond_Destroy (&((*reader)->ackSendCond));
+            free ((*reader)->filters);
             free (*reader);
             *reader = NULL;
             retVal = ARSTREAM_OK;
@@ -359,6 +372,13 @@ void* ARSTREAM_Reader_RunDataThread (void *ARSTREAM_Reader_t_Param)
     ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARSTREAM_READER_TAG, "Stream reader thread running");
     reader->dataThreadStarted = 1;
 
+    // If we don't have filters, use the output buffer as the current one
+    if (reader->nbFilters == 0)
+    {
+        reader->currentFrameBuffer = reader->outputFrameBuffer;
+        reader->currentFrameBufferSize = reader->outputFrameBufferSize;
+    }
+
     while (reader->threadsShouldStop == 0)
     {
         eARNETWORK_ERROR err = ARNETWORK_Manager_ReadDataWithTimeout (reader->manager, reader->dataBufferID, recvData, recvDataLen, &recvSize, ARSTREAM_READER_DATAREAD_TIMEOUT_MS);
@@ -371,7 +391,7 @@ void* ARSTREAM_Reader_RunDataThread (void *ARSTREAM_Reader_t_Param)
         }
         else
         {
-            int cpIndex, cpSize, endIndex;
+            int cpIndex, cpSize, endIndex, filterEndIndex;
             ARSAL_Mutex_Lock (&(reader->ackPacketMutex));
             if (header->frameNumber != reader->ackPacket.frameNumber)
             {
@@ -408,23 +428,86 @@ void* ARSTREAM_Reader_RunDataThread (void *ARSTREAM_Reader_t_Param)
             cpIndex = reader->maxFragmentSize * header->fragmentNumber;
             cpSize = recvSize - sizeof (ARSTREAM_NetworkHeaders_DataHeader_t);
             endIndex = cpIndex + cpSize;
-            while ((endIndex > reader->currentFrameBufferSize) &&
+            filterEndIndex = endIndex;
+            if (reader->nbFilters > 0)
+            {
+                int i;
+                for (i = 0; i < reader->nbFilters; i++)
+                {
+                    ARSTREAM_Filter_t *filter = reader->filters[i];
+                    filterEndIndex = filter->getOutputSize(filter->context,
+                                                           filterEndIndex);
+                }
+            }
+
+            while (((endIndex > reader->currentFrameBufferSize) ||
+                    (filterEndIndex > reader->outputFrameBufferSize)) &&
                    (skipCurrentFrame == 0) &&
                    (packetWasAlreadyAck == 0))
             {
-                uint32_t nextFrameBufferSize = reader->maxFragmentSize * header->fragmentsPerFrame;
+                uint32_t nextFrameBufferSize = endIndex;
                 uint32_t dummy;
-                uint8_t *nextFrameBuffer = reader->callback (ARSTREAM_READER_CAUSE_FRAME_TOO_SMALL, reader->currentFrameBuffer, reader->currentFrameSize, 0, 0, &nextFrameBufferSize, reader->custom);
-                if (nextFrameBufferSize >= reader->currentFrameSize && nextFrameBufferSize > 0)
+                uint8_t *nextFrameBuffer;
+                // If we have at least a filter, chain resize the buffers
+                if (reader->nbFilters > 0)
                 {
-                    memcpy (nextFrameBuffer, reader->currentFrameBuffer, reader->currentFrameSize);
+                    ARSTREAM_Filter_t *firstFilter = reader->filters[0];
+                    nextFrameBuffer = firstFilter->getBuffer(firstFilter->context,
+                                                             nextFrameBufferSize);
+                    int i;
+                    int finalOutputSize = firstFilter->getOutputSize(firstFilter->context,
+                                                                     nextFrameBufferSize);
+                    // Update final output size by requesting it from each filter
+                    for (i = 1; i < reader->nbFilters; i++)
+                    {
+                        ARSTREAM_Filter_t *filter = reader->filters[i];
+                        finalOutputSize = filter->getOutputSize(filter->context,
+                                                                finalOutputSize);
+                    }
+
+                    // Resize actual output buffer if needed
+                    if (finalOutputSize > reader->outputFrameBufferSize)
+                    {
+                        int newOutputSize = finalOutputSize;
+                        uint8_t *tmpFrame = reader->callback (ARSTREAM_READER_CAUSE_FRAME_TOO_SMALL, reader->outputFrameBuffer, reader->currentFrameSize, 0, 0, &newOutputSize, reader->custom);
+                        if (newOutputSize < finalOutputSize)
+                        {
+                            skipCurrentFrame = 1;
+                        }
+                        reader->callback (ARSTREAM_READER_CAUSE_COPY_COMPLETE, reader->outputFrameBuffer, reader->currentFrameSize, 0, skipCurrentFrame, &dummy, reader->custom);
+                        reader->outputFrameBuffer = tmpFrame;
+                        reader->outputFrameBufferSize = finalOutputSize;
+                    }
+
+                    // Copy into new buffer
+                    if (nextFrameBuffer != NULL)
+                    {
+                        memcpy(nextFrameBuffer, reader->currentFrameBuffer, reader->currentFrameSize);
+                    }
+                    else
+                    {
+                        skipCurrentFrame = 1;
+                    }
+                    firstFilter->releaseBuffer(firstFilter->context,
+                                               reader->currentFrameBuffer);
                 }
+                // Else, direclty resize the output buffer (and copy)
                 else
                 {
-                    skipCurrentFrame = 1;
+                    nextFrameBuffer = reader->callback (ARSTREAM_READER_CAUSE_FRAME_TOO_SMALL, reader->outputFrameBuffer, reader->currentFrameSize, 0, 0, &nextFrameBufferSize, reader->custom);
+                    if (nextFrameBufferSize >= reader->currentFrameSize && nextFrameBufferSize > 0)
+                    {
+                        memcpy (nextFrameBuffer, reader->currentFrameBuffer, reader->currentFrameSize);
+                    }
+                    else
+                    {
+                        skipCurrentFrame = 1;
+                    }
+                    //TODO: Add "SKIP_FRAME"
+                    reader->callback (ARSTREAM_READER_CAUSE_COPY_COMPLETE, reader->outputFrameBuffer, reader->currentFrameSize, 0, skipCurrentFrame, &dummy, reader->custom);
+                    reader->outputFrameBuffer = nextFrameBuffer;
+                    reader->outputFrameBufferSize = nextFrameBufferSize;
                 }
-                //TODO: Add "SKIP_FRAME"
-                reader->callback (ARSTREAM_READER_CAUSE_COPY_COMPLETE, reader->currentFrameBuffer, reader->currentFrameSize, 0, skipCurrentFrame, &dummy, reader->custom);
                 reader->currentFrameBuffer = nextFrameBuffer;
                 reader->currentFrameBufferSize = nextFrameBufferSize;
             }
@@ -456,7 +539,55 @@ void* ARSTREAM_Reader_RunDataThread (void *ARSTREAM_Reader_t_Param)
                         }
                         previousFNum = header->frameNumber;
                         skipCurrentFrame = 1;
-                        reader->currentFrameBuffer = reader->callback (ARSTREAM_READER_CAUSE_FRAME_COMPLETE, reader->currentFrameBuffer, reader->currentFrameSize, nbMissedFrame, isFlushFrame, &(reader->currentFrameBufferSize), reader->custom);
+                        // If we have filters, apply them !
+                        if (reader->nbFilters > 0)
+                        {
+                            int i;
+                            ARSTREAM_Filter_t *filter;
+                            ARSTREAM_Filter_t *nextFilter;
+                            uint8_t *inBuffer = reader->currentFrameBuffer;
+                            int inSize = reader->currentFrameSize;
+                            uint8_t *outBuffer;
+                            int outSize;
+                            int maxOutSize;
+                            // Chain filters
+                            for (i = 0; i < (reader->nbFilters - 1); i++)
+                            {
+                                filter = reader->filters[i];
+                                nextFilter = reader->filters[i+1];
+                                maxOutSize = filter->getOutputSize(filter->context,
+                                                                   inSize);
+                                outBuffer = nextFilter->getBuffer(nextFilter->context,
+                                                                  maxOutSize);
+                                outSize = filter->filterBuffer(filter->context,
+                                                               inBuffer, inSize,
+                                                               outBuffer, maxOutSize);
+                                filter->releaseBuffer(filter->context,
+                                                      inBuffer);
+                                inBuffer = outBuffer;
+                                inSize = outSize;
+                            }
+                            // Apply last filter
+                            filter = reader->filters[reader->nbFilters-1];
+                            outSize = filter->filterBuffer(filter->context,
+                                                           inBuffer, inSize,
+                                                           reader->outputFrameBuffer,
+                                                           reader->outputFrameBufferSize);
+                            filter->releaseBuffer(filter->context,
+                                                  inBuffer);
+                            reader->outputFrameBuffer = reader->callback (ARSTREAM_READER_CAUSE_FRAME_COMPLETE, reader->outputFrameBuffer, outSize, nbMissedFrame, isFlushFrame, &(reader->outputFrameBufferSize), reader->custom);
+                            // Get a new buffer from first filter
+                            filter = reader->filters[0];
+                            reader->currentFrameBuffer = filter->getBuffer(filter->context,
+                                                                           reader->currentFrameBufferSize);
+                        }
+                        // No filters, directly talk to the callback
+                        else
+                        {
+                            reader->outputFrameBuffer = reader->callback (ARSTREAM_READER_CAUSE_FRAME_COMPLETE, reader->currentFrameBuffer, reader->currentFrameSize, nbMissedFrame, isFlushFrame, &(reader->outputFrameBufferSize), reader->custom);
+                            reader->currentFrameBuffer = reader->outputFrameBuffer;
+                            reader->currentFrameBufferSize = reader->outputFrameBufferSize;
+                        }
                     }
                 }
                 ARSAL_Mutex_Unlock (&(reader->ackPacketMutex));
@@ -466,7 +597,13 @@ void* ARSTREAM_Reader_RunDataThread (void *ARSTREAM_Reader_t_Param)
 
     free (recvData);
 
-    reader->callback (ARSTREAM_READER_CAUSE_CANCEL, reader->currentFrameBuffer, reader->currentFrameSize, 0, 0, &(reader->currentFrameBufferSize), reader->custom);
+    reader->callback (ARSTREAM_READER_CAUSE_CANCEL, reader->outputFrameBuffer, reader->currentFrameSize, 0, 0, &(reader->outputFrameBufferSize), reader->custom);
+    if (reader->nbFilters > 0)
+    {
+        ARSTREAM_Filter_t *filter = reader->filters[0];
+        filter->releaseBuffer(filter->context,
+                              reader->currentFrameBuffer);
+    }
 
     ARSAL_PRINT (ARSAL_PRINT_DEBUG, ARSTREAM_READER_TAG, "Stream reader thread ended");
     reader->dataThreadStarted = 0;
@@ -559,4 +696,34 @@ void* ARSTREAM_Reader_GetCustom (ARSTREAM_Reader_t *reader)
         ret = reader->custom;
     }
     return ret;
+}
+
+eARSTREAM_ERROR ARSTREAM_Reader_AddFilter (ARSTREAM_Reader_t *reader, ARSTREAM_Filter_t *filter)
+{
+    if (reader == NULL || filter == NULL)
+    {
+        return ARSTREAM_ERROR_BAD_PARAMETERS;
+    }
+
+    if (reader->dataThreadStarted != 0 ||
+        reader->ackThreadStarted != 0)
+    {
+        return ARSTREAM_ERROR_BUSY;
+    }
+
+    eARSTREAM_ERROR err = ARSTREAM_OK;
+    ARSTREAM_Filter_t **newFilters =
+        realloc(reader->filters,
+                (reader->nbFilters + 1) * sizeof (ARSTREAM_Filter_t *));
+    if (newFilters != NULL)
+    {
+        reader->filters = newFilters;
+        newFilters[reader->nbFilters] = filter;
+        reader->nbFilters++;
+    }
+    else
+    {
+        err = ARSTREAM_ERROR_ALLOC;
+    }
+    return err;
 }

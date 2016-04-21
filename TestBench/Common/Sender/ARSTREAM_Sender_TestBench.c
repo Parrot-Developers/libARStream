@@ -1,32 +1,32 @@
 /*
-    Copyright (C) 2014 Parrot SA
+  Copyright (C) 2014 Parrot SA
 
-    Redistribution and use in source and binary forms, with or without
-    modification, are permitted provided that the following conditions
-    are met:
-    * Redistributions of source code must retain the above copyright
-      notice, this list of conditions and the following disclaimer.
-    * Redistributions in binary form must reproduce the above copyright
-      notice, this list of conditions and the following disclaimer in
-      the documentation and/or other materials provided with the 
-      distribution.
-    * Neither the name of Parrot nor the names
-      of its contributors may be used to endorse or promote products
-      derived from this software without specific prior written
-      permission.
+  Redistribution and use in source and binary forms, with or without
+  modification, are permitted provided that the following conditions
+  are met:
+  * Redistributions of source code must retain the above copyright
+  notice, this list of conditions and the following disclaimer.
+  * Redistributions in binary form must reproduce the above copyright
+  notice, this list of conditions and the following disclaimer in
+  the documentation and/or other materials provided with the
+  distribution.
+  * Neither the name of Parrot nor the names
+  of its contributors may be used to endorse or promote products
+  derived from this software without specific prior written
+  permission.
 
-    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-    "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-    LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-    FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-    COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-    INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-    BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-    OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED 
-    AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-    OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-    OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
-    SUCH DAMAGE.
+  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+  FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+  COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+  BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+  OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+  OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+  SUCH DAMAGE.
 */
 /**
  * @file ARSTREAM_Sender_TestBench.c
@@ -63,8 +63,8 @@
 #define SENDING_PORT (54321)
 #define READING_PORT (43210)
 
-#define BITRATE_KBPS (1200)
-#define FPS          (30)
+#define BITRATE_KBPS (1)
+#define FPS          (1)
 
 #define FRAME_SIZE   (1000 * BITRATE_KBPS / FPS / 8)
 
@@ -86,9 +86,15 @@
 
 #define NB_FRAMES_FOR_AVERAGE (15)
 
+#define NB_FILTERS (10)
+
 /*
  * Types
  */
+
+typedef struct {
+    int id;
+} filter_ctx;
 
 /*
  * Globals
@@ -115,9 +121,67 @@ static int multiBufferIsFree[NB_BUFFERS];
 
 static char *appName;
 
+static filter_ctx fctx[NB_FILTERS] = {};
+static ARSTREAM_Filter_t filters[NB_FILTERS] = {};
+
 /*
  * Internal functions declarations
  */
+
+static uint8_t *getBuffer(void *context, int size)
+{
+    filter_ctx *ctx = (filter_ctx *)context;
+    ARSAL_PRINT (ARSAL_PRINT_INFO, __TAG__, "getBuffer(%d) on filter %d", size, ctx->id);
+    return malloc(size);
+}
+
+static int getOutputSize(void *context, int inputSize)
+{
+    filter_ctx *ctx = (filter_ctx *)context;
+    ARSAL_PRINT (ARSAL_PRINT_INFO, __TAG__, "getOutputSize(%d) on filter %d", inputSize, ctx->id);
+    return inputSize;
+}
+
+static int filterBuffer(void *context,
+                        uint8_t *input, int inSize,
+                        uint8_t *output, int outSize)
+{
+    filter_ctx *ctx = (filter_ctx *)context;
+    ARSAL_PRINT (ARSAL_PRINT_INFO, __TAG__, "filterBuffer(...) on filter %d", ctx->id);
+    int cpSize = inSize < outSize ? inSize : outSize;
+    int i;
+    memcpy(output, input, cpSize);
+    output[1]++;
+    return cpSize;
+}
+
+static void releaseBuffer(void *context, uint8_t *buffer)
+{
+    filter_ctx *ctx = (filter_ctx *)context;
+    ARSAL_PRINT (ARSAL_PRINT_INFO, __TAG__, "releaseBuffer(%p) on filter %d", buffer, ctx->id);
+    free(buffer);
+}
+
+static void ARSTREAM_SenderTB_AddFilters(void)
+{
+    int i;
+    for (i = 0; i < NB_FILTERS; i++)
+    {
+        filters[i].getBuffer = getBuffer;
+        filters[i].getOutputSize = getOutputSize;
+        filters[i].filterBuffer = filterBuffer;
+        filters[i].releaseBuffer = releaseBuffer;
+        filters[i].context = &fctx[i];
+        fctx[i].id = i;
+
+        eARSTREAM_ERROR err = ARSTREAM_Sender_AddFilter(g_Sender, &filters[i]);
+        if (err != ARSTREAM_OK)
+        {
+            ARSAL_PRINT(ARSAL_PRINT_ERROR, __TAG__, "Error while adding filter : %s", ARSTREAM_Error_ToString(err));
+        }
+    }
+}
+
 
 /**
  * @brief Print the parameters of the application
@@ -328,6 +392,8 @@ int ARSTREAM_SenderTb_StartStreamTest (ARNETWORK_Manager_t *manager)
         ARSAL_PRINT (ARSAL_PRINT_ERROR, __TAG__, "Error during ARSTREAM_Sender_New call : %s", ARSTREAM_Error_ToString(err));
         return 1;
     }
+
+    ARSTREAM_SenderTB_AddFilters();
 
     pthread_t streamsend, streamread;
     pthread_create (&streamsend, NULL, ARSTREAM_Sender_RunDataThread, g_Sender);

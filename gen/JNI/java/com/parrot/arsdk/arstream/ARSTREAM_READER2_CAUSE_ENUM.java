@@ -43,14 +43,14 @@ import java.util.HashMap;
 public enum ARSTREAM_READER2_CAUSE_ENUM {
    /** Dummy value for all unknown cases */
     eARSTREAM_READER2_CAUSE_UNKNOWN_ENUM_VALUE (Integer.MIN_VALUE, "Dummy value for all unknown cases"),
-   /** Frame is complete (no error) */
-    ARSTREAM_READER2_CAUSE_NALU_COMPLETE (0, "Frame is complete (no error)"),
-   /** Frame buffer is too small for the frame on the network */
-    ARSTREAM_READER2_CAUSE_NALU_BUFFER_TOO_SMALL (1, "Frame buffer is too small for the frame on the network"),
-   /** Copy of previous frame buffer is complete (called only after ARSTREAM_READER2_CAUSE_FRAME_TOO_SMALL) */
-    ARSTREAM_READER2_CAUSE_NALU_COPY_COMPLETE (2, "Copy of previous frame buffer is complete (called only after ARSTREAM_READER2_CAUSE_FRAME_TOO_SMALL)"),
-   /** Reader is closing, so buffer is no longer used */
-    ARSTREAM_READER2_CAUSE_CANCEL (3, "Reader is closing, so buffer is no longer used"),
+   /** NAL unit is complete (no error) */
+    ARSTREAM_READER2_CAUSE_NALU_COMPLETE (0, "NAL unit is complete (no error)"),
+   /** NAL unit buffer is too small */
+    ARSTREAM_READER2_CAUSE_NALU_BUFFER_TOO_SMALL (1, "NAL unit buffer is too small"),
+   /** The copy of the previous NAL unit buffer is complete (used only after ARSTREAM_READER2_CAUSE_NALU_BUFFER_TOO_SMALL) */
+    ARSTREAM_READER2_CAUSE_NALU_COPY_COMPLETE (2, "The copy of the previous NAL unit buffer is complete (used only after ARSTREAM_READER2_CAUSE_NALU_BUFFER_TOO_SMALL)"),
+   /** The reader is closing, so buffer is no longer used */
+    ARSTREAM_READER2_CAUSE_CANCEL (3, "The reader is closing, so buffer is no longer used"),
    ARSTREAM_READER2_CAUSE_MAX (4);
 
     private final int value;

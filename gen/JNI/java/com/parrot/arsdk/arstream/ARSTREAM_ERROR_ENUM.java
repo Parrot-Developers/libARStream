@@ -51,8 +51,8 @@ public enum ARSTREAM_ERROR_ENUM {
     ARSTREAM_ERROR_ALLOC (2, "Unable to allocate data"),
    /** Bad parameter : frame too large */
     ARSTREAM_ERROR_FRAME_TOO_LARGE (3, "Bad parameter : frame too large"),
-   /** Object is busy and can not be deleted yet */
-    ARSTREAM_ERROR_BUSY (4, "Object is busy and can not be deleted yet"),
+   /** Object is busy and the operation can not be applied on running objects */
+    ARSTREAM_ERROR_BUSY (4, "Object is busy and the operation can not be applied on running objects"),
    /** Frame queue is full */
     ARSTREAM_ERROR_QUEUE_FULL (5, "Frame queue is full");
 
