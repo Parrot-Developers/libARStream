@@ -7,5 +7,8 @@ LOCAL_CFLAGS := -g
 LOCAL_MODULE := libarstream_android
 LOCAL_SRC_FILES := JNI/c/ARSTREAM_JNIReader.c JNI/c/ARSTREAM_JNISender.c JNI/c/ARSTREAM_JNIReader2Resender.c JNI/c/ARSTREAM_JNIReader2.c
 LOCAL_LDLIBS := -llog -lz
-LOCAL_SHARED_LIBRARIES := libARStream-prebuilt libARSAL-prebuilt
+LOCAL_SHARED_LIBRARIES := \
+	libARStream \
+	libARSAL
+
 include $(BUILD_SHARED_LIBRARY)
