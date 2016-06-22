@@ -41,8 +41,6 @@
 #include <libARStream/ARSTREAM_Error.h>
 #include <libARStream/ARSTREAM_Filter.h>
 #include <libARStream/ARSTREAM_Sender.h>
-#include <libARStream/ARSTREAM_Sender2.h>
 #include <libARStream/ARSTREAM_Reader.h>
-#include <libARStream/ARSTREAM_Reader2.h>
 
 #endif /* _ARSTREAM_H_ */
