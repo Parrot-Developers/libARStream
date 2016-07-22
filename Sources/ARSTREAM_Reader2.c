@@ -1294,7 +1294,7 @@ void* ARSTREAM_Reader2_RunStreamThread(void *ARSTREAM_Reader2_t_Param)
                 ARSAL_PRINT(ARSAL_PRINT_ERROR, ARSTREAM_READER2_TAG, "Failed to read data (%d)", ret);
             }
         }
-        else if (recvSize >= sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t))
+        else if (recvSize > 0 && ((size_t)recvSize >= sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t)))
         {
             headersOffset = sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t);
             rtpTimestamp = ntohl(header->timestamp);
@@ -1786,7 +1786,7 @@ eARSTREAM_ERROR ARSTREAM_Reader2_GetMonitoring(ARSTREAM_Reader2_t *reader, uint6
     eARSTREAM_ERROR ret = ARSTREAM_OK;
     uint64_t endTime, curTime, previousTime, auTimestamp, receptionTimeSum = 0, receptionTimeVarSum = 0, packetSizeVarSum = 0;
     uint32_t bytes, bytesSum = 0, _meanPacketSize = 0, receptionTime = 0, meanReceptionTime = 0, _receptionTimeJitter = 0, _packetSizeStdDev = 0;
-    int currentSeqNum, previousSeqNum = -1, seqNumDelta, gapsInSeqNum;
+    int currentSeqNum, previousSeqNum = -1, seqNumDelta, gapsInSeqNum = 0;
     int points = 0, usefulPoints = 0, idx, i, firstUsefulIdx = -1;
 
     if ((reader == NULL) || (timeIntervalUs == 0))

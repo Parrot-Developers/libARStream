@@ -40,7 +40,7 @@
 
 #include <libARStream/ARSTREAM_Error.h>
 
-char* ARSTREAM_Error_ToString (eARSTREAM_ERROR error)
+const char* ARSTREAM_Error_ToString (eARSTREAM_ERROR error)
 {
     switch (error)
     {
@@ -63,7 +63,6 @@ char* ARSTREAM_Error_ToString (eARSTREAM_ERROR error)
         return "Frame queue is full";
         break;
     default:
-        return "Unknown value";
         break;
     }
     return "Unknown value";

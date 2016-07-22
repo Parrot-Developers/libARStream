@@ -73,6 +73,6 @@ typedef enum {
  *
  * @note User should NEVER try to modify a returned string
  */
-char* ARSTREAM_Error_ToString (eARSTREAM_ERROR error);
+const char* ARSTREAM_Error_ToString (eARSTREAM_ERROR error);
 
 #endif /* _ARSTREAM_ERROR_H_ */

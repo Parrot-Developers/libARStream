@@ -579,7 +579,7 @@ ARSTREAM_Sender2_t* ARSTREAM_Sender2_New(ARSTREAM_Sender2_Config_t *config, eARS
         retSender->naluCallbackUserPtr = config->naluCallbackUserPtr;
         retSender->naluFifoSize = (config->naluFifoSize > 0) ? config->naluFifoSize : ARSTREAM_SENDER2_DEFAULT_NALU_FIFO_SIZE;
         retSender->maxPacketSize = (config->maxPacketSize > 0) ? config->maxPacketSize - sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t) - ARSTREAM_NETWORK_UDP_HEADER_SIZE - ARSTREAM_NETWORK_IP_HEADER_SIZE : ARSTREAM_NETWORK_MAX_RTP_PAYLOAD_SIZE;
-        retSender->targetPacketSize = (config->targetPacketSize > 0) ? config->targetPacketSize - sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t) - ARSTREAM_NETWORK_UDP_HEADER_SIZE - ARSTREAM_NETWORK_IP_HEADER_SIZE : retSender->maxPacketSize;
+        retSender->targetPacketSize = (config->targetPacketSize > 0) ? config->targetPacketSize - (int)sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t) - ARSTREAM_NETWORK_UDP_HEADER_SIZE - ARSTREAM_NETWORK_IP_HEADER_SIZE : retSender->maxPacketSize;
         retSender->maxBitrate = (config->maxBitrate > 0) ? config->maxBitrate : 0;
         retSender->maxLatencyMs = (config->maxLatencyMs > 0) ? config->maxLatencyMs : 0;
         retSender->maxNetworkLatencyMs = (config->maxNetworkLatencyMs > 0) ? config->maxNetworkLatencyMs : 0;
@@ -1292,11 +1292,11 @@ static int ARSTREAM_Sender2_SendData(ARSTREAM_Sender2_t *sender, uint8_t *sendBu
     struct timespec t1;
     ARSAL_Time_GetTime(&t1);
     uint64_t curTime = (uint64_t)t1.tv_sec * 1000000 + (uint64_t)t1.tv_nsec / 1000;
-    if ((maxLatencyUs > 0) && (curTime - auTimestamp > maxLatencyUs))
+    if ((maxLatencyUs > 0) && (curTime - auTimestamp > (uint64_t)maxLatencyUs))
     {
         totalLatencyDrop = 1;
     }
-    else if ((maxNetworkLatencyUs > 0) && (curTime - inputTimestamp > maxNetworkLatencyUs))
+    else if ((maxNetworkLatencyUs > 0) && (curTime - inputTimestamp > (uint64_t)maxNetworkLatencyUs))
     {
         networkLatencyDrop = 1;
     }
@@ -1345,11 +1345,11 @@ static int ARSTREAM_Sender2_SendData(ARSTREAM_Sender2_t *sender, uint8_t *sendBu
                     {
                         ARSAL_Time_GetTime(&t1);
                         curTime = (uint64_t)t1.tv_sec * 1000000 + (uint64_t)t1.tv_nsec / 1000;
-                        if ((maxLatencyUs > 0) && (curTime - auTimestamp > maxLatencyUs))
+                        if ((maxLatencyUs > 0) && (curTime - auTimestamp > (uint64_t)maxLatencyUs))
                         {
                             totalLatencyDrop = 1;
                         }
-                        else if ((maxNetworkLatencyUs > 0) && (curTime - inputTimestamp > maxNetworkLatencyUs))
+                        else if ((maxNetworkLatencyUs > 0) && (curTime - inputTimestamp > (uint64_t)maxNetworkLatencyUs))
                         {
                             networkLatencyDrop = 1;
                         }
@@ -1543,11 +1543,11 @@ void* ARSTREAM_Sender2_RunStreamThread (void *ARSTREAM_Sender2_t_Param)
 
             /* check that the NALU is not older than the max latency */
             totalLatencyDrop = networkLatencyDrop = 0;
-            if ((maxLatencyUs > 0) && (curTime - nalu.auTimestamp > maxLatencyUs))
+            if ((maxLatencyUs > 0) && (curTime - nalu.auTimestamp > (uint64_t)maxLatencyUs))
             {
                 totalLatencyDrop = 1;
             }
-            else if ((maxNetworkLatencyUs > 0) && (curTime - nalu.naluInputTimestamp > maxNetworkLatencyUs))
+            else if ((maxNetworkLatencyUs > 0) && (curTime - nalu.naluInputTimestamp > (uint64_t)maxNetworkLatencyUs))
             {
                 networkLatencyDrop = 1;
             }
@@ -1559,7 +1559,7 @@ void* ARSTREAM_Sender2_RunStreamThread (void *ARSTREAM_Sender2_t_Param)
                 fragmentCount = (nalu.naluSize + targetPacketSize / 2) / targetPacketSize;
                 if (fragmentCount < 1) fragmentCount = 1;
 
-                if ((fragmentCount > 1) || (nalu.naluSize > maxPacketSize))
+                if ((fragmentCount > 1) || (nalu.naluSize > (uint32_t)maxPacketSize))
                 {
                     /* Fragmentation (FU-A) */
 
@@ -1583,7 +1583,7 @@ void* ARSTREAM_Sender2_RunStreamThread (void *ARSTREAM_Sender2_t_Param)
 
                     for (i = 0, offset = 1; i < fragmentCount; i++)
                     {
-                        fragmentSize = (i == fragmentCount - 1) ? nalu.naluSize - offset : meanFragmentSize;
+                        fragmentSize = (i == fragmentCount - 1) ? (int)nalu.naluSize - offset : meanFragmentSize;
                         fragmentOffset = 0;
                         do
                         {
@@ -1614,8 +1614,8 @@ void* ARSTREAM_Sender2_RunStreamThread (void *ARSTREAM_Sender2_t_Param)
                 }
                 else
                 {
-                    int stapSize = nalu.naluSize + 2 + ((!stapPending) ? sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t) + 1 : 0);
-                    if ((sendSize + stapSize >= maxPacketSize) || (sendSize + stapSize > targetPacketSize) || (nalu.seqNumForcedDiscontinuity))
+                    uint32_t stapSize = nalu.naluSize + 2 + ((!stapPending) ? sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t) + 1 : 0);
+                    if ((sendSize + stapSize >= (uint32_t)maxPacketSize) || (sendSize + stapSize > (uint32_t)targetPacketSize) || (nalu.seqNumForcedDiscontinuity))
                     {
                         if (stapPending)
                         {
@@ -1630,7 +1630,7 @@ void* ARSTREAM_Sender2_RunStreamThread (void *ARSTREAM_Sender2_t_Param)
                         }
                     }
 
-                    if ((sendSize + stapSize >= maxPacketSize) || (sendSize + stapSize > targetPacketSize))
+                    if ((sendSize + stapSize >= (uint32_t)maxPacketSize) || (sendSize + stapSize > (uint32_t)targetPacketSize))
                     {
                         /* Single NAL unit */
                         memcpy(sendBuffer + sizeof(ARSTREAM_NetworkHeaders_DataHeader2_t), nalu.naluBuffer, nalu.naluSize);

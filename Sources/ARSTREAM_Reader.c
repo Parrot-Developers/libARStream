@@ -440,8 +440,8 @@ void* ARSTREAM_Reader_RunDataThread (void *ARSTREAM_Reader_t_Param)
                 }
             }
 
-            while (((endIndex > reader->currentFrameBufferSize) ||
-                    (filterEndIndex > reader->outputFrameBufferSize)) &&
+            while ((((uint32_t)endIndex > reader->currentFrameBufferSize) ||
+                    ((uint32_t)filterEndIndex > reader->outputFrameBufferSize)) &&
                    (skipCurrentFrame == 0) &&
                    (packetWasAlreadyAck == 0))
             {
@@ -466,11 +466,11 @@ void* ARSTREAM_Reader_RunDataThread (void *ARSTREAM_Reader_t_Param)
                     }
 
                     // Resize actual output buffer if needed
-                    if (finalOutputSize > reader->outputFrameBufferSize)
+                    if ((uint32_t)finalOutputSize > reader->outputFrameBufferSize)
                     {
-                        int newOutputSize = finalOutputSize;
+                        uint32_t newOutputSize = finalOutputSize;
                         uint8_t *tmpFrame = reader->callback (ARSTREAM_READER_CAUSE_FRAME_TOO_SMALL, reader->outputFrameBuffer, reader->currentFrameSize, 0, 0, &newOutputSize, reader->custom);
-                        if (newOutputSize < finalOutputSize)
+                        if (newOutputSize < (uint32_t)finalOutputSize)
                         {
                             skipCurrentFrame = 1;
                         }
@@ -519,7 +519,7 @@ void* ARSTREAM_Reader_RunDataThread (void *ARSTREAM_Reader_t_Param)
                     memcpy (&(reader->currentFrameBuffer)[cpIndex], &recvData[sizeof (ARSTREAM_NetworkHeaders_DataHeader_t)], recvSize - sizeof (ARSTREAM_NetworkHeaders_DataHeader_t));
                 }
 
-                if (endIndex > reader->currentFrameSize)
+                if ((uint32_t)endIndex > reader->currentFrameSize)
                 {
                     reader->currentFrameSize = endIndex;
                 }
