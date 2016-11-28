@@ -280,8 +280,8 @@ static void ARSTREAM_NetworkHeaders_InternalAckPacketDump (const char *prefix, A
     else
     {
         ARSAL_PRINT (level, ARSTREAM_NETWORK_HEADERS_TAG, " - Frame number : %d", packet->frameNumber);
-        ARSAL_PRINT (level, ARSTREAM_NETWORK_HEADERS_TAG, " - HI 64 bits : %016llX", packet->highPacketsAck);
-        ARSAL_PRINT (level, ARSTREAM_NETWORK_HEADERS_TAG, " - LO 64 bits : %016llX", packet->lowPacketsAck);
+        ARSAL_PRINT (level, ARSTREAM_NETWORK_HEADERS_TAG, " - HI 64 bits : %016" PRIu64, packet->highPacketsAck);
+        ARSAL_PRINT (level, ARSTREAM_NETWORK_HEADERS_TAG, " - LO 64 bits : %016" PRIu64, packet->lowPacketsAck);
     }
 }
 
