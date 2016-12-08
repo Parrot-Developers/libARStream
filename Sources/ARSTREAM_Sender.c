@@ -1073,7 +1073,7 @@ void* ARSTREAM_Sender_RunAckThread (void *ARSTREAM_Sender_t_Param)
         }
         else if (recvSize != sizeof (recvPacket))
         {
-            ARSAL_PRINT (ARSAL_PRINT_ERROR, ARSTREAM_SENDER_TAG, "Read %d octets, expected %d", recvSize, sizeof (recvPacket));
+            ARSAL_PRINT (ARSAL_PRINT_ERROR, ARSTREAM_SENDER_TAG, "Read %d octets, expected %zu", recvSize, sizeof (recvPacket));
         }
         else
         {
