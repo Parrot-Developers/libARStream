@@ -875,7 +875,12 @@ void* ARSTREAM_Sender_RunDataThread (void *ARSTREAM_Sender_t_Param)
     int numbersOfFragmentsSentForCurrentFrame = 0;
     uint32_t lastFragmentSize = 0;
     ARSTREAM_NetworkHeaders_DataHeader_t *header = NULL;
-    ARSTREAM_Sender_Frame_t nextFrame = {0};
+    ARSTREAM_Sender_Frame_t nextFrame = {
+        .frameNumber = 0,
+        .frameSize = 0,
+        .frameBuffer = NULL,
+        .isHighPriority = 0
+    };
     int firstFrame = 1;
 
     /* Parameters check */
