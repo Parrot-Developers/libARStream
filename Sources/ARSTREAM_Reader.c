@@ -612,7 +612,11 @@ void* ARSTREAM_Reader_RunDataThread (void *ARSTREAM_Reader_t_Param)
 
 void* ARSTREAM_Reader_RunAckThread (void *ARSTREAM_Reader_t_Param)
 {
-    ARSTREAM_NetworkHeaders_AckPacket_t sendPacket = {0};
+    ARSTREAM_NetworkHeaders_AckPacket_t sendPacket = {
+        .frameNumber = 0,
+        .highPacketsAck = 0,
+        .lowPacketsAck = 0
+    };
     ARSTREAM_Reader_t *reader = (ARSTREAM_Reader_t *)ARSTREAM_Reader_t_Param;
     memset(&sendPacket, 0, sizeof(sendPacket));
 
